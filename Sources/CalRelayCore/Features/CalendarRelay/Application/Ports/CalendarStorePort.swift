@@ -1,6 +1,6 @@
 import Foundation
 
-protocol CalendarStorePort: Sendable {
+public protocol CalendarStorePort: Sendable {
     func listCalendars() async throws -> [CalendarSnapshot]
 
     func events(
