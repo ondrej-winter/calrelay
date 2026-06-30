@@ -20,6 +20,9 @@ struct CalRelayContractTests {
         try testVisibleEventKeysRemainDistinctForAdjacentMeetings()
         try testProjectsIncludedWorkEventToHub()
         try testDoesNotProjectExcludedWorkEventToHub()
+        try testProjectsPrefixedHubEventToOtherWorkCalendars()
+        try testProjectsUnprefixedHubEventToAllWorkCalendarsWithPersonalPrefix()
+        try testProjectsRemotePrefixedHubEventToLocalWorkCalendars()
 
         print("CalRelay contract tests passed")
     }
@@ -219,6 +222,57 @@ struct CalRelayContractTests {
         try expect(projections.isEmpty, "Excluded source events should not produce hub projections")
     }
 
+    private static func testProjectsPrefixedHubEventToOtherWorkCalendars() throws {
+        let hubEvent = eventSnapshot(
+            calendar: CalendarReference(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
+            title: "[ACME] Client Planning"
+        )
+
+        let projections = HubToWorkProjector.project(
+            hubEvents: [hubEvent],
+            to: workCalendarTargets(),
+            personalPrefix: "[ME]"
+        )
+
+        try expect(projections.count == 2, "Expected prefixed hub event to project to non-source work calendars")
+        try expect(!projections.contains { $0.destinationCalendar.title == "ACME Work" }, "Prefixed hub event should not route back to matching source calendar")
+        try expect(projections.contains { $0.destinationCalendar.title == "BETA Work" && $0.title == "[ACME] Client Planning" }, "Prefixed hub event should route to BETA unchanged")
+        try expect(projections.contains { $0.destinationCalendar.title == "CONTOSO Work" && $0.title == "[ACME] Client Planning" }, "Prefixed hub event should route to CONTOSO unchanged")
+    }
+
+    private static func testProjectsUnprefixedHubEventToAllWorkCalendarsWithPersonalPrefix() throws {
+        let hubEvent = eventSnapshot(
+            calendar: CalendarReference(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
+            title: "Dentist"
+        )
+
+        let projections = HubToWorkProjector.project(
+            hubEvents: [hubEvent],
+            to: workCalendarTargets(),
+            personalPrefix: "[ME]"
+        )
+
+        try expect(projections.count == 3, "Expected unprefixed hub event to project to all work calendars")
+        try expect(projections.allSatisfy { $0.title == "[ME] Dentist" }, "Unprefixed hub event should use personal prefix")
+    }
+
+    private static func testProjectsRemotePrefixedHubEventToLocalWorkCalendars() throws {
+        let hubEvent = eventSnapshot(
+            calendar: CalendarReference(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
+            title: "[BETA] Sales Call"
+        )
+
+        let projections = HubToWorkProjector.project(
+            hubEvents: [hubEvent],
+            to: [workCalendarTarget(name: "ACME", prefix: "[ACME]", calendarID: "acme-1", calendarTitle: "ACME Work")],
+            personalPrefix: "[ME]"
+        )
+
+        try expect(projections.count == 1, "Expected remote prefixed hub event to project to local work calendar")
+        try expect(projections[0].destinationCalendar.title == "ACME Work", "Remote prefixed hub event should target locally configured work calendar")
+        try expect(projections[0].title == "[BETA] Sales Call", "Remote prefixed hub event should preserve remote prefix")
+    }
+
     private static func validSettings(
         hubCalendar: CalendarSelector = CalendarSelector(sourceTitle: "iCloud", calendarTitle: "Personal Work"),
         personalPrefix: String = "[ME]",
@@ -266,6 +320,30 @@ struct CalRelayContractTests {
             name: "ACME",
             prefix: "[ACME]",
             calendar: CalendarSelector(sourceTitle: "Google", calendarTitle: "ACME Work")
+        )
+    }
+
+    private static func workCalendarTargets() -> [WorkCalendarProjectionTarget] {
+        [
+            workCalendarTarget(name: "ACME", prefix: "[ACME]", calendarID: "acme-1", calendarTitle: "ACME Work"),
+            workCalendarTarget(name: "BETA", prefix: "[BETA]", calendarID: "beta-1", calendarTitle: "BETA Work"),
+            workCalendarTarget(name: "CONTOSO", prefix: "[CONTOSO]", calendarID: "contoso-1", calendarTitle: "CONTOSO Work")
+        ]
+    }
+
+    private static func workCalendarTarget(
+        name: String,
+        prefix: String,
+        calendarID: String,
+        calendarTitle: String
+    ) -> WorkCalendarProjectionTarget {
+        WorkCalendarProjectionTarget(
+            settings: WorkCalendarSettings(
+                name: name,
+                prefix: prefix,
+                calendar: CalendarSelector(sourceTitle: "Google", calendarTitle: calendarTitle)
+            ),
+            calendar: CalendarReference(id: calendarID, title: calendarTitle, sourceTitle: "Google")
         )
     }
 

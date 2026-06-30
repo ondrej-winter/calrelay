@@ -213,14 +213,14 @@ SwiftPM executable/package skeleton
 
 **Acceptance criteria:**
 
-- [ ] `[ACME] Client Planning` in the hub routes to BETA/CONTOSO but not ACME.
-- [ ] Unprefixed hub event `Dentist` routes to all configured work calendars as `[ME] Dentist`.
-- [ ] Remote/unknown prefixed hub events can route into locally configured work calendars but are not treated as hub events this machine may delete.
+- [x] `[ACME] Client Planning` in the hub routes to BETA/CONTOSO but not ACME.
+- [x] Unprefixed hub event `Dentist` routes to all configured work calendars as `[ME] Dentist`.
+- [x] Remote/unknown prefixed hub events can route into locally configured work calendars but are not treated as hub events this machine may delete.
 
 **Verification:**
 
-- [ ] Focused domain tests for prefixed hub routing, unprefixed hub routing, and remote-prefixed blockers.
-- [ ] `swift test`
+- [x] Focused domain tests for prefixed hub routing, unprefixed hub routing, and remote-prefixed blockers.
+- [x] `swift test`
 
 **Dependencies:** Task 4
 
