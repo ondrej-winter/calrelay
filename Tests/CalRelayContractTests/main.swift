@@ -4,7 +4,7 @@ import Foundation
 
 @main
 struct CalRelayContractTests {
-    static func main() throws {
+    static func main() async throws {
         try testAcceptsValidSettings()
         try testRejectsMissingWorkCalendars()
         try testRejectsEmptyHubSelectorFields()
@@ -34,6 +34,12 @@ struct CalRelayContractTests {
         try testDefaultsSyncWindowDaysWhenOmitted()
         try testReportsSafeYAMLShapeErrors()
         try testReportsSettingsValidationErrorsFromYAML()
+        try await testDryRunPlansChangesWithoutMutatingCalendarStore()
+        try await testRejectsMissingCalendarSelectorDuringReconciliation()
+        try await testRejectsAmbiguousCalendarSelectorDuringReconciliation()
+        try await testApplyRejectsReadOnlyDestinationBeforeMutation()
+        try await testApplyCreatesAndDeletesPlannedChanges()
+        try await testReconciliationPropagatesCancellation()
 
         print("CalRelay contract tests passed")
     }
@@ -426,6 +432,114 @@ struct CalRelayContractTests {
         throw ContractTestFailure("Expected settings validation error")
     }
 
+    private static func testDryRunPlansChangesWithoutMutatingCalendarStore() async throws {
+        let fixtures = applicationFixtures()
+        let store = FakeCalendarStore(
+            calendars: [fixtures.hubCalendar, fixtures.workCalendar],
+            eventsByCalendarID: [fixtures.workCalendar.id: [fixtures.workEvent]]
+        )
+        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+
+        let plan = try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now)
+        let createdEvents = await store.createdEvents()
+        let deletedEvents = await store.deletedEvents()
+
+        try expect(plan.creates == [fixtures.expectedHubProjection], "Dry-run should plan missing hub projection")
+        try expect(plan.deletes.isEmpty, "Dry-run should not plan deletes for this scenario")
+        try expect(createdEvents.isEmpty, "Dry-run should not create events")
+        try expect(deletedEvents.isEmpty, "Dry-run should not delete events")
+    }
+
+    private static func testRejectsMissingCalendarSelectorDuringReconciliation() async throws {
+        let fixtures = applicationFixtures()
+        let store = FakeCalendarStore(calendars: [fixtures.workCalendar])
+        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+
+        try await expectReconciliationError(
+            .calendarNotFound(fixtures.settings.hubCalendar),
+            from: { try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now) }
+        )
+    }
+
+    private static func testRejectsAmbiguousCalendarSelectorDuringReconciliation() async throws {
+        let fixtures = applicationFixtures()
+        let duplicateHub = CalendarSnapshot(
+            id: "hub-duplicate",
+            title: fixtures.hubCalendar.title,
+            sourceTitle: fixtures.hubCalendar.sourceTitle,
+            isWritable: true
+        )
+        let store = FakeCalendarStore(calendars: [fixtures.hubCalendar, duplicateHub, fixtures.workCalendar])
+        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+
+        try await expectReconciliationError(
+            .calendarAmbiguous(fixtures.settings.hubCalendar),
+            from: { try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now) }
+        )
+    }
+
+    private static func testApplyRejectsReadOnlyDestinationBeforeMutation() async throws {
+        let fixtures = applicationFixtures(hubIsWritable: false)
+        let store = FakeCalendarStore(
+            calendars: [fixtures.hubCalendar, fixtures.workCalendar],
+            eventsByCalendarID: [fixtures.workCalendar.id: [fixtures.workEvent]]
+        )
+        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+
+        try await expectReconciliationError(
+            .calendarReadOnly(fixtures.hubReference),
+            from: { try await useCase.apply(settings: fixtures.settings, now: fixtures.now) }
+        )
+
+        try expect((await store.createdEvents()).isEmpty, "Read-only apply should not create events")
+        try expect((await store.deletedEvents()).isEmpty, "Read-only apply should not delete events")
+    }
+
+    private static func testApplyCreatesAndDeletesPlannedChanges() async throws {
+        let fixtures = applicationFixtures()
+        let staleHubProjection = eventSnapshot(
+            id: "hub-stale-1",
+            calendar: fixtures.hubReference,
+            title: "[ACME] Old Planning"
+        )
+        let store = FakeCalendarStore(
+            calendars: [fixtures.hubCalendar, fixtures.workCalendar],
+            eventsByCalendarID: [
+                fixtures.hubCalendar.id: [staleHubProjection],
+                fixtures.workCalendar.id: [fixtures.workEvent]
+            ]
+        )
+        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+
+        let plan = try await useCase.apply(settings: fixtures.settings, now: fixtures.now)
+
+        try expect(plan.creates == [fixtures.expectedHubProjection], "Apply should return planned create")
+        try expect(plan.deletes == [staleHubProjection], "Apply should return planned delete")
+        try expect(await store.createdEvents() == [fixtures.expectedHubProjection], "Apply should create planned projections")
+        try expect(await store.deletedEvents() == [staleHubProjection], "Apply should delete stale managed projections")
+    }
+
+    private static func testReconciliationPropagatesCancellation() async throws {
+        let fixtures = applicationFixtures()
+        let store = FakeCalendarStore(calendars: [fixtures.hubCalendar, fixtures.workCalendar])
+        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+
+        let task = Task {
+            try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now)
+        }
+        task.cancel()
+
+        do {
+            _ = try await task.value
+        } catch is CancellationError {
+            return
+        } catch {
+            throw ContractTestFailure("Expected CancellationError, got \(error)")
+        }
+
+        throw ContractTestFailure("Expected reconciliation cancellation to propagate")
+    }
+
     private static func validSettings(
         hubCalendar: CalendarSelector = CalendarSelector(sourceTitle: "iCloud", calendarTitle: "Personal Work"),
         personalPrefix: String = "[ME]",
@@ -533,6 +647,50 @@ struct CalRelayContractTests {
         """
     }
 
+    private static func applicationFixtures(hubIsWritable: Bool = true) -> ApplicationFixtures {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let hubCalendar = CalendarSnapshot(
+            id: "hub-1",
+            title: "Personal Work",
+            sourceTitle: "iCloud",
+            isWritable: hubIsWritable
+        )
+        let workCalendar = CalendarSnapshot(
+            id: "acme-1",
+            title: "ACME Work",
+            sourceTitle: "Google",
+            isWritable: true
+        )
+        let hubReference = CalendarReference(id: hubCalendar.id, title: hubCalendar.title, sourceTitle: hubCalendar.sourceTitle)
+        let workReference = CalendarReference(id: workCalendar.id, title: workCalendar.title, sourceTitle: workCalendar.sourceTitle)
+        let workEvent = eventSnapshot(
+            id: "acme-source-1",
+            calendar: workReference,
+            title: "Client Planning",
+            start: Date(timeIntervalSince1970: 11_000),
+            end: Date(timeIntervalSince1970: 12_000)
+        )
+        let settings = validSettings()
+        let expectedHubProjection = ProjectedEvent(
+            destinationCalendar: hubReference,
+            title: "[ACME] Client Planning",
+            start: workEvent.start,
+            end: workEvent.end,
+            isAllDay: workEvent.isAllDay
+        )
+
+        return ApplicationFixtures(
+            now: now,
+            settings: settings,
+            hubCalendar: hubCalendar,
+            hubReference: hubReference,
+            workCalendar: workCalendar,
+            workReference: workReference,
+            workEvent: workEvent,
+            expectedHubProjection: expectedHubProjection
+        )
+    }
+
     private static func expectValidationError(
         _ expectedError: SettingsValidationError,
         for settings: CalendarRelaySettings
@@ -551,10 +709,82 @@ struct CalRelayContractTests {
         throw ContractTestFailure("Expected validation error: \(expectedError)")
     }
 
+    private static func expectReconciliationError(
+        _ expectedError: ReconcileCalendarsError,
+        from operation: () async throws -> ReconciliationPlan
+    ) async throws {
+        do {
+            _ = try await operation()
+        } catch let error as ReconcileCalendarsError {
+            guard error == expectedError else {
+                throw ContractTestFailure("Expected \(expectedError), got \(error)")
+            }
+            return
+        } catch {
+            throw ContractTestFailure("Expected ReconcileCalendarsError, got \(error)")
+        }
+
+        throw ContractTestFailure("Expected reconciliation error: \(expectedError)")
+    }
+
     private static func expect(_ condition: Bool, _ message: String) throws {
         guard condition else {
             throw ContractTestFailure(message)
         }
+    }
+}
+
+private struct ApplicationFixtures {
+    let now: Date
+    let settings: CalendarRelaySettings
+    let hubCalendar: CalendarSnapshot
+    let hubReference: CalendarReference
+    let workCalendar: CalendarSnapshot
+    let workReference: CalendarReference
+    let workEvent: EventSnapshot
+    let expectedHubProjection: ProjectedEvent
+}
+
+private actor FakeCalendarStore: CalendarStorePort {
+    private let calendars: [CalendarSnapshot]
+    private let eventsByCalendarID: [String: [EventSnapshot]]
+    private var recordedCreates: [ProjectedEvent] = []
+    private var recordedDeletes: [EventSnapshot] = []
+
+    init(
+        calendars: [CalendarSnapshot],
+        eventsByCalendarID: [String: [EventSnapshot]] = [:]
+    ) {
+        self.calendars = calendars
+        self.eventsByCalendarID = eventsByCalendarID
+    }
+
+    func listCalendars() async throws -> [CalendarSnapshot] {
+        calendars
+    }
+
+    func events(
+        in calendar: CalendarReference,
+        from start: Date,
+        to end: Date
+    ) async throws -> [EventSnapshot] {
+        eventsByCalendarID[calendar.id, default: []]
+    }
+
+    func createEvent(_ event: ProjectedEvent) async throws {
+        recordedCreates.append(event)
+    }
+
+    func deleteEvent(_ event: EventSnapshot) async throws {
+        recordedDeletes.append(event)
+    }
+
+    func createdEvents() -> [ProjectedEvent] {
+        recordedCreates
+    }
+
+    func deletedEvents() -> [EventSnapshot] {
+        recordedDeletes
     }
 }
 

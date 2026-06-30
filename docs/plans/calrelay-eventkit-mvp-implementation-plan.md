@@ -302,17 +302,17 @@ SwiftPM executable/package skeleton
 
 **Acceptance criteria:**
 
-- [ ] Dry-run use case reads calendars/events and returns a reconciliation plan without calling mutation methods.
-- [ ] Calendar selectors that match zero calendars are rejected.
-- [ ] Calendar selectors that match multiple calendars are rejected.
-- [ ] Apply use case validates settings and calendar writability before mutation.
-- [ ] Apply use case creates missing projections and deletes stale safe projections via the outbound port.
-- [ ] Cancellation can propagate through async operations.
+- [x] Dry-run use case reads calendars/events and returns a reconciliation plan without calling mutation methods.
+- [x] Calendar selectors that match zero calendars are rejected.
+- [x] Calendar selectors that match multiple calendars are rejected.
+- [x] Apply use case validates settings and calendar writability before mutation.
+- [x] Apply use case creates missing projections and deletes stale safe projections via the outbound port.
+- [x] Cancellation can propagate through async operations.
 
 **Verification:**
 
-- [ ] Application tests with fake calendar port prove dry-run does not mutate and apply mutates only planned changes.
-- [ ] `swift test`
+- [x] Application tests with fake calendar port prove dry-run does not mutate and apply mutates only planned changes.
+- [x] `swift test`
 
 **Dependencies:** Tasks 3 and 7
 
