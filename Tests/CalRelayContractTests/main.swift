@@ -43,6 +43,7 @@ struct CalRelayContractTests {
         try testFormatsEmptyReconciliationPlan()
         try testFormatsPlannedCreatesAndDeletes()
         try testReconciliationPlanOutputAvoidsDebugDumps()
+        try testFormatsCalendarList()
 
         print("CalRelay contract tests passed")
     }
@@ -581,6 +582,20 @@ struct CalRelayContractTests {
 
         try expect(!output.contains("ProjectedEvent("), "Output should not expose Swift debug dumps")
         try expect(!output.contains("CalendarReference("), "Output should not expose Swift type internals")
+    }
+
+    private static func testFormatsCalendarList() throws {
+        let output = CalendarListFormatter.format([
+            CalendarSnapshot(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: true),
+            CalendarSnapshot(id: "readonly-1", title: "Shared Holidays", sourceTitle: "Subscribed", isWritable: false)
+        ])
+
+        try expect(output.contains("Calendars (2)"), "Calendar output should summarize count")
+        try expect(output.contains("iCloud / Personal Work"), "Calendar output should include source/title selector")
+        try expect(output.contains("id: hub-1"), "Calendar output should include IDs for troubleshooting")
+        try expect(output.contains("writable"), "Calendar output should show writable state")
+        try expect(output.contains("read-only"), "Calendar output should show read-only state")
+        try expect(!output.contains("CalendarSnapshot("), "Calendar output should not expose Swift debug dumps")
     }
 
     private static func validSettings(

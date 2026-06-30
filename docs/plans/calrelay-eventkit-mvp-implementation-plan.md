@@ -367,17 +367,17 @@ SwiftPM executable/package skeleton
 
 **Acceptance criteria:**
 
-- [ ] EventKit imports are limited to `Adapters/Outbound/EventKit/...`.
-- [ ] EventKit permission handling uses the macOS 26+ API baseline and remains isolated inside the EventKit adapter.
-- [ ] `calrelay calendars` requests/handles calendar permission at the platform boundary.
-- [ ] Calendar output includes calendar ID, title, source/account information, and writability.
-- [ ] Permission denied/revoked/unavailable states fail safely with clear messages.
+ - [x] EventKit imports are limited to `Adapters/Outbound/EventKit/...`.
+ - [x] EventKit permission handling uses the macOS 26+ API baseline and remains isolated inside the EventKit adapter.
+ - [x] `calrelay calendars` requests/handles calendar permission at the platform boundary.
+ - [x] Calendar output includes calendar ID, title, source/account information, and writability.
+ - [x] Permission denied/revoked/unavailable states fail safely with clear messages.
 
 **Verification:**
 
-- [ ] `swift build`
-- [ ] `swift test`
-- [ ] Manual: `swift run calrelay calendars` on macOS with Apple Calendar available.
+ - [x] `swift build`
+ - [x] `swift run CalRelayContractTests`
+ - [ ] Manual: `swift run calrelay calendars` on macOS with Apple Calendar available.
 
 **Dependencies:** Tasks 2 and 10
 

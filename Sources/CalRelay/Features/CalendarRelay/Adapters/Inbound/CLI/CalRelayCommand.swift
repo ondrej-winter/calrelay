@@ -3,7 +3,9 @@ import CalRelayAdapters
 import CalRelayCore
 import Foundation
 
-struct CalRelayCommand: ParsableCommand {
+@main
+@available(macOS 10.15, macCatalyst 13, iOS 13, tvOS 13, watchOS 6, *)
+struct CalRelayCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "calrelay",
         abstract: "Relay Apple Calendar availability blockers across configured calendars.",
@@ -12,14 +14,15 @@ struct CalRelayCommand: ParsableCommand {
     )
 }
 
-struct CalendarsCommand: ParsableCommand {
+struct CalendarsCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "calendars",
         abstract: "List visible calendars and their source/title selectors."
     )
 
-    func run() throws {
-        throw ValidationError("Calendar listing is not available until the EventKit adapter is configured.")
+    func run() async throws {
+        let calendars = try await EventKitCalendarStore().listCalendars()
+        print(CalendarListFormatter.format(calendars))
     }
 }
 
