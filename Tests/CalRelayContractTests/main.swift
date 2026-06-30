@@ -18,6 +18,8 @@ struct CalRelayContractTests {
         try testSkipsDeclinedEvents()
         try testSkipsCancelledEvents()
         try testVisibleEventKeysRemainDistinctForAdjacentMeetings()
+        try testProjectsIncludedWorkEventToHub()
+        try testDoesNotProjectExcludedWorkEventToHub()
 
         print("CalRelay contract tests passed")
     }
@@ -178,6 +180,45 @@ struct CalRelayContractTests {
         )
     }
 
+    private static func testProjectsIncludedWorkEventToHub() throws {
+        let hubCalendar = CalendarReference(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud")
+        let sourceEvent = eventSnapshot(
+            id: "acme-1",
+            calendar: CalendarReference(id: "acme-1", title: "ACME Work", sourceTitle: "Google"),
+            title: "Client Planning",
+            start: Date(timeIntervalSince1970: 1_000),
+            end: Date(timeIntervalSince1970: 2_000),
+            isAllDay: false,
+            availability: .busy,
+            status: .confirmed
+        )
+
+        let projections = WorkToHubProjector.project(
+            events: [sourceEvent],
+            from: workCalendarSettings(),
+            to: hubCalendar
+        )
+
+        try expect(projections.count == 1, "Expected one hub projection")
+        try expect(projections[0].destinationCalendar == hubCalendar, "Projection should target hub calendar")
+        try expect(projections[0].title == "[ACME] Client Planning", "Projection should prefix source title")
+        try expect(projections[0].start == sourceEvent.start, "Projection should copy start")
+        try expect(projections[0].end == sourceEvent.end, "Projection should copy end")
+        try expect(projections[0].isAllDay == sourceEvent.isAllDay, "Projection should copy all-day flag")
+    }
+
+    private static func testDoesNotProjectExcludedWorkEventToHub() throws {
+        let sourceEvent = eventSnapshot(isAllDay: true, availability: .busy, status: .confirmed)
+
+        let projections = WorkToHubProjector.project(
+            events: [sourceEvent],
+            from: workCalendarSettings(),
+            to: CalendarReference(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud")
+        )
+
+        try expect(projections.isEmpty, "Excluded source events should not produce hub projections")
+    }
+
     private static func validSettings(
         hubCalendar: CalendarSelector = CalendarSelector(sourceTitle: "iCloud", calendarTitle: "Personal Work"),
         personalPrefix: String = "[ME]",
@@ -217,6 +258,14 @@ struct CalRelayContractTests {
             isAllDay: isAllDay,
             availability: availability,
             status: status
+        )
+    }
+
+    private static func workCalendarSettings() -> WorkCalendarSettings {
+        WorkCalendarSettings(
+            name: "ACME",
+            prefix: "[ACME]",
+            calendar: CalendarSelector(sourceTitle: "Google", calendarTitle: "ACME Work")
         )
     }
 

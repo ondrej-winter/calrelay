@@ -77,15 +77,15 @@ SwiftPM executable/package skeleton
 
 **Acceptance criteria:**
 
-- [ ] `Package.swift` defines an executable product named `calrelay`.
-- [ ] `Package.swift` includes `swift-argument-parser` for CLI parsing.
-- [ ] `swift run calrelay --help` prints available commands/options and exits successfully.
-- [ ] Source directories follow the documented vertical-slice structure.
+- [x] `Package.swift` defines an executable product named `calrelay`.
+- [x] `Package.swift` includes `swift-argument-parser` for CLI parsing.
+- [x] `swift run calrelay --help` prints available commands/options and exits successfully.
+- [x] Source directories follow the documented vertical-slice structure.
 
 **Verification:**
 
-- [ ] `swift build`
-- [ ] `swift run calrelay --help`
+- [x] `swift build`
+- [x] `swift run calrelay --help`
 
 **Dependencies:** None
 
@@ -104,14 +104,14 @@ SwiftPM executable/package skeleton
 
 **Acceptance criteria:**
 
-- [ ] Application DTOs model calendars, sources/accounts, writability, event snapshots, settings, and reconciliation changes without importing EventKit.
-- [ ] Outbound calendar port exposes calendar listing, event reading, event creation, and managed-event deletion operations.
-- [ ] Settings DTO includes hub calendar selector, work calendar selectors, unique prefixes, personal prefix, and sync window days.
+- [x] Application DTOs model calendars, sources/accounts, writability, event snapshots, settings, and reconciliation changes without importing EventKit.
+- [x] Outbound calendar port exposes calendar listing, event reading, event creation, and managed-event deletion operations.
+- [x] Settings DTO includes hub calendar selector, work calendar selectors, unique prefixes, personal prefix, and sync window days.
 
 **Verification:**
 
-- [ ] `swift build`
-- [ ] DTO/port files compile without EventKit imports outside adapters.
+- [x] `swift build`
+- [x] DTO/port files compile without EventKit imports outside adapters.
 
 **Dependencies:** Task 1
 
@@ -128,16 +128,16 @@ SwiftPM executable/package skeleton
 
 **Acceptance criteria:**
 
-- [ ] Duplicate prefixes are rejected with user-actionable errors.
-- [ ] Missing hub/work calendar selectors are rejected.
-- [ ] Empty source/title selector fields are rejected.
-- [ ] Non-positive sync windows are rejected.
-- [ ] Validation errors do not expose private event contents or unnecessary path details.
+- [x] Duplicate prefixes are rejected with user-actionable errors.
+- [x] Missing hub/work calendar selectors are rejected.
+- [x] Empty source/title selector fields are rejected.
+- [x] Non-positive sync windows are rejected.
+- [x] Validation errors do not expose private event contents or unnecessary path details.
 
 **Verification:**
 
-- [ ] `swift test` with focused settings validation tests.
-- [ ] `swift build`
+- [x] `swift test` with focused settings validation tests.
+- [x] `swift build`
 
 **Dependencies:** Task 2
 
@@ -151,10 +151,10 @@ SwiftPM executable/package skeleton
 
 ### Checkpoint: Foundation
 
-- [ ] `swift build` passes.
-- [ ] `swift test` passes for initial DTO/settings validation tests.
-- [ ] No EventKit types appear in Domain/Application APIs.
-- [ ] `swift run calrelay --help` works.
+- [x] `swift build` passes.
+- [x] `swift test` passes for initial DTO/settings validation tests.
+- [x] No EventKit types appear in Domain/Application APIs.
+- [x] `swift run calrelay --help` works.
 
 ## Phase 2: Pure reconciliation core
 
@@ -164,15 +164,15 @@ SwiftPM executable/package skeleton
 
 **Acceptance criteria:**
 
-- [ ] Timed busy events are included.
-- [ ] Tentative timed events are included.
-- [ ] All-day, declined, and cancelled events are skipped.
-- [ ] Repeated titles and adjacent meetings remain distinct when start/end differ.
+- [x] Timed busy events are included.
+- [x] Tentative timed events are included.
+- [x] All-day, declined, and cancelled events are skipped.
+- [x] Repeated titles and adjacent meetings remain distinct when start/end differ.
 
 **Verification:**
 
-- [ ] Focused domain tests for inclusion and equality.
-- [ ] `swift test`
+- [x] Focused domain tests for inclusion and equality.
+- [x] `swift test`
 
 **Dependencies:** Task 2
 
@@ -189,14 +189,14 @@ SwiftPM executable/package skeleton
 
 **Acceptance criteria:**
 
-- [ ] `ACME: Client Planning` produces hub event `[ACME] Client Planning`.
-- [ ] Source events excluded by MVP inclusion rules do not produce projections.
-- [ ] Generated projections copy only title, start, end, all-day flag, and destination calendar.
+- [x] `ACME: Client Planning` produces hub event `[ACME] Client Planning`.
+- [x] Source events excluded by MVP inclusion rules do not produce projections.
+- [x] Generated projections copy only title, start, end, all-day flag, and destination calendar.
 
 **Verification:**
 
-- [ ] Focused domain tests for work-to-hub projection.
-- [ ] `swift test`
+- [x] Focused domain tests for work-to-hub projection.
+- [x] `swift test`
 
 **Dependencies:** Task 4
 
