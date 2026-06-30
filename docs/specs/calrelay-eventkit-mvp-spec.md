@@ -13,6 +13,7 @@ The MVP is for a single user who wants one personal Apple Calendar work calendar
 - `README.md` is intentionally minimal and should link to this spec as the canonical product/implementation definition.
 - Project rules prefer Swift Package Manager, hexagonal architecture, vertical feature slices, and adapters around EventKit/platform APIs.
 - Apple Calendar/EventKit is the integration surface: if a client calendar is visible and writable in Apple Calendar, CalRelay can participate.
+- The MVP targets macOS 26+.
 
 ## Desired behavior
 
@@ -147,19 +148,25 @@ Unknown prefixed events in work calendars are preserved by default unless a futu
 
 ### Initial configuration shape
 
-The initial configuration format is YAML. The implementation may use a SwiftPM YAML package such as `Yams` rather than hand-rolling a parser.
+The initial configuration format is YAML. The implementation uses `Yams` rather than hand-rolling a parser.
 
-Example single-work-calendar configuration:
+Example single-work-calendar configuration using source/title selectors:
 
 ```yaml
-hubCalendarID: "EVENTKIT-HUB-ID"
+hubCalendar:
+  sourceTitle: "iCloud"
+  calendarTitle: "Personal Work"
 personalPrefix: "[ME]"
 syncWindowDays: 60
 workCalendars:
-  - id: "EVENTKIT-ACME-ID"
-    name: "ACME"
+  - name: "ACME"
     prefix: "[ACME]"
+    calendar:
+      sourceTitle: "Google"
+      calendarTitle: "ACME Work"
 ```
+
+Calendar selection is by source/title selector for the MVP. EventKit calendar IDs may be displayed by the calendar listing command for troubleshooting, but they are not the canonical configuration key.
 
 The executable command name is `calrelay`.
 
@@ -196,6 +203,9 @@ Initial commands once the SwiftPM package exists:
 - Keep reconciliation logic pure and unit-testable.
 - Keep configuration loading, parsing, defaulting, and validation in adapters or bootstrap code before constructing application services.
 - Use YAML for initial configuration and document any YAML parser dependency.
+- Use source/title selectors as the MVP calendar configuration model rather than EventKit ID-only configuration.
+- Use `swift-argument-parser` for CLI command parsing rather than maintaining custom parsing logic.
+- Target macOS 26+ and keep EventKit permission APIs isolated inside the EventKit adapter.
 - Pass validated settings into application use cases as explicit DTOs.
 - Prefer Swift structured concurrency for asynchronous workflows.
 - Default to dry-run unless `--apply` is passed.
@@ -230,7 +240,8 @@ Use fakes for calendar repository/EventKit ports in domain and application tests
 
 ## Boundaries
 
-- Always: validate calendar identifiers/names and prefix uniqueness before apply mode.
+- Always: statically validate required selectors, prefix uniqueness, personal-prefix conflicts, and sync-window values before reconciliation.
+- Always: resolve selectors against visible EventKit calendars and validate apply-mode writability before mutation.
 - Always: fail safely when calendar permissions are unavailable, denied, revoked, or a target calendar is read-only.
 - Always: mutate only calendars configured for the current run.
 - Always: map EventKit framework types into application DTOs at the adapter boundary.
@@ -257,10 +268,10 @@ Use fakes for calendar repository/EventKit ports in domain and application tests
 
 ## Open questions
 
-- Should MVP configuration identify calendars by EventKit calendar ID, title, source/title combination, or another stable selector?
+- Are source/title selectors stable enough across the user's Apple Calendar accounts, or will a fallback ID selector be needed later?
 - Should all-day, declined, and cancelled event handling remain hard-coded for MVP or become configurable from day one?
 - Should tentative timed events remain included by default after real-world testing?
-- Which YAML parser dependency should be used, or should the project avoid a third-party YAML parser?
+- Which exact `Yams` and `swift-argument-parser` versions should be pinned after the SwiftPM package is created?
 - Can EventKit reliably expose recurring occurrences as ordinary visible event snapshots inside the sync window?
 - Is the 60-day default sync window sufficient, or should the first implementation require explicit configuration?
 

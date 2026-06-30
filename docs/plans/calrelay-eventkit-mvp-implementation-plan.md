@@ -15,8 +15,10 @@ This plan breaks the accepted MVP spec in `docs/specs/calrelay-eventkit-mvp-spec
 - Keep configuration loading/parsing/defaulting at adapter/bootstrap boundaries.
 - Use YAML for configuration.
 - Use `Yams` as the YAML parser dependency.
+- Use `swift-argument-parser` as the CLI parser dependency.
 - Identify configured calendars by source/title selector, not EventKit ID-only.
 - Calendar listing should still display EventKit IDs for troubleshooting.
+- Target macOS 26+ for the MVP.
 - Prefer CLI shape:
 
   ```sh
@@ -34,6 +36,22 @@ This plan breaks the accepted MVP spec in `docs/specs/calrelay-eventkit-mvp-spec
   - skip cancelled events
 - Add separate configuration documentation from the beginning in `docs/configuration.md`.
 
+Canonical YAML shape for the MVP uses source/title selectors:
+
+```yaml
+hubCalendar:
+  sourceTitle: "iCloud"
+  calendarTitle: "Personal Work"
+personalPrefix: "[ME]"
+syncWindowDays: 60
+workCalendars:
+  - name: "ACME"
+    prefix: "[ACME]"
+    calendar:
+      sourceTitle: "Google"
+      calendarTitle: "ACME Work"
+```
+
 ## Dependency graph
 
 ```text
@@ -42,6 +60,7 @@ SwiftPM executable/package skeleton
     -> Pure domain event/projection/reconciliation model
       -> Unit tests for routing/deletion/idempotency rules
     -> YAML config adapter and validation
+    -> Application orchestration with fake calendar ports
     -> CLI commands and output formatting
     -> EventKit outbound adapter
       -> list calendars/capability command
@@ -54,11 +73,12 @@ SwiftPM executable/package skeleton
 
 ### Task 1: Create SwiftPM CLI skeleton
 
-**Description:** Add a SwiftPM package with an executable target named `calrelay`, a `CalRelay` module, and a minimal CLI entry point that supports `--help` without EventKit access.
+**Description:** Add a SwiftPM package with an executable target named `calrelay`, a `CalRelay` module, and a minimal CLI entry point using `swift-argument-parser` that supports `--help` without EventKit access.
 
 **Acceptance criteria:**
 
 - [ ] `Package.swift` defines an executable product named `calrelay`.
+- [ ] `Package.swift` includes `swift-argument-parser` for CLI parsing.
 - [ ] `swift run calrelay --help` prints available commands/options and exits successfully.
 - [ ] Source directories follow the documented vertical-slice structure.
 
@@ -72,6 +92,7 @@ SwiftPM executable/package skeleton
 **Files likely touched:**
 
 - `Package.swift`
+- `Package.resolved` if SwiftPM creates it
 - `Sources/CalRelay/main.swift` or equivalent CLI entry point
 - `Sources/CalRelay/Features/CalendarRelay/Adapters/Inbound/CLI/...`
 
@@ -101,17 +122,16 @@ SwiftPM executable/package skeleton
 
 **Estimated scope:** Small-Medium: 2-4 files
 
-### Task 3: Add settings validation rules
+### Task 3: Add static settings validation rules
 
-**Description:** Implement validation for configuration shape before reconciliation or apply mode: hub selector present, one or more work calendars, unique prefixes, personal prefix not conflicting with work prefixes, positive sync window, selectors matching exactly one calendar, and writable apply targets.
+**Description:** Implement static validation for configuration shape before reconciliation orchestration: hub selector present, one or more work calendars, unique prefixes, personal prefix not conflicting with work prefixes, and positive sync window. Selector resolution and writable-calendar validation happen later after calendars are loaded through the calendar port.
 
 **Acceptance criteria:**
 
 - [ ] Duplicate prefixes are rejected with user-actionable errors.
 - [ ] Missing hub/work calendar selectors are rejected.
-- [ ] Calendar selectors that match zero calendars are rejected.
-- [ ] Calendar selectors that match multiple calendars are rejected.
-- [ ] Apply mode rejects read-only target calendars before mutation.
+- [ ] Empty source/title selector fields are rejected.
+- [ ] Non-positive sync windows are rejected.
 - [ ] Validation errors do not expose private event contents or unnecessary path details.
 
 **Verification:**
@@ -256,7 +276,7 @@ SwiftPM executable/package skeleton
 - [ ] Source/title selector YAML parses successfully.
 - [ ] `syncWindowDays` defaults to 60 when omitted.
 - [ ] Parse/default/validation errors are clear and safe.
-- [ ] `Yams` is added to `Package.swift` and lockfile changes are intentional.
+- [ ] `Yams` is added to `Package.swift` and `Package.resolved` changes are intentional if SwiftPM creates or updates it.
 
 **Verification:**
 
@@ -276,7 +296,35 @@ SwiftPM executable/package skeleton
 
 **Estimated scope:** Medium: 3-5 files
 
-### Task 9: Implement CLI command parsing and dry-run output
+### Task 9: Add application use case orchestration with fake calendar ports
+
+**Description:** Implement use cases that load snapshots through the calendar port, invoke pure reconciliation, return dry-run plans, and execute apply-mode operations through the port only when requested.
+
+**Acceptance criteria:**
+
+- [ ] Dry-run use case reads calendars/events and returns a reconciliation plan without calling mutation methods.
+- [ ] Calendar selectors that match zero calendars are rejected.
+- [ ] Calendar selectors that match multiple calendars are rejected.
+- [ ] Apply use case validates settings and calendar writability before mutation.
+- [ ] Apply use case creates missing projections and deletes stale safe projections via the outbound port.
+- [ ] Cancellation can propagate through async operations.
+
+**Verification:**
+
+- [ ] Application tests with fake calendar port prove dry-run does not mutate and apply mutates only planned changes.
+- [ ] `swift test`
+
+**Dependencies:** Tasks 3 and 7
+
+**Files likely touched:**
+
+- `Sources/CalRelay/Features/CalendarRelay/Application/UseCases/...`
+- `Sources/CalRelay/Features/CalendarRelay/Application/Ports/...`
+- `Tests/Unit/Features/CalendarRelay/Application/...`
+
+**Estimated scope:** Medium: 3-5 files
+
+### Task 10: Implement CLI command parsing and dry-run output
 
 **Description:** Add user-facing CLI commands/options for listing calendars and reconciling from a config file. Reconciliation defaults to dry-run and prints planned creates/deletes without mutation.
 
@@ -293,39 +341,13 @@ SwiftPM executable/package skeleton
 - [ ] `swift run calrelay --help`
 - [ ] `swift test`
 
-**Dependencies:** Tasks 7 and 8
+**Dependencies:** Tasks 7, 8, and 9
 
 **Files likely touched:**
 
 - `Sources/CalRelay/Features/CalendarRelay/Adapters/Inbound/CLI/...`
 - `Sources/CalRelay/Features/CalendarRelay/Application/UseCases/...`
 - `Tests/Unit/Features/CalendarRelay/Adapters/Inbound/CLI/...`
-
-**Estimated scope:** Medium: 3-5 files
-
-### Task 10: Add application use case orchestration with fake calendar ports
-
-**Description:** Implement use cases that load snapshots through the calendar port, invoke pure reconciliation, return dry-run plans, and execute apply-mode operations through the port only when requested.
-
-**Acceptance criteria:**
-
-- [ ] Dry-run use case reads calendars/events and returns a reconciliation plan without calling mutation methods.
-- [ ] Apply use case validates settings and calendar writability before mutation.
-- [ ] Apply use case creates missing projections and deletes stale safe projections via the outbound port.
-- [ ] Cancellation can propagate through async operations.
-
-**Verification:**
-
-- [ ] Application tests with fake calendar port prove dry-run does not mutate and apply mutates only planned changes.
-- [ ] `swift test`
-
-**Dependencies:** Tasks 3, 7, and 9
-
-**Files likely touched:**
-
-- `Sources/CalRelay/Features/CalendarRelay/Application/UseCases/...`
-- `Sources/CalRelay/Features/CalendarRelay/Application/Ports/...`
-- `Tests/Unit/Features/CalendarRelay/Application/...`
 
 **Estimated scope:** Medium: 3-5 files
 
@@ -341,11 +363,12 @@ SwiftPM executable/package skeleton
 
 ### Task 11: Implement EventKit calendar listing adapter
 
-**Description:** Add the outbound EventKit adapter for permission request/status and calendar/source listing, mapping EventKit calendars into application DTOs with writable/read-only status.
+**Description:** Add the outbound EventKit adapter for macOS 26+ permission request/status and calendar/source listing, mapping EventKit calendars into application DTOs with writable/read-only status.
 
 **Acceptance criteria:**
 
 - [ ] EventKit imports are limited to `Adapters/Outbound/EventKit/...`.
+- [ ] EventKit permission handling uses the macOS 26+ API baseline and remains isolated inside the EventKit adapter.
 - [ ] `calrelay calendars` requests/handles calendar permission at the platform boundary.
 - [ ] Calendar output includes calendar ID, title, source/account information, and writability.
 - [ ] Permission denied/revoked/unavailable states fail safely with clear messages.
@@ -356,7 +379,7 @@ SwiftPM executable/package skeleton
 - [ ] `swift test`
 - [ ] Manual: `swift run calrelay calendars` on macOS with Apple Calendar available.
 
-**Dependencies:** Tasks 2 and 9
+**Dependencies:** Tasks 2 and 10
 
 **Files likely touched:**
 
@@ -383,7 +406,7 @@ SwiftPM executable/package skeleton
 - [ ] `swift build`
 - [ ] Manual dry-run against test calendars with timed, all-day, tentative, declined/cancelled if feasible.
 
-**Dependencies:** Tasks 10 and 11
+**Dependencies:** Tasks 9 and 11
 
 **Files likely touched:**
 
@@ -409,7 +432,7 @@ SwiftPM executable/package skeleton
 - [ ] `swift test`
 - [ ] Manual dry-run check with representative local calendars.
 
-**Dependencies:** Tasks 8, 10, 11, and 12
+**Dependencies:** Tasks 8, 9, 10, 11, and 12
 
 **Files likely touched:**
 
@@ -426,8 +449,11 @@ SwiftPM executable/package skeleton
 **Acceptance criteria:**
 
 - [ ] `--apply` is required for mutation.
+- [ ] Config, permission status, selector resolution, and writability are validated before any mutation starts.
 - [ ] Create operations create disposable projection events with expected title/start/end/all-day/calendar fields.
 - [ ] Delete operations delete only event snapshots selected by conservative reconciliation logic.
+- [ ] Mutations execute in deterministic order: create missing projections first, then delete stale safe projections.
+- [ ] Partial failures are reported clearly so a later dry-run/apply can converge.
 - [ ] Apply rejects denied permissions/read-only calendars before mutation.
 - [ ] No original unprefixed work/client events are deleted.
 
@@ -530,6 +556,8 @@ SwiftPM executable/package skeleton
 | Recurring occurrence behavior may not match assumptions | Medium-High | Treat recurrence as a capability check in Task 12; document limitations if EventKit does not expose occurrences cleanly. |
 | Prefix-based deletion could delete user-created prefixed events | Medium | Preserve unknown prefixes; document that configured prefixes mark CalRelay-managed projections; dry-run by default. |
 | YAML parser dependency affects package policy | Low-Medium | Use approved `Yams`; update manifest and lockfile together. |
+| CLI parser dependency affects package policy | Low | Use approved `swift-argument-parser`; update manifest and lockfile together. |
+| EventKit permission APIs differ by macOS version | Low-Medium | Target macOS 26+ for MVP and keep permission handling isolated in the EventKit adapter. |
 | CLI output may expose private event titles/times | Medium | Keep diagnostics privacy-safe; accept explicit dry-run output as user-facing command output; avoid logging raw calendar contents. |
 | Manual EventKit validation depends on local Apple Calendar state | Medium | Keep default tests fake/deterministic; document manual checks separately. |
 
@@ -538,6 +566,7 @@ SwiftPM executable/package skeleton
 - Can EventKit reliably expose recurring occurrences as ordinary visible event snapshots inside the sync window?
 - Is the 60-day default sync window sufficient after real-world testing?
 - Are source/title selectors stable enough across the user's Apple Calendar accounts, or will a fallback ID selector be needed later?
+- Which exact `Yams` and `swift-argument-parser` versions should be pinned after the SwiftPM package is created?
 
 ## Recommended first implementation slice
 
@@ -546,7 +575,7 @@ Start with Tasks 1-3:
 1. Create the SwiftPM executable skeleton for `calrelay`.
 2. Add initial vertical-slice directories.
 3. Add application DTOs/ports/settings contracts using source/title selectors.
-4. Add settings validation and focused tests.
+4. Add static settings validation and focused tests.
 5. Run `swift build` and `swift test`.
 
 This leaves the repository in a buildable, tested state before tackling reconciliation and EventKit behavior.
