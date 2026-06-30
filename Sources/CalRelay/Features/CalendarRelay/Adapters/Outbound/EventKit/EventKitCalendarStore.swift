@@ -7,6 +7,7 @@ enum EventKitCalendarStoreError: Error, CustomStringConvertible {
     case accessRestricted
     case writeOnlyAccess
     case accessNotGranted
+    case calendarNotFound(CalendarReference)
 
     var description: String {
         switch self {
@@ -18,6 +19,8 @@ enum EventKitCalendarStoreError: Error, CustomStringConvertible {
             "Calendar access is write-only. calrelay needs full access to list and reconcile calendars."
         case .accessNotGranted:
             "Full calendar access was not granted."
+        case .calendarNotFound(let calendar):
+            "Calendar is no longer available: \(calendar.sourceTitle) / \(calendar.title)."
         }
     }
 }
@@ -47,7 +50,30 @@ final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable {
         from start: Date,
         to end: Date
     ) async throws -> [EventSnapshot] {
-        throw CalendarStoreOperationUnavailableError(operation: "Event reading")
+        try await requestFullCalendarAccessIfNeeded()
+
+        guard let eventKitCalendar = eventStore.calendar(withIdentifier: calendar.id) else {
+            throw EventKitCalendarStoreError.calendarNotFound(calendar)
+        }
+
+        let predicate = eventStore.predicateForEvents(
+            withStart: start,
+            end: end,
+            calendars: [eventKitCalendar]
+        )
+
+        return eventStore.events(matching: predicate).map { event in
+            EventSnapshot(
+                id: event.eventIdentifier ?? event.calendarItemIdentifier,
+                calendar: calendar,
+                title: event.title ?? "",
+                start: event.startDate,
+                end: event.endDate,
+                isAllDay: event.isAllDay,
+                availability: Self.mapAvailability(event.availability),
+                status: Self.mapStatus(event)
+            )
+        }
     }
 
     func createEvent(_ event: ProjectedEvent) async throws {
@@ -87,6 +113,42 @@ final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable {
                     continuation.resume(returning: granted)
                 }
             }
+        }
+    }
+
+    private static func mapAvailability(_ availability: EKEventAvailability) -> EventAvailability {
+        switch availability {
+        case .busy:
+            .busy
+        case .tentative:
+            .tentative
+        case .free:
+            .free
+        case .unavailable:
+            .unavailable
+        case .notSupported:
+            .unknown
+        @unknown default:
+            .unknown
+        }
+    }
+
+    private static func mapStatus(_ event: EKEvent) -> EventStatus {
+        if event.attendees?.contains(where: { $0.participantStatus == .declined }) == true {
+            return .declined
+        }
+
+        switch event.status {
+        case .confirmed:
+            return .confirmed
+        case .tentative:
+            return .tentative
+        case .canceled:
+            return .cancelled
+        case .none:
+            return .unknown
+        @unknown default:
+            return .unknown
         }
     }
 }

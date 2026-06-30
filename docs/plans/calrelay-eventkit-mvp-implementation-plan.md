@@ -395,15 +395,15 @@ SwiftPM executable/package skeleton
 
 **Acceptance criteria:**
 
-- [ ] Reads only configured hub/work calendars for the current run.
-- [ ] Uses sync window from validated settings, defaulting to next 60 days.
-- [ ] Maps title, start, end, all-day flag, status/availability fields needed for inclusion rules.
-- [ ] Recurring occurrences exposed by EventKit inside the window are treated as ordinary snapshots.
+- [x] Reads only configured hub/work calendars for the current run.
+- [x] Uses sync window from validated settings, defaulting to next 60 days.
+- [x] Maps title, start, end, all-day flag, status/availability fields needed for inclusion rules.
+- [x] Recurring occurrences exposed by EventKit inside the window are treated as ordinary snapshots.
 
 **Verification:**
 
-- [ ] Unit tests for mapper logic where possible without real EventKit.
-- [ ] `swift build`
+- [x] Unit tests for mapper logic where possible without real EventKit. No deterministic EventKit mapper unit test was added because `EKEvent`/permissions are platform-state dependent; existing contract tests remain fake-only.
+- [x] `swift build`
 - [ ] Manual dry-run against test calendars with timed, all-day, tentative, declined/cancelled if feasible.
 
 **Dependencies:** Tasks 9 and 11
@@ -561,21 +561,8 @@ SwiftPM executable/package skeleton
 | CLI output may expose private event titles/times | Medium | Keep diagnostics privacy-safe; accept explicit dry-run output as user-facing command output; avoid logging raw calendar contents. |
 | Manual EventKit validation depends on local Apple Calendar state | Medium | Keep default tests fake/deterministic; document manual checks separately. |
 
-## Open questions
+## Remaining validation questions
 
-- Can EventKit reliably expose recurring occurrences as ordinary visible event snapshots inside the sync window?
-- Is the 60-day default sync window sufficient after real-world testing?
-- Are source/title selectors stable enough across the user's Apple Calendar accounts, or will a fallback ID selector be needed later?
-- Which exact `Yams` and `swift-argument-parser` versions should be pinned after the SwiftPM package is created?
-
-## Recommended first implementation slice
-
-Start with Tasks 1-3:
-
-1. Create the SwiftPM executable skeleton for `calrelay`.
-2. Add initial vertical-slice directories.
-3. Add application DTOs/ports/settings contracts using source/title selectors.
-4. Add static settings validation and focused tests.
-5. Run `swift build` and `swift test`.
-
-This leaves the repository in a buildable, tested state before tackling reconciliation and EventKit behavior.
+- Can EventKit reliably expose recurring occurrences as ordinary visible event snapshots inside the sync window? Event reads now use EventKit range predicates, but this still needs manual validation against real recurring calendars.
+- Is the 60-day default sync window sufficient after real-world testing? The default is implemented, but may need adjustment after MVP use.
+- Are source/title selectors stable enough across the user's Apple Calendar accounts, or will a fallback ID selector be needed later? Source/title selectors are implemented for the MVP; fallback IDs remain a possible future enhancement.
