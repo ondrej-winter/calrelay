@@ -376,7 +376,7 @@ SwiftPM executable/package skeleton
 **Verification:**
 
  - [x] `swift build`
- - [x] `swift run CalRelayContractTests`
+ - [x] `swift test`
  - [ ] Manual: `swift run calrelay calendars` on macOS with Apple Calendar available.
 
 **Dependencies:** Tasks 2 and 10
@@ -429,7 +429,7 @@ SwiftPM executable/package skeleton
 **Verification:**
 
 - [x] `swift build`
-- [x] `swift run CalRelayContractTests`
+- [x] `swift test`
 - [ ] Manual dry-run check with representative local calendars.
 
 **Dependencies:** Tasks 8, 9, 10, 11, and 12
@@ -461,7 +461,7 @@ SwiftPM executable/package skeleton
 
 - [x] Application tests with fakes still pass.
 - [x] `swift build`
-- [x] `swift run CalRelayContractTests`
+- [x] `swift test`
 - [ ] Manual EventKit write check: create and delete harmless generated blockers in configured writable test calendars.
 
 **Dependencies:** Task 13
@@ -477,8 +477,7 @@ SwiftPM executable/package skeleton
 ### Checkpoint: EventKit MVP capability
 
 - [x] `swift build` passes.
-- [x] `swift run CalRelayContractTests` passes as the current deterministic local test gate.
-- [x] `swift test` is either wired to a real SwiftPM test target or remains explicitly documented as not used for this repository yet.
+- [x] `swift test` passes as the current deterministic local test gate.
 - [ ] Calendar list/capability command works locally.
 - [ ] Dry-run produces expected creates/deletes without mutation.
 - [ ] Apply mode can create/delete harmless generated projections in test calendars.
@@ -525,11 +524,12 @@ SwiftPM executable/package skeleton
 
 **Validation note, 2026-06-30 21:53 Europe/Prague:** Clean deterministic validation was rerun from the VS Code/Cline context with Calendar-access checks intentionally excluded: `swift package clean`, `swift build`, `swift run CalRelayContractTests`, `swift run calrelay --help`, and `swift run calrelay reconcile --help` all passed. The user separately verified EventKit copy/delete/apply behavior from a permissioned Terminal context, because VS Code/Cline does not have macOS Calendar access. Calendar-access commands such as `swift run calrelay calendars` and real `reconcile --config ...` remain manual/external validation steps for this environment.
 
+**Validation note, 2026-06-30 22:06 Europe/Prague:** `CalRelayContractTests` was converted from a SwiftPM executable target into a real SwiftPM test target using Swift Testing, making `swift test` the deterministic local gate. The active Command Line Tools selection could compile Swift Testing only with manual framework/plugin flags and could not run the test bundle due to missing runtime framework lookup. Running through full Xcode succeeded: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` passed with one Swift Testing suite/test. EventKit calendar-access commands remain excluded from Cline's local validation gate.
+
 **Acceptance criteria:**
 
 - [x] `swift build` passes.
-- [x] `swift run CalRelayContractTests` passes.
-- [x] `swift test` either passes after adding a real SwiftPM test target or is intentionally replaced in docs by the contract-test executable gate. Current behavior: `swift test` builds and reports `error: no tests found`; README documents `swift run CalRelayContractTests` as the deterministic gate.
+- [x] `swift test` passes with the full Xcode toolchain selected: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test`.
 - [x] `swift run calrelay --help` passes.
 - [x] `swift run calrelay calendars` works. Verified from the user's permissioned Terminal context; Cline's tool execution context remains denied by macOS Calendar permissions.
 - [x] Dry-run shows expected creates/deletes.
@@ -540,6 +540,7 @@ SwiftPM executable/package skeleton
 **Verification:**
 
 - [x] Deterministic non-EventKit commands validated on 2026-06-30 at 20:36 Europe/Prague: `swift build`, `swift run CalRelayContractTests`, `swift run calrelay --help`, and `swift run calrelay reconcile --help`.
+- [x] Deterministic test target validated on 2026-06-30 at 22:05 Europe/Prague: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test`.
 - [x] Calendar listing validated from the user's permissioned Terminal context on 2026-06-30 at 20:39 Europe/Prague. Dedicated writable test calendars are available as `Default / Test-Hub`, `Default / Test-Work-1`, and `Default / Test-Work-2`.
 - [x] Manual EventKit reconciliation validation notes are complete for dry-run/apply/idempotency/double-booking with writable `Default / Test-*` calendars and ignored `tmp/` fixtures.
 - [x] Manual rename/change/copy-delete validation is complete. Rename/change is covered by deterministic contract tests; the user verified EventKit copy/delete/apply behavior externally from a permissioned Terminal context. Cline's VS Code execution context cannot access Calendar data, so Calendar-access commands are intentionally excluded from its local validation gate.

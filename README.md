@@ -17,11 +17,15 @@ Implementation work is broken down in the [CalRelay EventKit MVP implementation 
 
 ```sh
 swift build
-swift run CalRelayContractTests
+swift test
 swift run calrelay --help
 ```
 
-`CalRelayContractTests` is the current local deterministic test gate. The default `swift test` command is not used yet because this repository currently keeps its runnable contract checks in a SwiftPM executable target rather than a SwiftPM test target.
+`swift test` is the local deterministic test gate. It does not require real EventKit access or real calendars. If the active Command Line Tools toolchain cannot load Swift Testing, run tests with full Xcode selected for the command:
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
+```
 
 ## Usage
 

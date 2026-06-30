@@ -36,7 +36,7 @@ let package = Package(
             ],
             path: "Sources/CalRelay"
         ),
-        .executableTarget(
+        .testTarget(
             name: "CalRelayContractTests",
             dependencies: [
                 "CalRelayCore",
