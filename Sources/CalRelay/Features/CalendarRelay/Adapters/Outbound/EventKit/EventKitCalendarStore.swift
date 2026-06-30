@@ -8,6 +8,9 @@ enum EventKitCalendarStoreError: Error, CustomStringConvertible {
     case writeOnlyAccess
     case accessNotGranted
     case calendarNotFound(CalendarReference)
+    case calendarReadOnly(CalendarReference)
+    case eventNotFound(EventSnapshot)
+    case eventCalendarMismatch(expected: CalendarReference)
 
     var description: String {
         switch self {
@@ -21,6 +24,12 @@ enum EventKitCalendarStoreError: Error, CustomStringConvertible {
             "Full calendar access was not granted."
         case .calendarNotFound(let calendar):
             "Calendar is no longer available: \(calendar.sourceTitle) / \(calendar.title)."
+        case .calendarReadOnly(let calendar):
+            "Calendar is read-only: \(calendar.sourceTitle) / \(calendar.title)."
+        case .eventNotFound(let event):
+            "Event is no longer available for deletion: \(event.calendar.sourceTitle) / \(event.calendar.title)."
+        case .eventCalendarMismatch(let expected):
+            "Event selected for deletion no longer belongs to the expected calendar: \(expected.sourceTitle) / \(expected.title)."
         }
     }
 }
@@ -77,11 +86,45 @@ final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable {
     }
 
     func createEvent(_ event: ProjectedEvent) async throws {
-        throw CalendarStoreOperationUnavailableError(operation: "Event creation")
+        try await requestFullCalendarAccessIfNeeded()
+
+        let calendar = try writableEventKitCalendar(for: event.destinationCalendar)
+        let eventKitEvent = EKEvent(eventStore: eventStore)
+        eventKitEvent.calendar = calendar
+        eventKitEvent.title = event.title
+        eventKitEvent.startDate = event.start
+        eventKitEvent.endDate = event.end
+        eventKitEvent.isAllDay = event.isAllDay
+
+        try eventStore.save(eventKitEvent, span: .thisEvent, commit: true)
     }
 
     func deleteEvent(_ event: EventSnapshot) async throws {
-        throw CalendarStoreOperationUnavailableError(operation: "Event deletion")
+        try await requestFullCalendarAccessIfNeeded()
+
+        _ = try writableEventKitCalendar(for: event.calendar)
+
+        guard let eventKitEvent = eventStore.event(withIdentifier: event.id) else {
+            throw EventKitCalendarStoreError.eventNotFound(event)
+        }
+
+        guard eventKitEvent.calendar.calendarIdentifier == event.calendar.id else {
+            throw EventKitCalendarStoreError.eventCalendarMismatch(expected: event.calendar)
+        }
+
+        try eventStore.remove(eventKitEvent, span: .thisEvent, commit: true)
+    }
+
+    private func writableEventKitCalendar(for calendar: CalendarReference) throws -> EKCalendar {
+        guard let eventKitCalendar = eventStore.calendar(withIdentifier: calendar.id) else {
+            throw EventKitCalendarStoreError.calendarNotFound(calendar)
+        }
+
+        guard eventKitCalendar.allowsContentModifications else {
+            throw EventKitCalendarStoreError.calendarReadOnly(calendar)
+        }
+
+        return eventKitCalendar
     }
 
     private func requestFullCalendarAccessIfNeeded() async throws {
@@ -150,13 +193,5 @@ final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable {
         @unknown default:
             return .unknown
         }
-    }
-}
-
-private struct CalendarStoreOperationUnavailableError: Error, CustomStringConvertible {
-    let operation: String
-
-    var description: String {
-        "\(operation) is not available until the EventKit event adapter is implemented."
     }
 }

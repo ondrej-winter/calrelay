@@ -9,7 +9,7 @@ struct CalRelayCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "calrelay",
         abstract: "Relay Apple Calendar availability blockers across configured calendars.",
-        discussion: "Calendar listing and reconciliation commands are available, with EventKit-backed calendar access added in a later slice.",
+        discussion: "Calendar listing and reconciliation commands use EventKit-backed Apple Calendar access.",
         subcommands: [CalendarsCommand.self, ReconcileCommand.self]
     )
 }
@@ -26,11 +26,11 @@ struct CalendarsCommand: AsyncParsableCommand {
     }
 }
 
-struct ReconcileCommand: ParsableCommand {
+struct ReconcileCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "reconcile",
         abstract: "Load configuration and plan calendar relay changes.",
-        discussion: "Dry-run is the default. Pass --apply to request mutation after the EventKit adapter is wired."
+        discussion: "Dry-run is the default. Pass --apply to create/delete planned EventKit projections."
     )
 
     @Option(name: .long, help: "Path to the CalRelay YAML configuration file.")
@@ -39,13 +39,14 @@ struct ReconcileCommand: ParsableCommand {
     @Flag(name: .long, help: "Apply planned changes. Without this flag, reconciliation is a dry-run.")
     var apply = false
 
-    func run() throws {
+    func run() async throws {
         let yaml = try String(contentsOfFile: config, encoding: .utf8)
-        _ = try YAMLCalendarRelaySettingsLoader.load(yaml)
+        let settings = try YAMLCalendarRelaySettingsLoader.load(yaml)
+        let useCase = ReconcileCalendarsUseCase(calendarStore: EventKitCalendarStore())
 
-        print(apply ? "Apply requested." : "Dry-run mode. No calendar mutations will be performed.")
-        print(ReconciliationPlanFormatter.format(ReconciliationPlan(creates: [], deletes: [])))
-
-        throw ValidationError("Calendar reconciliation is not available until the EventKit adapter is configured.")
+        let now = Date()
+        let plan = try await (apply ? useCase.apply(settings: settings, now: now) : useCase.dryRun(settings: settings, now: now))
+        print(apply ? "Apply mode. Planned calendar mutations were performed." : "Dry-run mode. No calendar mutations were performed.")
+        print(ReconciliationPlanFormatter.format(plan))
     }
 }

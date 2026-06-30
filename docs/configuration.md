@@ -35,6 +35,30 @@ workCalendars:
 
 Calendar selectors use `sourceTitle` plus `calendarTitle` rather than EventKit calendar IDs. This keeps configuration readable and avoids relying on opaque local identifiers. Later calendar-resolution steps reject selectors that match zero calendars or multiple calendars.
 
+Use the calendar listing command to discover the exact source/calendar titles and writable status visible to EventKit:
+
+```sh
+swift run calrelay calendars
+```
+
+The listing includes EventKit calendar IDs for troubleshooting, but IDs are not the canonical configuration key for the MVP.
+
+## Commands
+
+Dry-run reconciliation is the default and performs no calendar mutations:
+
+```sh
+swift run calrelay reconcile --config calrelay.yml
+```
+
+Apply mode creates missing prefixed projection events and deletes stale prefixed projections selected by the reconciliation plan:
+
+```sh
+swift run calrelay reconcile --config calrelay.yml --apply
+```
+
+Review dry-run output before using `--apply`, especially when introducing new prefixes or changing calendar selectors.
+
 ## Validation and safety notes
 
 - At least one work calendar must be configured.
@@ -44,3 +68,16 @@ Calendar selectors use `sourceTitle` plus `calendarTitle` rather than EventKit c
 - `personalPrefix` must not match any configured work calendar prefix.
 - Configured prefixes identify CalRelay-managed projections during reconciliation. Use dry-run output to review planned deletes before running apply mode.
 - Configuration errors are reported without echoing raw YAML content.
+- CalRelay requires full Calendar access. If macOS denies or restricts access, listing and reconciliation fail safely.
+- Apply mode requires writable target calendars. Read-only calendars are rejected before planned mutations are executed.
+- CalRelay must never delete unprefixed original work/client events; deletion is limited to stale prefixed projections selected by the conservative reconciliation logic.
+
+## Manual MVP checks
+
+Because EventKit depends on local Apple Calendar state, perform these checks with harmless test calendars before relying on CalRelay for real calendars:
+
+1. Run `swift run calrelay calendars` and confirm the hub/work calendars are visible and writable where needed.
+2. Run dry-run and inspect planned creates/deletes.
+3. Run apply, then run dry-run again and confirm the second run reports no changes.
+4. Rename or move a source event and confirm dry-run shows delete-old plus create-new projection.
+5. Create a representative double-booking scenario across at least two work calendars and confirm blockers are projected through the hub within the sync window.

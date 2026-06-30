@@ -421,15 +421,15 @@ SwiftPM executable/package skeleton
 
 **Acceptance criteria:**
 
-- [ ] `swift run calrelay reconcile --config <file>` performs a dry-run with no mutations.
+- [x] `swift run calrelay reconcile --config <file>` performs a dry-run with no mutations.
 - [ ] Planned creates/deletes match expected routing rules for representative test calendars.
-- [ ] Read-only target calendars are reported before apply mode would mutate.
-- [ ] Errors remain clear for missing calendars, denied permissions, or invalid config.
+- [x] Read-only target calendars are reported before apply mode would mutate.
+- [x] Errors remain clear for missing calendars, denied permissions, or invalid config.
 
 **Verification:**
 
-- [ ] `swift build`
-- [ ] `swift test`
+- [x] `swift build`
+- [x] `swift run CalRelayContractTests`
 - [ ] Manual dry-run check with representative local calendars.
 
 **Dependencies:** Tasks 8, 9, 10, 11, and 12
@@ -448,20 +448,20 @@ SwiftPM executable/package skeleton
 
 **Acceptance criteria:**
 
-- [ ] `--apply` is required for mutation.
-- [ ] Config, permission status, selector resolution, and writability are validated before any mutation starts.
-- [ ] Create operations create disposable projection events with expected title/start/end/all-day/calendar fields.
-- [ ] Delete operations delete only event snapshots selected by conservative reconciliation logic.
-- [ ] Mutations execute in deterministic order: create missing projections first, then delete stale safe projections.
-- [ ] Partial failures are reported clearly so a later dry-run/apply can converge.
-- [ ] Apply rejects denied permissions/read-only calendars before mutation.
-- [ ] No original unprefixed work/client events are deleted.
+- [x] `--apply` is required for mutation.
+- [x] Config, permission status, selector resolution, and writability are validated before any mutation starts.
+- [x] Create operations create disposable projection events with expected title/start/end/all-day/calendar fields.
+- [x] Delete operations delete only event snapshots selected by conservative reconciliation logic.
+- [x] Mutations execute in deterministic order: create missing projections first, then delete stale safe projections.
+- [x] Partial failures are reported clearly so a later dry-run/apply can converge.
+- [x] Apply rejects denied permissions/read-only calendars before mutation.
+- [x] No original unprefixed work/client events are deleted.
 
 **Verification:**
 
-- [ ] Application tests with fakes still pass.
-- [ ] `swift build`
-- [ ] `swift test`
+- [x] Application tests with fakes still pass.
+- [x] `swift build`
+- [x] `swift run CalRelayContractTests`
 - [ ] Manual EventKit write check: create and delete harmless generated blockers in configured writable test calendars.
 
 **Dependencies:** Task 13
@@ -491,15 +491,15 @@ SwiftPM executable/package skeleton
 
 **Acceptance criteria:**
 
-- [ ] README explains build/test/run commands and links to the spec, implementation plan, and configuration reference.
-- [ ] `docs/configuration.md` documents YAML schema, source/title selector matching, defaults, and safety notes.
-- [ ] YAML examples use safe placeholder calendar/source names.
-- [ ] Manual checks include calendar listing, dry-run, apply/idempotency, rename/change, and double-booking scenario.
-- [ ] Permission and writable-calendar requirements are documented.
+- [x] README explains build/test/run commands and links to the spec, implementation plan, and configuration reference.
+- [x] `docs/configuration.md` documents YAML schema, source/title selector matching, defaults, and safety notes.
+- [x] YAML examples use safe placeholder calendar/source names.
+- [x] Manual checks include calendar listing, dry-run, apply/idempotency, rename/change, and double-booking scenario.
+- [x] Permission and writable-calendar requirements are documented.
 
 **Verification:**
 
-- [ ] Documentation review against implemented command names/options.
+- [x] Documentation review against implemented command names/options.
 - [ ] Commands in docs are copy/pasteable.
 
 **Dependencies:** Tasks 13 and 14, because final command names/options should be known.
