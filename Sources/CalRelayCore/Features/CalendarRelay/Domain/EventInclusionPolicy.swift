@@ -10,6 +10,6 @@ public enum EventInclusionPolicy {
             return false
         }
 
-        return event.availability == .busy || event.availability == .tentative
+        return event.availability == .busy || event.availability == .tentative || event.availability == .notSupported
     }
 }

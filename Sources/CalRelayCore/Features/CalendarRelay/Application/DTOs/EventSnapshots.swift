@@ -36,6 +36,7 @@ public enum EventAvailability: Equatable, Sendable {
     case tentative
     case free
     case unavailable
+    case notSupported
     case unknown
 }
 

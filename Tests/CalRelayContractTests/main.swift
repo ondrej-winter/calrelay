@@ -15,6 +15,7 @@ struct CalRelayContractTests {
         try testRejectsPersonalPrefixConflictingWithWorkPrefix()
         try testIncludesTimedBusyEvents()
         try testIncludesTimedTentativeEvents()
+        try testIncludesTimedEventsWhenAvailabilityIsNotSupported()
         try testSkipsAllDayEvents()
         try testSkipsDeclinedEvents()
         try testSkipsCancelledEvents()
@@ -39,6 +40,9 @@ struct CalRelayContractTests {
         try await testRejectsAmbiguousCalendarSelectorDuringReconciliation()
         try await testApplyRejectsReadOnlyDestinationBeforeMutation()
         try await testApplyCreatesAndDeletesPlannedChanges()
+        try await testDoesNotReprojectManagedWorkProjectionsToHub()
+        try await testProjectsWorkSourceToOtherWorkCalendarsInSamePlan()
+        try await testDoesNotProjectUnknownPrefixedWorkBlockersBackToHub()
         try await testReconciliationPropagatesCancellation()
         try testFormatsEmptyReconciliationPlan()
         try testFormatsPlannedCreatesAndDeletes()
@@ -164,6 +168,12 @@ struct CalRelayContractTests {
         let event = eventSnapshot(availability: .tentative, status: .tentative)
 
         try expect(EventInclusionPolicy.includes(event), "Timed tentative events should be included")
+    }
+
+    private static func testIncludesTimedEventsWhenAvailabilityIsNotSupported() throws {
+        let event = eventSnapshot(availability: .notSupported, status: .confirmed)
+
+        try expect(EventInclusionPolicy.includes(event), "Timed events from calendars without availability support should be included")
     }
 
     private static func testSkipsAllDayEvents() throws {
@@ -521,6 +531,88 @@ struct CalRelayContractTests {
         try expect(plan.deletes == [staleHubProjection], "Apply should return planned delete")
         try expect(await store.createdEvents() == [fixtures.expectedHubProjection], "Apply should create planned projections")
         try expect(await store.deletedEvents() == [staleHubProjection], "Apply should delete stale managed projections")
+    }
+
+    private static func testDoesNotReprojectManagedWorkProjectionsToHub() async throws {
+        let fixtures = applicationFixtures()
+        let managedWorkProjection = eventSnapshot(
+            id: "work-projection-1",
+            calendar: fixtures.workReference,
+            title: "[ME] Dentist",
+            start: Date(timeIntervalSince1970: 13_000),
+            end: Date(timeIntervalSince1970: 14_000)
+        )
+        let store = FakeCalendarStore(
+            calendars: [fixtures.hubCalendar, fixtures.workCalendar],
+            eventsByCalendarID: [
+                fixtures.hubCalendar.id: [],
+                fixtures.workCalendar.id: [managedWorkProjection]
+            ]
+        )
+        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+
+        let plan = try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now)
+
+        try expect(!plan.creates.contains { $0.destinationCalendar == fixtures.hubReference && $0.title == "[ACME] [ME] Dentist" }, "Managed work projections should not be projected back into the hub")
+        try expect(plan.deletes == [managedWorkProjection], "Stale managed work projection should still be deleted when no longer expected")
+    }
+
+    private static func testProjectsWorkSourceToOtherWorkCalendarsInSamePlan() async throws {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let hubCalendar = CalendarSnapshot(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: true)
+        let acmeCalendar = CalendarSnapshot(id: "acme-1", title: "ACME Work", sourceTitle: "Google", isWritable: true)
+        let betaCalendar = CalendarSnapshot(id: "beta-1", title: "BETA Work", sourceTitle: "Google", isWritable: true)
+        let acmeReference = CalendarReference(id: acmeCalendar.id, title: acmeCalendar.title, sourceTitle: acmeCalendar.sourceTitle)
+        let betaReference = CalendarReference(id: betaCalendar.id, title: betaCalendar.title, sourceTitle: betaCalendar.sourceTitle)
+        let sourceEvent = eventSnapshot(
+            id: "acme-source-1",
+            calendar: acmeReference,
+            title: "Client Planning",
+            start: Date(timeIntervalSince1970: 11_000),
+            end: Date(timeIntervalSince1970: 12_000)
+        )
+        let settings = CalendarRelaySettings(
+            hubCalendar: CalendarSelector(sourceTitle: hubCalendar.sourceTitle, calendarTitle: hubCalendar.title),
+            personalPrefix: "[ME]",
+            syncWindowDays: 1,
+            workCalendars: [
+                WorkCalendarSettings(name: "ACME", prefix: "[ACME]", calendar: CalendarSelector(sourceTitle: acmeCalendar.sourceTitle, calendarTitle: acmeCalendar.title)),
+                WorkCalendarSettings(name: "BETA", prefix: "[BETA]", calendar: CalendarSelector(sourceTitle: betaCalendar.sourceTitle, calendarTitle: betaCalendar.title))
+            ]
+        )
+        let store = FakeCalendarStore(
+            calendars: [hubCalendar, acmeCalendar, betaCalendar],
+            eventsByCalendarID: [acmeCalendar.id: [sourceEvent]]
+        )
+        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+
+        let plan = try await useCase.dryRun(settings: settings, now: now)
+
+        try expect(plan.creates.contains { $0.destinationCalendar == betaReference && $0.title == "[ACME] Client Planning" }, "Work source events should project to other work calendars through the expected hub projection in the same plan")
+    }
+
+    private static func testDoesNotProjectUnknownPrefixedWorkBlockersBackToHub() async throws {
+        let fixtures = applicationFixtures()
+        let remoteWorkProjection = eventSnapshot(
+            id: "remote-work-projection-1",
+            calendar: fixtures.workReference,
+            title: "[REMOTE] Partner Planning",
+            start: Date(timeIntervalSince1970: 13_000),
+            end: Date(timeIntervalSince1970: 14_000)
+        )
+        let store = FakeCalendarStore(
+            calendars: [fixtures.hubCalendar, fixtures.workCalendar],
+            eventsByCalendarID: [
+                fixtures.hubCalendar.id: [],
+                fixtures.workCalendar.id: [remoteWorkProjection]
+            ]
+        )
+        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+
+        let plan = try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now)
+
+        try expect(!plan.creates.contains { $0.destinationCalendar == fixtures.hubReference && $0.title == "[ACME] [REMOTE] Partner Planning" }, "Unknown prefixed work blockers should not be projected back into the hub")
+        try expect(plan.deletes.isEmpty, "Unknown prefixed work blockers should be preserved rather than deleted")
     }
 
     private static func testReconciliationPropagatesCancellation() async throws {

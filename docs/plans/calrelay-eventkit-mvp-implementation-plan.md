@@ -517,7 +517,9 @@ SwiftPM executable/package skeleton
 
 **Description:** Run the full local quality gate and manual EventKit acceptance checks from the spec, then fix any implementation gaps discovered.
 
-**Validation note, 2026-06-30:** Deterministic local checks were run with the current executable contract-test setup. Real EventKit validation is blocked until macOS grants Full Calendar access to the `calrelay` executable and harmless writable test calendars/selectors are available. Latest rerun: `swift build`, `swift run CalRelayContractTests`, `swift run calrelay --help`, and `swift run calrelay reconcile --help` passed. `swift run calrelay calendars` still fails safely with `Full calendar access was not granted.`
+**Validation note, 2026-06-30 20:42 Europe/Prague:** Deterministic local checks were run with the current executable contract-test setup. Latest rerun: `swift build`, `swift run CalRelayContractTests`, `swift run calrelay --help`, and `swift run calrelay reconcile --help` passed. `swift run calrelay calendars` succeeds and lists writable `Default / Test-Hub`, `Default / Test-Work-1`, and `Default / Test-Work-2` calendars for manual validation.
+
+**Validation note, 2026-06-30 21:32 Europe/Prague:** Manual EventKit validation with ignored `tmp/` fixtures found and fixed three MVP gaps: EventKit `.notSupported` availability from local test calendars is now treated as blocking for timed events, prefixed work-calendar projections no longer relay back into the hub, and work-source blockers are projected to other configured work calendars in the same plan. A real EventKit dry-run showed eight expected creates across hub/work calendars; apply succeeded; the immediate follow-up dry-run reported `No changes planned`; unknown remote-prefixed blockers were preserved and projected into local work calendars. A follow-up rename attempt by mutating an existing EventKit event title did not surface delete-old/create-new in this environment, so rename/change remains covered by deterministic contract tests rather than confirmed manually.
 
 **Acceptance criteria:**
 
@@ -525,16 +527,18 @@ SwiftPM executable/package skeleton
 - [x] `swift run CalRelayContractTests` passes.
 - [x] `swift test` either passes after adding a real SwiftPM test target or is intentionally replaced in docs by the contract-test executable gate. Current behavior: `swift test` builds and reports `error: no tests found`; README documents `swift run CalRelayContractTests` as the deterministic gate.
 - [x] `swift run calrelay --help` passes.
-- [ ] `swift run calrelay calendars` works. Current local result: command fails safely with `Full calendar access was not granted.`
-- [ ] Dry-run shows expected creates/deletes.
-- [ ] Apply followed by second apply/dry-run produces no second-run changes.
+- [x] `swift run calrelay calendars` works. Verified from the user's permissioned Terminal context; Cline's tool execution context remains denied by macOS Calendar permissions.
+- [x] Dry-run shows expected creates/deletes.
+- [x] Apply followed by second apply/dry-run produces no second-run changes.
 - [ ] Rename/change produces delete-old + create-new.
-- [ ] Representative double-booking scenario is projected across at least two work calendars for the sync window.
+- [x] Representative double-booking scenario is projected across at least two work calendars for the sync window.
 
 **Verification:**
 
-- [x] Deterministic non-EventKit commands validated on 2026-06-30: `swift build`, `swift run CalRelayContractTests`, `swift run calrelay --help`, and `swift run calrelay reconcile --help`.
-- [ ] Manual EventKit validation notes are complete. Current local result: `swift run calrelay calendars` fails safely with `Full calendar access was not granted.`, so dry-run/apply/idempotency/rename/double-booking checks remain blocked by Calendar permission/test-calendar availability.
+- [x] Deterministic non-EventKit commands validated on 2026-06-30 at 20:36 Europe/Prague: `swift build`, `swift run CalRelayContractTests`, `swift run calrelay --help`, and `swift run calrelay reconcile --help`.
+- [x] Calendar listing validated from the user's permissioned Terminal context on 2026-06-30 at 20:39 Europe/Prague. Dedicated writable test calendars are available as `Default / Test-Hub`, `Default / Test-Work-1`, and `Default / Test-Work-2`.
+- [x] Manual EventKit reconciliation validation notes are complete for dry-run/apply/idempotency/double-booking with writable `Default / Test-*` calendars and ignored `tmp/` fixtures.
+- [ ] Manual rename/change validation is complete. Current state: rename/change is covered by deterministic contract tests; a real EventKit title mutation attempt in the local test calendars did not surface delete-old/create-new during the validation window.
 
 **Dependencies:** Tasks 1-15
 
@@ -550,7 +554,7 @@ SwiftPM executable/package skeleton
 - [x] No default tests require real EventKit, real user calendars, external providers, OAuth, or network APIs.
 - [x] Docs match implemented commands/config.
 - [x] Conservative deletion and unknown-prefix preservation are covered by contract tests (`testPlansDeleteForStaleManagedProjection`, `testNeverDeletesUnprefixedEvents`, and `testPreservesUnknownPrefixedEvents`).
-- [ ] Ready for review or next implementation session.
+- [x] Ready for review or next implementation session.
 
 ## Risks and mitigations
 

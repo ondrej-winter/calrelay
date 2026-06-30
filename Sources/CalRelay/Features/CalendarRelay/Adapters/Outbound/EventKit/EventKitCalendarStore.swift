@@ -170,7 +170,7 @@ final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable {
         case .unavailable:
             .unavailable
         case .notSupported:
-            .unknown
+            .notSupported
         @unknown default:
             .unknown
         }

@@ -66,6 +66,8 @@ public struct ReconcileCalendarsUseCase: Sendable {
 
         let syncWindowEnd = now.addingTimeInterval(Double(settings.syncWindowDays) * 24 * 60 * 60)
 
+        let managedPrefixes = Set(settings.workCalendars.map(\.prefix) + [settings.personalPrefix])
+
         let hubEvents = try await calendarStore.events(
             in: hubCalendar.reference,
             from: now,
@@ -85,7 +87,9 @@ public struct ReconcileCalendarsUseCase: Sendable {
 
         let expectedHubEvents = workCalendars.flatMap { workCalendar in
             WorkToHubProjector.project(
-                events: workEventsByCalendarID[workCalendar.calendar.snapshot.id, default: []],
+                events: workEventsByCalendarID[workCalendar.calendar.snapshot.id, default: []].filter { event in
+                    !isPrefixedProjection(event)
+                },
                 from: workCalendar.settings,
                 to: hubCalendar.reference
             )
@@ -97,14 +101,16 @@ public struct ReconcileCalendarsUseCase: Sendable {
                 calendar: workCalendar.calendar.reference
             )
         }
+        let expectedHubEventSnapshots = expectedHubEvents.map { projectedEvent in
+            snapshot(for: projectedEvent, idPrefix: "expected-hub")
+        }
         let expectedWorkEvents = HubToWorkProjector.project(
-            hubEvents: hubEvents,
+            hubEvents: hubEvents + expectedHubEventSnapshots,
             to: workTargets,
             personalPrefix: settings.personalPrefix
         )
 
         let existingEvents = hubEvents + workEventsByCalendarID.values.flatMap { $0 }
-        let managedPrefixes = Set(settings.workCalendars.map(\.prefix) + [settings.personalPrefix])
         let reconciliationPlan = ReconciliationPlanner.plan(
             expected: expectedHubEvents + expectedWorkEvents,
             existing: existingEvents,
@@ -115,6 +121,23 @@ public struct ReconcileCalendarsUseCase: Sendable {
             plan: reconciliationPlan,
             calendarsByID: Dictionary(uniqueKeysWithValues: calendars.map { ($0.id, $0) })
         )
+    }
+
+    private func snapshot(for event: ProjectedEvent, idPrefix: String) -> EventSnapshot {
+        EventSnapshot(
+            id: "\(idPrefix)-\(event.destinationCalendar.id)-\(event.title)-\(event.start.timeIntervalSince1970)-\(event.end.timeIntervalSince1970)",
+            calendar: event.destinationCalendar,
+            title: event.title,
+            start: event.start,
+            end: event.end,
+            isAllDay: event.isAllDay,
+            availability: .busy,
+            status: .confirmed
+        )
+    }
+
+    private func isPrefixedProjection(_ event: EventSnapshot) -> Bool {
+        event.title.hasPrefix("[")
     }
 
     private func validate(_ settings: CalendarRelaySettings) throws {
