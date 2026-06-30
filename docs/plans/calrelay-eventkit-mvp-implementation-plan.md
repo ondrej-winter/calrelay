@@ -526,6 +526,8 @@ SwiftPM executable/package skeleton
 
 **Validation note, 2026-06-30 22:06 Europe/Prague:** `CalRelayContractTests` was converted from a SwiftPM executable target into a real SwiftPM test target using Swift Testing, making `swift test` the deterministic local gate. The active Command Line Tools selection could compile Swift Testing only with manual framework/plugin flags and could not run the test bundle due to missing runtime framework lookup. Running through full Xcode succeeded: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` passed with one Swift Testing suite/test. EventKit calendar-access commands remain excluded from Cline's local validation gate.
 
+**Validation note, 2026-06-30 22:16 Europe/Prague:** Recurring-event capability was validated externally from the user's permissioned Terminal context because VS Code/Cline does not have macOS Calendar access. A short recurring timed event in a configured test work calendar converged through dry-run, apply, and follow-up dry-run using the documented recipe in `docs/manual-validation.md`; EventKit exposed occurrences inside the sync window as ordinary snapshots for this validation case.
+
 **Acceptance criteria:**
 
 - [x] `swift build` passes.
@@ -536,6 +538,7 @@ SwiftPM executable/package skeleton
 - [x] Apply followed by second apply/dry-run produces no second-run changes.
 - [x] Rename/change/copy-delete behavior produces delete-old + create-new. Deterministic contract coverage exists in `CalRelayContractTests`; manual EventKit copy/delete behavior was verified externally by the user from a permissioned Terminal context.
 - [x] Representative double-booking scenario is projected across at least two work calendars for the sync window.
+- [x] Recurring timed events exposed by EventKit inside the sync window are reconciled occurrence-by-occurrence. Verified externally from the user's permissioned Terminal context on 2026-06-30 at 22:16 Europe/Prague.
 
 **Verification:**
 
@@ -544,6 +547,7 @@ SwiftPM executable/package skeleton
 - [x] Calendar listing validated from the user's permissioned Terminal context on 2026-06-30 at 20:39 Europe/Prague. Dedicated writable test calendars are available as `Default / Test-Hub`, `Default / Test-Work-1`, and `Default / Test-Work-2`.
 - [x] Manual EventKit reconciliation validation notes are complete for dry-run/apply/idempotency/double-booking with writable `Default / Test-*` calendars and ignored `tmp/` fixtures.
 - [x] Manual rename/change/copy-delete validation is complete. Rename/change is covered by deterministic contract tests; the user verified EventKit copy/delete/apply behavior externally from a permissioned Terminal context. Cline's VS Code execution context cannot access Calendar data, so Calendar-access commands are intentionally excluded from its local validation gate.
+- [x] Manual recurring-event validation is complete for a short recurring timed event in a configured test work calendar. EventKit exposed occurrences inside the sync window as ordinary event snapshots in the user's permissioned Terminal context.
 
 **Dependencies:** Tasks 1-15
 
@@ -577,6 +581,5 @@ SwiftPM executable/package skeleton
 
 ## Remaining validation questions
 
-- Can EventKit reliably expose recurring occurrences as ordinary visible event snapshots inside the sync window? Event reads now use EventKit range predicates, but this still needs manual validation against real recurring calendars.
 - Is the 60-day default sync window sufficient after real-world testing? The default is implemented, but may need adjustment after MVP use.
 - Are source/title selectors stable enough across the user's Apple Calendar accounts, or will a fallback ID selector be needed later? Source/title selectors are implemented for the MVP; fallback IDs remain a possible future enhancement.
