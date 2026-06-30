@@ -476,12 +476,13 @@ SwiftPM executable/package skeleton
 
 ### Checkpoint: EventKit MVP capability
 
-- [ ] `swift build` passes.
-- [ ] `swift test` passes.
+- [x] `swift build` passes.
+- [x] `swift run CalRelayContractTests` passes as the current deterministic local test gate.
+- [ ] `swift test` is either wired to a real SwiftPM test target or remains explicitly documented as not used for this repository yet.
 - [ ] Calendar list/capability command works locally.
 - [ ] Dry-run produces expected creates/deletes without mutation.
 - [ ] Apply mode can create/delete harmless generated projections in test calendars.
-- [ ] EventKit imports remain adapter-only.
+- [x] EventKit imports remain adapter-only.
 
 ## Phase 5: MVP verification, docs, and hardening
 
@@ -519,7 +520,8 @@ SwiftPM executable/package skeleton
 **Acceptance criteria:**
 
 - [ ] `swift build` passes.
-- [ ] `swift test` passes.
+- [x] `swift run CalRelayContractTests` passes.
+- [ ] `swift test` either passes after adding a real SwiftPM test target or is intentionally replaced in docs by the contract-test executable gate.
 - [ ] `swift run calrelay --help` passes.
 - [ ] `swift run calrelay calendars` works.
 - [ ] Dry-run shows expected creates/deletes.

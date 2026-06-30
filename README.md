@@ -21,6 +21,8 @@ swift run CalRelayContractTests
 swift run calrelay --help
 ```
 
+`CalRelayContractTests` is the current local deterministic test gate. The default `swift test` command is not used yet because this repository currently keeps its runnable contract checks in a SwiftPM executable target rather than a SwiftPM test target.
+
 ## Usage
 
 List visible EventKit calendars, their source titles, local calendar IDs, and writable status:
