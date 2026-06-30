@@ -517,13 +517,15 @@ SwiftPM executable/package skeleton
 
 **Description:** Run the full local quality gate and manual EventKit acceptance checks from the spec, then fix any implementation gaps discovered.
 
+**Validation note, 2026-06-30:** Deterministic local checks were run with the current executable contract-test setup. Real EventKit validation is blocked until macOS grants Full Calendar access to the `calrelay` executable and harmless writable test calendars/selectors are available.
+
 **Acceptance criteria:**
 
-- [ ] `swift build` passes.
+- [x] `swift build` passes.
 - [x] `swift run CalRelayContractTests` passes.
-- [ ] `swift test` either passes after adding a real SwiftPM test target or is intentionally replaced in docs by the contract-test executable gate.
-- [ ] `swift run calrelay --help` passes.
-- [ ] `swift run calrelay calendars` works.
+- [x] `swift test` either passes after adding a real SwiftPM test target or is intentionally replaced in docs by the contract-test executable gate. Current behavior: `swift test` builds and reports `error: no tests found`; README documents `swift run CalRelayContractTests` as the deterministic gate.
+- [x] `swift run calrelay --help` passes.
+- [ ] `swift run calrelay calendars` works. Current local result: command fails safely with `Full calendar access was not granted.`
 - [ ] Dry-run shows expected creates/deletes.
 - [ ] Apply followed by second apply/dry-run produces no second-run changes.
 - [ ] Rename/change produces delete-old + create-new.
@@ -531,7 +533,7 @@ SwiftPM executable/package skeleton
 
 **Verification:**
 
-- [ ] Commands above plus manual EventKit validation notes.
+- [ ] Commands above plus manual EventKit validation notes. Non-mutating commands validated: `swift build`, `swift run CalRelayContractTests`, `swift run calrelay --help`, `swift run calrelay reconcile --help`; EventKit manual checks remain blocked by Calendar permission/test-calendar availability.
 
 **Dependencies:** Tasks 1-15
 
