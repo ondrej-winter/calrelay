@@ -12,6 +12,12 @@ struct CalRelayContractTests {
         try testRejectsNonPositiveSyncWindow()
         try testRejectsDuplicateWorkPrefixes()
         try testRejectsPersonalPrefixConflictingWithWorkPrefix()
+        try testIncludesTimedBusyEvents()
+        try testIncludesTimedTentativeEvents()
+        try testSkipsAllDayEvents()
+        try testSkipsDeclinedEvents()
+        try testSkipsCancelledEvents()
+        try testVisibleEventKeysRemainDistinctForAdjacentMeetings()
 
         print("CalRelay contract tests passed")
     }
@@ -122,6 +128,56 @@ struct CalRelayContractTests {
         )
     }
 
+    private static func testIncludesTimedBusyEvents() throws {
+        let event = eventSnapshot(availability: .busy, status: .confirmed)
+
+        try expect(EventInclusionPolicy.includes(event), "Timed busy events should be included")
+    }
+
+    private static func testIncludesTimedTentativeEvents() throws {
+        let event = eventSnapshot(availability: .tentative, status: .tentative)
+
+        try expect(EventInclusionPolicy.includes(event), "Timed tentative events should be included")
+    }
+
+    private static func testSkipsAllDayEvents() throws {
+        let event = eventSnapshot(isAllDay: true, availability: .busy, status: .confirmed)
+
+        try expect(!EventInclusionPolicy.includes(event), "All-day events should be skipped")
+    }
+
+    private static func testSkipsDeclinedEvents() throws {
+        let event = eventSnapshot(availability: .busy, status: .declined)
+
+        try expect(!EventInclusionPolicy.includes(event), "Declined events should be skipped")
+    }
+
+    private static func testSkipsCancelledEvents() throws {
+        let event = eventSnapshot(availability: .busy, status: .cancelled)
+
+        try expect(!EventInclusionPolicy.includes(event), "Cancelled events should be skipped")
+    }
+
+    private static func testVisibleEventKeysRemainDistinctForAdjacentMeetings() throws {
+        let first = eventSnapshot(
+            id: "event-1",
+            title: "Planning",
+            start: Date(timeIntervalSince1970: 1_000),
+            end: Date(timeIntervalSince1970: 2_000)
+        )
+        let adjacent = eventSnapshot(
+            id: "event-2",
+            title: "Planning",
+            start: Date(timeIntervalSince1970: 2_000),
+            end: Date(timeIntervalSince1970: 3_000)
+        )
+
+        try expect(
+            VisibleEventKey(event: first) != VisibleEventKey(event: adjacent),
+            "Repeated titles and adjacent meetings should remain distinct when start/end differ"
+        )
+    }
+
     private static func validSettings(
         hubCalendar: CalendarSelector = CalendarSelector(sourceTitle: "iCloud", calendarTitle: "Personal Work"),
         personalPrefix: String = "[ME]",
@@ -142,6 +198,28 @@ struct CalRelayContractTests {
         )
     }
 
+    private static func eventSnapshot(
+        id: String = "event-1",
+        calendar: CalendarReference = CalendarReference(id: "calendar-1", title: "ACME Work", sourceTitle: "Google"),
+        title: String = "Client Planning",
+        start: Date = Date(timeIntervalSince1970: 1_000),
+        end: Date = Date(timeIntervalSince1970: 2_000),
+        isAllDay: Bool = false,
+        availability: EventAvailability = .busy,
+        status: EventStatus = .confirmed
+    ) -> EventSnapshot {
+        EventSnapshot(
+            id: id,
+            calendar: calendar,
+            title: title,
+            start: start,
+            end: end,
+            isAllDay: isAllDay,
+            availability: availability,
+            status: status
+        )
+    }
+
     private static func expectValidationError(
         _ expectedError: SettingsValidationError,
         for settings: CalendarRelaySettings
@@ -158,6 +236,12 @@ struct CalRelayContractTests {
         }
 
         throw ContractTestFailure("Expected validation error: \(expectedError)")
+    }
+
+    private static func expect(_ condition: Bool, _ message: String) throws {
+        guard condition else {
+            throw ContractTestFailure(message)
+        }
     }
 }
 
