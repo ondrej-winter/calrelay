@@ -237,17 +237,17 @@ SwiftPM executable/package skeleton
 
 **Acceptance criteria:**
 
-- [ ] Missing expected projections appear as creates.
-- [ ] Stale locally managed prefixed projections appear as deletes.
-- [ ] Unprefixed events are never proposed for deletion.
-- [ ] Unknown prefixed hub/work events are preserved unless the prefix is configured/owned for that run.
-- [ ] Rename/change behavior appears as delete old projection + create new projection.
-- [ ] Running reconciliation against its own expected state produces no changes.
+- [x] Missing expected projections appear as creates.
+- [x] Stale locally managed prefixed projections appear as deletes.
+- [x] Unprefixed events are never proposed for deletion.
+- [x] Unknown prefixed hub/work events are preserved unless the prefix is configured/owned for that run.
+- [x] Rename/change behavior appears as delete old projection + create new projection.
+- [x] Running reconciliation against its own expected state produces no changes.
 
 **Verification:**
 
-- [ ] Unit tests for stale prefixed deletion, refusal to delete unprefixed events, unknown prefix preservation, rename/change, and idempotent second run.
-- [ ] `swift test`
+- [x] Unit tests for stale prefixed deletion, refusal to delete unprefixed events, unknown prefix preservation, rename/change, and idempotent second run.
+- [x] `swift test`
 
 **Dependencies:** Tasks 5 and 6
 
@@ -260,10 +260,10 @@ SwiftPM executable/package skeleton
 
 ### Checkpoint: Reconciliation core
 
-- [ ] `swift test` passes without real EventKit access.
+- [x] `swift test` passes without real EventKit access.
 - [ ] Unit tests cover all reconciliation bullets from the spec's testing strategy.
-- [ ] Domain code remains pure Swift/Foundation and has no EventKit, CLI, YAML, logging, or OS permission concerns.
-- [ ] Reconciliation plan output is suitable for both dry-run printing and apply-mode execution.
+- [x] Domain code remains pure Swift/Foundation and has no EventKit, CLI, YAML, logging, or OS permission concerns.
+- [x] Reconciliation plan output is suitable for both dry-run printing and apply-mode execution.
 
 ## Phase 3: Configuration and CLI orchestration
 

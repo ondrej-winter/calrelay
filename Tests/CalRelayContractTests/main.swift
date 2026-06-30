@@ -23,6 +23,12 @@ struct CalRelayContractTests {
         try testProjectsPrefixedHubEventToOtherWorkCalendars()
         try testProjectsUnprefixedHubEventToAllWorkCalendarsWithPersonalPrefix()
         try testProjectsRemotePrefixedHubEventToLocalWorkCalendars()
+        try testPlansCreateForMissingExpectedProjection()
+        try testPlansDeleteForStaleManagedProjection()
+        try testNeverDeletesUnprefixedEvents()
+        try testPreservesUnknownPrefixedEvents()
+        try testPlansRenameAsDeleteOldAndCreateNew()
+        try testPlansNoChangesWhenExpectedStateAlreadyExists()
 
         print("CalRelay contract tests passed")
     }
@@ -273,6 +279,90 @@ struct CalRelayContractTests {
         try expect(projections[0].title == "[BETA] Sales Call", "Remote prefixed hub event should preserve remote prefix")
     }
 
+    private static func testPlansCreateForMissingExpectedProjection() throws {
+        let expected = projectedEvent(title: "[ACME] Client Planning")
+
+        let plan = ReconciliationPlanner.plan(
+            expected: [expected],
+            existing: [],
+            managedPrefixes: ["[ACME]"]
+        )
+
+        try expect(plan.creates == [expected], "Missing expected projection should be planned as create")
+        try expect(plan.deletes.isEmpty, "Missing expected projection should not create deletes")
+    }
+
+    private static func testPlansDeleteForStaleManagedProjection() throws {
+        let stale = eventSnapshot(title: "[ACME] Old Planning")
+
+        let plan = ReconciliationPlanner.plan(
+            expected: [],
+            existing: [stale],
+            managedPrefixes: ["[ACME]"]
+        )
+
+        try expect(plan.creates.isEmpty, "Stale managed projection should not create events")
+        try expect(plan.deletes == [stale], "Stale managed projection should be planned as delete")
+    }
+
+    private static func testNeverDeletesUnprefixedEvents() throws {
+        let original = eventSnapshot(title: "Client Planning")
+
+        let plan = ReconciliationPlanner.plan(
+            expected: [],
+            existing: [original],
+            managedPrefixes: ["[ACME]"]
+        )
+
+        try expect(plan.deletes.isEmpty, "Unprefixed events should never be deleted")
+    }
+
+    private static func testPreservesUnknownPrefixedEvents() throws {
+        let remote = eventSnapshot(title: "[BETA] Sales Call")
+
+        let plan = ReconciliationPlanner.plan(
+            expected: [],
+            existing: [remote],
+            managedPrefixes: ["[ACME]"]
+        )
+
+        try expect(plan.deletes.isEmpty, "Unknown prefixed events should be preserved")
+    }
+
+    private static func testPlansRenameAsDeleteOldAndCreateNew() throws {
+        let old = eventSnapshot(title: "[ACME] Old Planning")
+        let new = projectedEvent(title: "[ACME] New Planning")
+
+        let plan = ReconciliationPlanner.plan(
+            expected: [new],
+            existing: [old],
+            managedPrefixes: ["[ACME]"]
+        )
+
+        try expect(plan.creates == [new], "Renamed projection should create new visible event")
+        try expect(plan.deletes == [old], "Renamed projection should delete old managed event")
+    }
+
+    private static func testPlansNoChangesWhenExpectedStateAlreadyExists() throws {
+        let existing = eventSnapshot(title: "[ACME] Client Planning")
+        let expected = projectedEvent(
+            destinationCalendar: existing.calendar,
+            title: existing.title,
+            start: existing.start,
+            end: existing.end,
+            isAllDay: existing.isAllDay
+        )
+
+        let plan = ReconciliationPlanner.plan(
+            expected: [expected],
+            existing: [existing],
+            managedPrefixes: ["[ACME]"]
+        )
+
+        try expect(plan.creates.isEmpty, "Existing expected projection should not be created again")
+        try expect(plan.deletes.isEmpty, "Existing expected projection should not be deleted")
+    }
+
     private static func validSettings(
         hubCalendar: CalendarSelector = CalendarSelector(sourceTitle: "iCloud", calendarTitle: "Personal Work"),
         personalPrefix: String = "[ME]",
@@ -312,6 +402,22 @@ struct CalRelayContractTests {
             isAllDay: isAllDay,
             availability: availability,
             status: status
+        )
+    }
+
+    private static func projectedEvent(
+        destinationCalendar: CalendarReference = CalendarReference(id: "calendar-1", title: "ACME Work", sourceTitle: "Google"),
+        title: String,
+        start: Date = Date(timeIntervalSince1970: 1_000),
+        end: Date = Date(timeIntervalSince1970: 2_000),
+        isAllDay: Bool = false
+    ) -> ProjectedEvent {
+        ProjectedEvent(
+            destinationCalendar: destinationCalendar,
+            title: title,
+            start: start,
+            end: end,
+            isAllDay: isAllDay
         )
     }
 
