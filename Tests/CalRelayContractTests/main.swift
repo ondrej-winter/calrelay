@@ -40,6 +40,9 @@ struct CalRelayContractTests {
         try await testApplyRejectsReadOnlyDestinationBeforeMutation()
         try await testApplyCreatesAndDeletesPlannedChanges()
         try await testReconciliationPropagatesCancellation()
+        try testFormatsEmptyReconciliationPlan()
+        try testFormatsPlannedCreatesAndDeletes()
+        try testReconciliationPlanOutputAvoidsDebugDumps()
 
         print("CalRelay contract tests passed")
     }
@@ -538,6 +541,46 @@ struct CalRelayContractTests {
         }
 
         throw ContractTestFailure("Expected reconciliation cancellation to propagate")
+    }
+
+    private static func testFormatsEmptyReconciliationPlan() throws {
+        let output = ReconciliationPlanFormatter.format(ReconciliationPlan(creates: [], deletes: []))
+
+        try expect(output.contains("No changes planned."), "Empty plans should produce understandable output")
+    }
+
+    private static func testFormatsPlannedCreatesAndDeletes() throws {
+        let create = projectedEvent(
+            destinationCalendar: CalendarReference(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
+            title: "[ACME] Client Planning",
+            start: Date(timeIntervalSince1970: 1_000),
+            end: Date(timeIntervalSince1970: 2_000)
+        )
+        let delete = eventSnapshot(
+            id: "stale-1",
+            calendar: CalendarReference(id: "acme-1", title: "ACME Work", sourceTitle: "Google"),
+            title: "[ME] Dentist",
+            start: Date(timeIntervalSince1970: 3_000),
+            end: Date(timeIntervalSince1970: 4_000)
+        )
+
+        let output = ReconciliationPlanFormatter.format(ReconciliationPlan(creates: [create], deletes: [delete]))
+
+        try expect(output.contains("Creates (1)"), "Output should summarize create count")
+        try expect(output.contains("Deletes (1)"), "Output should summarize delete count")
+        try expect(output.contains("iCloud / Personal Work"), "Create output should include destination selector")
+        try expect(output.contains("Google / ACME Work"), "Delete output should include event calendar selector")
+        try expect(output.contains("[ACME] Client Planning"), "Create output should include title")
+        try expect(output.contains("[ME] Dentist"), "Delete output should include title")
+        try expect(output.contains("1970-01-01 00:16:40 +0000 → 1970-01-01 00:33:20 +0000"), "Output should include create time range")
+        try expect(output.contains("1970-01-01 00:50:00 +0000 → 1970-01-01 01:06:40 +0000"), "Output should include delete time range")
+    }
+
+    private static func testReconciliationPlanOutputAvoidsDebugDumps() throws {
+        let output = ReconciliationPlanFormatter.format(ReconciliationPlan(creates: [projectedEvent(title: "[ACME] Client Planning")], deletes: []))
+
+        try expect(!output.contains("ProjectedEvent("), "Output should not expose Swift debug dumps")
+        try expect(!output.contains("CalendarReference("), "Output should not expose Swift type internals")
     }
 
     private static func validSettings(

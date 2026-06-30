@@ -330,16 +330,16 @@ SwiftPM executable/package skeleton
 
 **Acceptance criteria:**
 
-- [ ] CLI supports `calrelay calendars`.
-- [ ] CLI supports `calrelay reconcile --config <file> [--apply]`.
-- [ ] Without `--apply`, CLI prints planned creates/deletes and performs no mutations.
-- [ ] Output is understandable while avoiding unnecessary raw private data beyond explicit user-facing dry-run output.
+- [x] CLI supports `calrelay calendars`.
+- [x] CLI supports `calrelay reconcile --config <file> [--apply]`.
+- [x] Without `--apply`, CLI prints planned creates/deletes and performs no mutations.
+- [x] Output is understandable while avoiding unnecessary raw private data beyond explicit user-facing dry-run output.
 
 **Verification:**
 
-- [ ] CLI parser tests or focused command tests.
-- [ ] `swift run calrelay --help`
-- [ ] `swift test`
+- [x] CLI parser tests or focused command tests.
+- [x] `swift run calrelay --help`
+- [x] `swift test`
 
 **Dependencies:** Tasks 7, 8, and 9
 
@@ -353,10 +353,10 @@ SwiftPM executable/package skeleton
 
 ### Checkpoint: CLI and application without EventKit
 
-- [ ] `swift build` passes.
-- [ ] `swift test` passes using fakes only.
-- [ ] `swift run calrelay --help` works.
-- [ ] A fake/in-memory application test proves dry-run and apply orchestration behavior.
+- [x] `swift build` passes.
+- [x] `swift test` passes using fakes only.
+- [x] `swift run calrelay --help` works.
+- [x] A fake/in-memory application test proves dry-run and apply orchestration behavior.
 - [ ] README and `docs/configuration.md` match command names and YAML shape.
 
 ## Phase 4: EventKit adapter and capability validation
