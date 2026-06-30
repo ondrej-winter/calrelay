@@ -22,10 +22,11 @@ The MVP is for a single user who wants one personal Apple Calendar work calendar
 - List available calendars, sources/accounts, and writable/read-only status.
 - Load configuration for:
   - hub calendar
-  - multiple work/client calendars
+  - one or more locally available work/client calendars
   - unique prefix per work/client calendar
   - personal-origin prefix, such as `[ME]`
   - sync window, defaulting to the next 60 days
+- Use YAML as the initial configuration format.
 - Perform dry-run reconciliation that prints events to create and delete without mutating calendars.
 - Perform apply-mode reconciliation only when explicitly requested with `--apply` after configuration validation succeeds.
 - Repeat safely: running reconciliation twice after a successful apply should produce no second-run changes.
@@ -64,7 +65,8 @@ For the first MVP:
 - Skip all-day events.
 - Skip declined events.
 - Skip cancelled events.
-- Copy recurring events occurrence-by-occurrence inside the sync window when EventKit supports exposing those occurrences adequately.
+- Copy recurring events occurrence-by-occurrence inside the sync window when EventKit exposes those occurrences.
+- Treat each exposed recurring occurrence as an ordinary visible event snapshot for reconciliation.
 - Do not preserve or reproduce original recurrence-rule configuration.
 
 ### Managed-event safety convention
@@ -73,7 +75,23 @@ For the first MVP:
 - Prefixes are both human-readable source markers and CalRelay ownership markers.
 - CalRelay may delete stale prefixed events in configured managed calendars.
 - CalRelay must never delete unprefixed events from work/client calendars.
+- CalRelay must preserve unknown prefixed events by default rather than treating them as stale local projections.
+- CalRelay must mutate only the hub calendar and locally configured writable work/client calendars for the current run.
 - Manual edits to prefixed generated events may be overwritten or deleted by reconciliation.
+
+### Multi-computer topology
+
+CalRelay may run on multiple computers where each machine can see the shared hub calendar plus only a subset of work/client calendars. For example:
+
+```text
+Laptop A: Personal Work hub + ACME
+Laptop B: Personal Work hub + BETA
+Laptop C: Personal Work hub + ACME + BETA
+```
+
+Each machine is responsible only for its locally configured work calendars and prefixes. A machine must not delete hub events with unknown or remote prefixes just because their source work calendar is not configured locally.
+
+Remote prefixed hub events can still act as blockers for local work calendars. For example, if Laptop A is configured only with ACME but sees `[BETA] Sales Call` in the hub, it may project `[BETA] Sales Call` into ACME to prevent double-booking, but it must not delete the `[BETA]` hub event.
 
 ### Routing rules
 
@@ -115,12 +133,43 @@ Personal Work: Dentist
 -> CONTOSO: [ME] Dentist
 ```
 
+Remote prefixed hub event to locally configured work calendar:
+
+```text
+Machine configuration: hub + ACME only
+
+Personal Work: [BETA] Sales Call
+-> ACME: [BETA] Sales Call
+-> do not delete [BETA] Sales Call from Personal Work
+```
+
+Unknown prefixed events in work calendars are preserved by default unless a future configuration explicitly opts into managing that prefix.
+
+### Initial configuration shape
+
+The initial configuration format is YAML. The implementation may use a SwiftPM YAML package such as `Yams` rather than hand-rolling a parser.
+
+Example single-work-calendar configuration:
+
+```yaml
+hubCalendarID: "EVENTKIT-HUB-ID"
+personalPrefix: "[ME]"
+syncWindowDays: 60
+workCalendars:
+  - id: "EVENTKIT-ACME-ID"
+    name: "ACME"
+    prefix: "[ACME]"
+```
+
+The executable command name is `calrelay`.
+
 ## Commands and validation
 
 Initial commands once the SwiftPM package exists:
 
 - Build: `swift build`
 - Test: `swift test`
+- Basic command/help check: `swift run calrelay --help`.
 - Calendar capability check: run the CLI command that lists calendars, sources/accounts, and writability.
 - Dry-run check: run reconciliation in dry-run mode and inspect planned creates/deletes.
 - Idempotency check: run reconciliation twice after apply and confirm the second run is a no-op.
@@ -146,6 +195,7 @@ Initial commands once the SwiftPM package exists:
 - Keep EventKit, permissions, calendar IDs, calendar stores, and mutation mechanics inside adapters.
 - Keep reconciliation logic pure and unit-testable.
 - Keep configuration loading, parsing, defaulting, and validation in adapters or bootstrap code before constructing application services.
+- Use YAML for initial configuration and document any YAML parser dependency.
 - Pass validated settings into application use cases as explicit DTOs.
 - Prefer Swift structured concurrency for asynchronous workflows.
 - Default to dry-run unless `--apply` is passed.
@@ -171,6 +221,10 @@ Unit-test set reconciliation for:
 - skipped cancelled events
 - repeated titles and adjacent meetings
 - tentative timed event inclusion
+- recurring occurrences treated as ordinary visible event snapshots when EventKit exposes them in the sync window
+- unknown prefixed hub events preserved rather than deleted as stale local projections
+- remote prefixed hub events projected into locally configured work calendars
+- unknown prefixed work-calendar events preserved by default
 
 Use fakes for calendar repository/EventKit ports in domain and application tests. Reserve real EventKit checks for manual validation or explicit integration/capability runs, because they depend on local Apple Calendar state, permissions, and writable calendars.
 
@@ -178,6 +232,7 @@ Use fakes for calendar repository/EventKit ports in domain and application tests
 
 - Always: validate calendar identifiers/names and prefix uniqueness before apply mode.
 - Always: fail safely when calendar permissions are unavailable, denied, revoked, or a target calendar is read-only.
+- Always: mutate only calendars configured for the current run.
 - Always: map EventKit framework types into application DTOs at the adapter boundary.
 - Always: keep SwiftUI/AppKit/menu-bar/background-agent work out of the MVP unless explicitly approved later.
 - Ask first: adding persistent stores, hidden source IDs, provider APIs, OAuth, UI/menu-bar app, background agent behavior, launch agents, or synchronization daemons.
@@ -195,18 +250,18 @@ Use fakes for calendar repository/EventKit ports in domain and application tests
 - Running reconciliation twice after apply produces no second-run changes.
 - Renaming a source event deletes the old projection and creates the new projection.
 - CalRelay never deletes unprefixed original work/client events.
+- CalRelay preserves unknown prefixed events by default in multi-computer setups.
+- CalRelay can project remote prefixed hub blockers into locally configured work calendars.
 - A representative double-booking scenario is prevented across at least two configured work calendars over the next 60 days.
 - Unit tests cover the core reconciliation rules without real EventKit access.
 
 ## Open questions
 
 - Should MVP configuration identify calendars by EventKit calendar ID, title, source/title combination, or another stable selector?
-- Should hub events with a prefix for an unknown or removed work calendar be ignored or treated as stale managed events?
 - Should all-day, declined, and cancelled event handling remain hard-coded for MVP or become configurable from day one?
 - Should tentative timed events remain included by default after real-world testing?
-- Can EventKit reliably expose recurring occurrences in a way that supports occurrence-by-occurrence projection inside the sync window?
-- Should the initial CLI config format be JSON, YAML, TOML, or argument-only?
-- What should the initial executable command name be: `calrelay`, `CalRelay`, or something else?
+- Which YAML parser dependency should be used, or should the project avoid a third-party YAML parser?
+- Can EventKit reliably expose recurring occurrences as ordinary visible event snapshots inside the sync window?
 - Is the 60-day default sync window sufficient, or should the first implementation require explicit configuration?
 
 ## Explicitly out of scope
