@@ -273,16 +273,16 @@ SwiftPM executable/package skeleton
 
 **Acceptance criteria:**
 
-- [ ] Source/title selector YAML parses successfully.
-- [ ] `syncWindowDays` defaults to 60 when omitted.
-- [ ] Parse/default/validation errors are clear and safe.
-- [ ] `Yams` is added to `Package.swift` and `Package.resolved` changes are intentional if SwiftPM creates or updates it.
+- [x] Source/title selector YAML parses successfully.
+- [x] `syncWindowDays` defaults to 60 when omitted.
+- [x] Parse/default/validation errors are clear and safe.
+- [x] `Yams` is added to `Package.swift` and `Package.resolved` changes are intentional if SwiftPM creates or updates it.
 
 **Verification:**
 
-- [ ] Unit tests for config parsing/defaulting/validation.
-- [ ] `swift build`
-- [ ] `swift test`
+- [x] Unit tests for config parsing/defaulting/validation.
+- [x] `swift build`
+- [x] `swift test`
 
 **Dependencies:** Task 3
 

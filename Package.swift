@@ -11,24 +11,37 @@ let package = Package(
         .executable(name: "calrelay", targets: ["CalRelay"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0")
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
+        .package(url: "https://github.com/jpsim/Yams.git", from: "6.0.0")
     ],
     targets: [
         .target(
             name: "CalRelayCore",
             path: "Sources/CalRelayCore"
         ),
+        .target(
+            name: "CalRelayAdapters",
+            dependencies: [
+                "CalRelayCore",
+                .product(name: "Yams", package: "Yams")
+            ],
+            path: "Sources/CalRelayAdapters"
+        ),
         .executableTarget(
             name: "CalRelay",
             dependencies: [
                 "CalRelayCore",
+                "CalRelayAdapters",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ],
             path: "Sources/CalRelay"
         ),
         .executableTarget(
             name: "CalRelayContractTests",
-            dependencies: ["CalRelayCore"],
+            dependencies: [
+                "CalRelayCore",
+                "CalRelayAdapters"
+            ],
             path: "Tests/CalRelayContractTests"
         )
     ]

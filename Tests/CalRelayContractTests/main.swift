@@ -1,3 +1,4 @@
+import CalRelayAdapters
 import CalRelayCore
 import Foundation
 
@@ -29,6 +30,10 @@ struct CalRelayContractTests {
         try testPreservesUnknownPrefixedEvents()
         try testPlansRenameAsDeleteOldAndCreateNew()
         try testPlansNoChangesWhenExpectedStateAlreadyExists()
+        try testParsesCanonicalYAMLSettings()
+        try testDefaultsSyncWindowDaysWhenOmitted()
+        try testReportsSafeYAMLShapeErrors()
+        try testReportsSettingsValidationErrorsFromYAML()
 
         print("CalRelay contract tests passed")
     }
@@ -363,6 +368,64 @@ struct CalRelayContractTests {
         try expect(plan.deletes.isEmpty, "Existing expected projection should not be deleted")
     }
 
+    private static func testParsesCanonicalYAMLSettings() throws {
+        let settings = try YAMLCalendarRelaySettingsLoader.load(canonicalSettingsYAML(syncWindowDays: 45))
+
+        try expect(settings == validSettings(syncWindowDays: 45), "Canonical YAML should parse into expected settings")
+    }
+
+    private static func testDefaultsSyncWindowDaysWhenOmitted() throws {
+        let settings = try YAMLCalendarRelaySettingsLoader.load(canonicalSettingsYAML(syncWindowDays: nil))
+
+        try expect(settings.syncWindowDays == 60, "Omitted syncWindowDays should default to 60")
+    }
+
+    private static func testReportsSafeYAMLShapeErrors() throws {
+        do {
+            _ = try YAMLCalendarRelaySettingsLoader.load("hubCalendar: [not, a, selector]")
+        } catch let error as YAMLCalendarRelaySettingsError {
+            try expect(error.description.contains("Invalid configuration"), "Shape errors should be clear")
+            try expect(!error.description.contains("hubCalendar: [not, a, selector]"), "Shape errors should not echo raw YAML")
+            return
+        } catch {
+            throw ContractTestFailure("Expected YAMLCalendarRelaySettingsError, got \(error)")
+        }
+
+        throw ContractTestFailure("Expected invalid YAML shape error")
+    }
+
+    private static func testReportsSettingsValidationErrorsFromYAML() throws {
+        let yaml = """
+        hubCalendar:
+          sourceTitle: "iCloud"
+          calendarTitle: "Personal Work"
+        personalPrefix: "[ME]"
+        syncWindowDays: 60
+        workCalendars:
+          - name: "ACME"
+            prefix: "[WORK]"
+            calendar:
+              sourceTitle: "Google"
+              calendarTitle: "ACME Work"
+          - name: "BETA"
+            prefix: "[WORK]"
+            calendar:
+              sourceTitle: "Exchange"
+              calendarTitle: "BETA Work"
+        """
+
+        do {
+            _ = try YAMLCalendarRelaySettingsLoader.load(yaml)
+        } catch let error as YAMLCalendarRelaySettingsError {
+            try expect(error.description.contains("Work calendar prefix must be unique"), "Validation errors should surface actionable messages")
+            return
+        } catch {
+            throw ContractTestFailure("Expected YAMLCalendarRelaySettingsError, got \(error)")
+        }
+
+        throw ContractTestFailure("Expected settings validation error")
+    }
+
     private static func validSettings(
         hubCalendar: CalendarSelector = CalendarSelector(sourceTitle: "iCloud", calendarTitle: "Personal Work"),
         personalPrefix: String = "[ME]",
@@ -451,6 +514,23 @@ struct CalRelayContractTests {
             ),
             calendar: CalendarReference(id: calendarID, title: calendarTitle, sourceTitle: "Google")
         )
+    }
+
+    private static func canonicalSettingsYAML(syncWindowDays: Int?) -> String {
+        let syncWindowLine = syncWindowDays.map { "syncWindowDays: \($0)\n" } ?? ""
+
+        return """
+        hubCalendar:
+          sourceTitle: "iCloud"
+          calendarTitle: "Personal Work"
+        personalPrefix: "[ME]"
+        \(syncWindowLine)workCalendars:
+          - name: "ACME"
+            prefix: "[ACME]"
+            calendar:
+              sourceTitle: "Google"
+              calendarTitle: "ACME Work"
+        """
     }
 
     private static func expectValidationError(
