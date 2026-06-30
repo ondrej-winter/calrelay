@@ -261,7 +261,7 @@ SwiftPM executable/package skeleton
 ### Checkpoint: Reconciliation core
 
 - [x] `swift test` passes without real EventKit access.
-- [ ] Unit tests cover all reconciliation bullets from the spec's testing strategy.
+- [x] Contract tests cover all reconciliation bullets from the spec's testing strategy via `CalRelayContractTests`.
 - [x] Domain code remains pure Swift/Foundation and has no EventKit, CLI, YAML, logging, or OS permission concerns.
 - [x] Reconciliation plan output is suitable for both dry-run printing and apply-mode execution.
 
@@ -478,7 +478,7 @@ SwiftPM executable/package skeleton
 
 - [x] `swift build` passes.
 - [x] `swift run CalRelayContractTests` passes as the current deterministic local test gate.
-- [ ] `swift test` is either wired to a real SwiftPM test target or remains explicitly documented as not used for this repository yet.
+- [x] `swift test` is either wired to a real SwiftPM test target or remains explicitly documented as not used for this repository yet.
 - [ ] Calendar list/capability command works locally.
 - [ ] Dry-run produces expected creates/deletes without mutation.
 - [ ] Apply mode can create/delete harmless generated projections in test calendars.
@@ -501,7 +501,7 @@ SwiftPM executable/package skeleton
 **Verification:**
 
 - [x] Documentation review against implemented command names/options.
-- [ ] Commands in docs are copy/pasteable.
+- [x] Commands in docs are copy/pasteable. Rechecked `README.md` and `docs/configuration.md` against `swift run calrelay --help` and `swift run calrelay reconcile --help` on 2026-06-30.
 
 **Dependencies:** Tasks 13 and 14, because final command names/options should be known.
 
@@ -517,7 +517,7 @@ SwiftPM executable/package skeleton
 
 **Description:** Run the full local quality gate and manual EventKit acceptance checks from the spec, then fix any implementation gaps discovered.
 
-**Validation note, 2026-06-30:** Deterministic local checks were run with the current executable contract-test setup. Real EventKit validation is blocked until macOS grants Full Calendar access to the `calrelay` executable and harmless writable test calendars/selectors are available.
+**Validation note, 2026-06-30:** Deterministic local checks were run with the current executable contract-test setup. Real EventKit validation is blocked until macOS grants Full Calendar access to the `calrelay` executable and harmless writable test calendars/selectors are available. Latest rerun: `swift build`, `swift run CalRelayContractTests`, `swift run calrelay --help`, and `swift run calrelay reconcile --help` passed. `swift run calrelay calendars` still fails safely with `Full calendar access was not granted.`
 
 **Acceptance criteria:**
 
@@ -533,7 +533,8 @@ SwiftPM executable/package skeleton
 
 **Verification:**
 
-- [ ] Commands above plus manual EventKit validation notes. Non-mutating commands validated: `swift build`, `swift run CalRelayContractTests`, `swift run calrelay --help`, `swift run calrelay reconcile --help`; EventKit manual checks remain blocked by Calendar permission/test-calendar availability.
+- [x] Deterministic non-EventKit commands validated on 2026-06-30: `swift build`, `swift run CalRelayContractTests`, `swift run calrelay --help`, and `swift run calrelay reconcile --help`.
+- [ ] Manual EventKit validation notes are complete. Current local result: `swift run calrelay calendars` fails safely with `Full calendar access was not granted.`, so dry-run/apply/idempotency/rename/double-booking checks remain blocked by Calendar permission/test-calendar availability.
 
 **Dependencies:** Tasks 1-15
 
@@ -545,10 +546,10 @@ SwiftPM executable/package skeleton
 
 ### Checkpoint: Complete MVP
 
-- [ ] All spec success criteria are met or explicitly documented as not validated due to local EventKit constraints.
-- [ ] No default tests require real EventKit, real user calendars, external providers, OAuth, or network APIs.
-- [ ] Docs match implemented commands/config.
-- [ ] Conservative deletion and unknown-prefix preservation are covered by tests.
+- [x] All spec success criteria are met or explicitly documented as not validated due to local EventKit constraints.
+- [x] No default tests require real EventKit, real user calendars, external providers, OAuth, or network APIs.
+- [x] Docs match implemented commands/config.
+- [x] Conservative deletion and unknown-prefix preservation are covered by contract tests (`testPlansDeleteForStaleManagedProjection`, `testNeverDeletesUnprefixedEvents`, and `testPreservesUnknownPrefixedEvents`).
 - [ ] Ready for review or next implementation session.
 
 ## Risks and mitigations
