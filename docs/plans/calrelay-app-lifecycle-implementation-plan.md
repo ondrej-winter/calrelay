@@ -24,9 +24,10 @@ This plan deliberately defers manual sync, timer sync, EventKit notifications, l
 - Keep lifecycle and menu bar code in `Sources/CalRelayApp/` as app/bootstrap/inbound adapter code.
 - Split the current single app file into focused app-edge files before adding status item behavior.
 - Keep the app Dock-visible by default; do not add `LSUIElement`, activation policy changes, login items, helper targets, or LaunchAgents.
-- Persist only the menu bar visibility preference in app-owned settings. `AppStorage` or `UserDefaults` is acceptable at this app adapter boundary.
+- Persist only the menu bar visibility preference in app-owned settings. Prefer `@AppStorage("showMenuBarItem")` with a default value of `true`; a tiny `UserDefaults` wrapper is acceptable only if it keeps hide/show behavior clearer.
 - The menu bar item should default to **on**, with a user-facing setting to hide or show it.
-- Menu handlers should only open/focus app UI or quit; they must not call `ReconcileCalendarsUseCase` or EventKit mutation workflows.
+- Prefer SwiftUI `MenuBarExtra` first because the app already uses SwiftUI and targets macOS 26. Fall back to a small AppKit `NSStatusItem` adapter only if SwiftUI scene conditionality or window focusing does not meet the acceptance criteria in the SwiftPM-built app bundle.
+- Menu handlers should only open/focus app UI or quit; they must not call `ReconcileCalendarsUseCase`, load YAML config, mutate calendars, start timers, or subscribe to EventKit changes.
 - Keep EventKit permission/calendar listing through `EventKitCalendarStore` and `CalendarListFormatter` for the current recovery/status surface.
 
 ## Task list
@@ -104,6 +105,7 @@ This plan deliberately defers manual sync, timer sync, EventKit notifications, l
 **Acceptance criteria:**
 
 - [ ] The main app UI has a user-facing toggle for showing/hiding the menu bar item.
+- [ ] The implementation uses a stable app-edge preference key, preferably `showMenuBarItem`.
 - [ ] The preference persists across app restarts.
 - [ ] The menu bar item defaults to **on**.
 - [ ] No runtime configuration keys are added to `CalRelayCore`.
@@ -126,12 +128,12 @@ This plan deliberately defers manual sync, timer sync, EventKit notifications, l
 
 ### Task 4: Add a SwiftUI/AppKit menu bar status item with minimal actions
 
-**Description:** Add a menu bar item controlled by the visibility preference. Prefer SwiftUI `MenuBarExtra` if it meets the macOS 26 SwiftPM app constraints; otherwise use a tiny AppKit `NSStatusItem` adapter owned by `Sources/CalRelayApp/`. The first item should be UI-only and contain only minimal lifecycle actions.
+**Description:** Add a menu bar item controlled by the visibility preference. First try SwiftUI `MenuBarExtra`; if conditional scene inclusion or runtime hide/show is awkward in the SwiftPM-built app bundle, use a tiny AppKit `NSStatusItem` adapter owned by `Sources/CalRelayApp/`. The first item should be UI-only and contain only minimal lifecycle actions.
 
 **Acceptance criteria:**
 
 - [ ] When enabled, a CalRelay menu bar item appears.
-- [ ] When disabled, the status item is removed/hidden.
+- [ ] When disabled, the status item is removed/hidden at runtime and remains hidden after restart.
 - [ ] Menu contains `Open CalRelay` and `Quit`.
 - [ ] `Open CalRelay` opens or focuses the main app window.
 - [ ] `Quit` terminates the app through normal app lifecycle.
@@ -170,6 +172,7 @@ This plan deliberately defers manual sync, timer sync, EventKit notifications, l
 **Acceptance criteria:**
 
 - [ ] `README.md` app section mentions the control panel and optional menu bar item.
+- [ ] `README.md` links to `docs/specs/calrelay-app-lifecycle-spec.md` or this implementation plan so the UI-only lifecycle staging remains discoverable.
 - [ ] `docs/specs/calrelay-app-lifecycle-spec.md` remains the lifecycle source of truth; if changed, only update it to reflect accepted implementation details, not to expand scope.
 - [ ] `docs/manual-validation.md` includes a manual menu bar validation recipe if menu behavior is implemented.
 - [ ] Docs explicitly avoid implying background sync or automatic reconciliation.
@@ -241,6 +244,13 @@ This plan deliberately defers manual sync, timer sync, EventKit notifications, l
 - Do not hide the Dock icon or make the app accessory-only.
 - Do not change `CFBundleIdentifier` from `dev.owinter.CalRelay`.
 - Do not move EventKit APIs into `CalRelayCore`.
+
+## Implementation notes for the first pass
+
+- Keep the first implementation intentionally manual-validation driven for app/menu lifecycle behavior. Do not add broad UI automation unless a thin deterministic seam naturally appears.
+- If `MenuBarExtra` is used, keep the visibility preference close to scene composition and verify that disabling the preference removes or hides the menu item both immediately and after restart.
+- If `NSStatusItem` is used, keep it as an app-edge adapter with no reconciliation or EventKit orchestration responsibilities.
+- Treat `Open CalRelay` as lifecycle/window management only. Any future sync action belongs in a later plan after configuration validity, selected calendars, permission state, latest operation status, and confirmation behavior exist.
 
 ## Risks and mitigations
 
