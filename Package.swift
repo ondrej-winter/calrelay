@@ -8,7 +8,8 @@ let package = Package(
         .macOS(.v26)
     ],
     products: [
-        .executable(name: "calrelay", targets: ["CalRelay"])
+        .executable(name: "calrelay", targets: ["CalRelay"]),
+        .executable(name: "CalRelayApp", targets: ["CalRelayApp"])
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
@@ -26,6 +27,14 @@ let package = Package(
                 .product(name: "Yams", package: "Yams")
             ],
             path: "Sources/CalRelayAdapters"
+        ),
+        .executableTarget(
+            name: "CalRelayApp",
+            dependencies: [
+                "CalRelayCore",
+                "CalRelayAdapters"
+            ],
+            path: "Sources/CalRelayApp"
         ),
         .executableTarget(
             name: "CalRelay",

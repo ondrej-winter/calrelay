@@ -1,6 +1,6 @@
 # calrelay
 
-CalRelay is a local macOS Swift CLI that uses Apple Calendar/EventKit-visible calendars to relay availability blockers across multiple work calendars.
+CalRelay is a local macOS Swift CLI and app that uses Apple Calendar/EventKit-visible calendars to relay availability blockers across multiple work calendars.
 
 The current implementation source of truth is the [CalRelay EventKit MVP spec](docs/specs/calrelay-eventkit-mvp-spec.md), derived from the original idea in [`docs/ideas/calrelay-eventkit-mvp.md`](docs/ideas/calrelay-eventkit-mvp.md).
 
@@ -10,7 +10,7 @@ Implementation work is broken down in the [CalRelay EventKit MVP implementation 
 
 - macOS 26+
 - Swift 6.2+
-- Full Calendar access for the `calrelay` executable when prompted by macOS
+- Full Calendar access for `CalRelay.app` when prompted by macOS
 - Writable Apple Calendar/EventKit calendars for any calendar that CalRelay should mutate
 
 ## Build and test
@@ -19,6 +19,7 @@ Implementation work is broken down in the [CalRelay EventKit MVP implementation 
 swift build
 swift test
 swift run calrelay --help
+zsh scripts/build-calrelay-app.sh
 ```
 
 `swift test` is the local deterministic test gate. It does not require real EventKit access or real calendars. If the active Command Line Tools toolchain cannot load Swift Testing, run tests with full Xcode selected for the command:
@@ -28,6 +29,19 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 ```
 
 ## Usage
+
+### App
+
+Build and open the app bundle:
+
+```sh
+zsh scripts/build-calrelay-app.sh
+open .build/CalRelay.app
+```
+
+The app uses bundle identifier `dev.owinter.CalRelay` and owns its own macOS Calendar permission prompt. Use the **List Calendars** button to request Calendar access and confirm visible calendars.
+
+### CLI
 
 List visible EventKit calendars, their source titles, local calendar IDs, and writable status:
 
@@ -47,4 +61,4 @@ Apply the planned reconciliation. Mutation only happens when `--apply` is passed
 swift run calrelay reconcile --config calrelay.yml --apply
 ```
 
-See [`docs/configuration.md`](docs/configuration.md) for the YAML schema, selector semantics, and safety notes.
+See [`docs/configuration.md`](docs/configuration.md) for the YAML schema, selector semantics, and safety notes. Use `CalRelay.app` for EventKit permission checks; see [`docs/manual-validation.md`](docs/manual-validation.md) for the app-backed validation recipe.

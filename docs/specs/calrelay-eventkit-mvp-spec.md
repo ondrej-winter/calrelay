@@ -236,7 +236,7 @@ Unit-test set reconciliation for:
 - remote prefixed hub events projected into locally configured work calendars
 - unknown prefixed work-calendar events preserved by default
 
-Use fakes for calendar repository/EventKit ports in domain and application tests. Reserve real EventKit checks for manual validation or explicit integration/capability runs, because they depend on local Apple Calendar state, permissions, and writable calendars.
+Use fakes for calendar repository/EventKit ports in domain and application tests. Reserve real EventKit checks for `CalRelay.app`-backed capability runs or explicit integration checks, because they depend on local Apple Calendar state, permissions, and writable calendars.
 
 ## Boundaries
 

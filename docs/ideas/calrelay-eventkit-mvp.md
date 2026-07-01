@@ -203,7 +203,7 @@ The old projection is no longer expected, so it is deleted. The new projection i
 - [ ] Visible equality is good enough for MVP.
   - Test with repeated titles, adjacent meetings, all-day events, and timezone behavior.
 - [ ] Prefix-based routing is understandable in daily Apple Calendar use.
-  - Test manually with `[ACME]`, `[BETA]`, and `[ME]` events.
+  - Exercise with `[ACME]`, `[BETA]`, and `[ME]` events.
 - [ ] Repeated sync runs are idempotent.
   - Test that the second run after reconciliation produces no creates or deletes.
 - [ ] Occurrence-by-occurrence recurring-event projection is practical with EventKit inside the configured sync window.

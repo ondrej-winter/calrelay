@@ -72,3 +72,5 @@ Review dry-run output before using `--apply`, especially when introducing new pr
 - Apply mode requires writable target calendars. Read-only calendars are rejected before planned mutations are executed.
 - CalRelay must never delete unprefixed original work/client events; deletion is limited to stale prefixed projections selected by the conservative reconciliation logic.
 - Timed events from calendars that do not expose EventKit availability are treated as blocking events for MVP reconciliation, unless they are all-day, declined, or cancelled.
+
+For app-backed EventKit validation checks, see [`docs/manual-validation.md`](manual-validation.md).

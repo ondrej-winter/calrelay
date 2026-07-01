@@ -1,12 +1,21 @@
-# CalRelay manual validation
+# CalRelay validation
 
-CalRelay's default local test gate is deterministic and does not require real Apple Calendar data. EventKit behavior depends on local Calendar state, permissions, and writable calendars, so these checks must be run from a Terminal process that has Full Calendar access.
+CalRelay's default local test gate is deterministic and does not require real Apple Calendar data. EventKit behavior depends on local Calendar state, permissions, and writable calendars, so capability checks use the built `CalRelay.app` bundle, which has its own stable macOS permission identity.
 
 Use harmless test calendars before relying on CalRelay for real calendars.
 
+## Build and open the app
+
+```sh
+zsh scripts/build-calrelay-app.sh
+open .build/CalRelay.app
+```
+
+Use the app's **List Calendars** button to trigger the Calendar permission prompt for bundle identifier `dev.owinter.CalRelay` and confirm visible calendars.
+
 ## Basic MVP checks
 
-1. Run `swift run calrelay calendars` and confirm the hub/work calendars are visible and writable where needed.
+1. Open `CalRelay.app`, click **List Calendars**, and confirm the hub/work calendars are visible and writable where needed.
 2. Run dry-run and inspect planned creates/deletes:
 
    ```sh

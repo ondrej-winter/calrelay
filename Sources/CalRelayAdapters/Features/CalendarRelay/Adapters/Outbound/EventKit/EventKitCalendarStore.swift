@@ -2,7 +2,7 @@ import CalRelayCore
 @preconcurrency import EventKit
 import Foundation
 
-enum EventKitCalendarStoreError: Error, CustomStringConvertible {
+public enum EventKitCalendarStoreError: Error, CustomStringConvertible {
     case accessDenied
     case accessRestricted
     case writeOnlyAccess
@@ -12,14 +12,14 @@ enum EventKitCalendarStoreError: Error, CustomStringConvertible {
     case eventNotFound(EventSnapshot)
     case eventCalendarMismatch(expected: CalendarReference)
 
-    var description: String {
+    public var description: String {
         switch self {
         case .accessDenied:
-            "Calendar access was denied. Enable full calendar access for calrelay in System Settings."
+            "Calendar access was denied. Enable full calendar access for CalRelay in System Settings."
         case .accessRestricted:
             "Calendar access is restricted on this Mac."
         case .writeOnlyAccess:
-            "Calendar access is write-only. calrelay needs full access to list and reconcile calendars."
+            "Calendar access is write-only. CalRelay needs full access to list and reconcile calendars."
         case .accessNotGranted:
             "Full calendar access was not granted."
         case .calendarNotFound(let calendar):
@@ -34,14 +34,14 @@ enum EventKitCalendarStoreError: Error, CustomStringConvertible {
     }
 }
 
-final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable {
+public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable {
     private let eventStore: EKEventStore
 
-    init(eventStore: EKEventStore = EKEventStore()) {
+    public init(eventStore: EKEventStore = EKEventStore()) {
         self.eventStore = eventStore
     }
 
-    func listCalendars() async throws -> [CalendarSnapshot] {
+    public func listCalendars() async throws -> [CalendarSnapshot] {
         try await requestFullCalendarAccessIfNeeded()
 
         return eventStore.calendars(for: .event).map { calendar in
@@ -54,7 +54,7 @@ final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable {
         }
     }
 
-    func events(
+    public func events(
         in calendar: CalendarReference,
         from start: Date,
         to end: Date
@@ -85,7 +85,7 @@ final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable {
         }
     }
 
-    func createEvent(_ event: ProjectedEvent) async throws {
+    public func createEvent(_ event: ProjectedEvent) async throws {
         try await requestFullCalendarAccessIfNeeded()
 
         let calendar = try writableEventKitCalendar(for: event.destinationCalendar)
@@ -99,7 +99,7 @@ final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable {
         try eventStore.save(eventKitEvent, span: .thisEvent, commit: true)
     }
 
-    func deleteEvent(_ event: EventSnapshot) async throws {
+    public func deleteEvent(_ event: EventSnapshot) async throws {
         try await requestFullCalendarAccessIfNeeded()
 
         _ = try writableEventKitCalendar(for: event.calendar)
