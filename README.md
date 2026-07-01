@@ -28,6 +28,15 @@ zsh scripts/build-calrelay-app.sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 ```
 
+## Repository layout
+
+- `Sources/CalRelayCore/`: pure domain/application logic for the `CalendarRelay` feature, including DTOs, ports, settings validation, projection, and reconciliation planning.
+- `Sources/CalRelayAdapters/`: YAML configuration, CLI output formatting, and EventKit outbound adapters.
+- `Sources/CalRelay/`: executable `calrelay` CLI command parsing and composition.
+- `Sources/CalRelayApp/`: minimal app wrapper used for macOS Calendar permission and EventKit capability checks.
+- `Tests/CalRelayContractTests/`: deterministic Swift Testing contract suite used by `swift test`; it uses fakes and does not require real EventKit access.
+- `docs/manual-validation.md`: app-backed EventKit validation recipe for local writable test calendars.
+
 ## Usage
 
 ### App

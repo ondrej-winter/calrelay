@@ -36,6 +36,21 @@ This plan breaks the accepted MVP spec in `docs/specs/calrelay-eventkit-mvp-spec
   - skip cancelled events
 - Add separate configuration documentation from the beginning in `docs/configuration.md`.
 
+## Actual implemented layout
+
+The completed MVP keeps the same `CalendarRelay` vertical-slice vocabulary, but the SwiftPM package is split into focused targets so architecture boundaries are clearer:
+
+- `Sources/CalRelayCore/Features/CalendarRelay/Domain/`: pure reconciliation and projection rules.
+- `Sources/CalRelayCore/Features/CalendarRelay/Application/`: DTOs, ports, settings validation, and reconciliation use-case orchestration.
+- `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Inbound/Config/`: YAML configuration loading and defaulting.
+- `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Inbound/CLI/`: user-facing output formatting.
+- `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Outbound/EventKit/`: EventKit permission, calendar, event-read, create, and delete adapter.
+- `Sources/CalRelay/Features/CalendarRelay/Adapters/Inbound/CLI/`: executable `calrelay` command parsing and composition.
+- `Sources/CalRelayApp/`: app-bundle wrapper for macOS Calendar permission and EventKit capability checks.
+- `Tests/CalRelayContractTests/`: deterministic Swift Testing contract suite run by `swift test` without real EventKit access.
+
+Some early task sections below mention the original single-target paths or the historical `swift run CalRelayContractTests` command. Those notes are preserved for traceability; the current deterministic test gate is `swift test`, using the `CalRelayContractTests` test target.
+
 Canonical YAML shape for the MVP uses source/title selectors:
 
 ```yaml

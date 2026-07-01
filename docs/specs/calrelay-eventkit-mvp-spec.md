@@ -9,8 +9,8 @@ The MVP is for a single user who wants one personal Apple Calendar work calendar
 ## Current context
 
 - Source idea: `docs/ideas/calrelay-eventkit-mvp.md`.
-- The repository currently has no Swift package skeleton.
-- `README.md` is intentionally minimal and should link to this spec as the canonical product/implementation definition.
+- The repository now has a Swift Package Manager implementation with separate core, adapter, CLI, app, and test targets.
+- `README.md` links to this spec as the canonical product definition and to the implementation plan for completed MVP delivery notes.
 - Project rules prefer Swift Package Manager, hexagonal architecture, vertical feature slices, and adapters around EventKit/platform APIs.
 - Apple Calendar/EventKit is the integration surface: if a client calendar is visible and writable in Apple Calendar, CalRelay can participate.
 - The MVP targets macOS 26+.
@@ -187,14 +187,17 @@ Initial commands once the SwiftPM package exists:
 ## Project structure
 
 - `Package.swift`: SwiftPM package manifest.
-- `Sources/CalRelay/Features/CalendarRelay/Domain/`: pure projection and reconciliation rules.
-- `Sources/CalRelay/Features/CalendarRelay/Application/UseCases/`: use-case orchestration.
-- `Sources/CalRelay/Features/CalendarRelay/Application/Ports/`: EventKit/calendar store outbound port protocols and CLI-facing inbound use-case protocols when needed.
-- `Sources/CalRelay/Features/CalendarRelay/Application/DTOs/`: commands, queries, results, event snapshots, calendar snapshots, and settings DTOs.
-- `Sources/CalRelay/Features/CalendarRelay/Adapters/Inbound/CLI/`: command parsing and user-facing command output.
-- `Sources/CalRelay/Features/CalendarRelay/Adapters/Outbound/EventKit/`: EventKit calendar adapter, permission handling, and platform mapping.
-- `Tests/Unit/Features/CalendarRelay/`: deterministic domain/application tests with fakes.
-- `Tests/Integration/Features/CalendarRelay/Adapters/`: optional EventKit adapter capability tests that are not required for default local test runs.
+- `Sources/CalRelayCore/Features/CalendarRelay/Domain/`: pure projection and reconciliation rules.
+- `Sources/CalRelayCore/Features/CalendarRelay/Application/UseCases/`: use-case orchestration.
+- `Sources/CalRelayCore/Features/CalendarRelay/Application/Ports/`: EventKit/calendar store outbound port protocols.
+- `Sources/CalRelayCore/Features/CalendarRelay/Application/DTOs/`: settings, snapshots, reconciliation plans, commands, queries, and results that cross application boundaries.
+- `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Inbound/CLI/`: user-facing output formatting.
+- `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Inbound/Config/`: YAML configuration parsing, defaulting, and mapping into application DTOs.
+- `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Outbound/EventKit/`: EventKit calendar adapter, permission handling, and platform mapping.
+- `Sources/CalRelay/Features/CalendarRelay/Adapters/Inbound/CLI/`: executable CLI command parsing and composition.
+- `Sources/CalRelayApp/`: minimal app wrapper used for app-bundle Calendar permission and capability validation.
+- `Tests/CalRelayContractTests/`: deterministic domain/application/adapter contract tests with fakes. This target is the default `swift test` gate and does not require real EventKit access.
+- Optional real EventKit capability checks are documented in `docs/manual-validation.md` and are run through `CalRelay.app` or explicit local validation, not default tests.
 - `docs/specs/calrelay-eventkit-mvp-spec.md`: accepted specification.
 
 ## Conventions
