@@ -6,6 +6,10 @@ Build `calrelay` as a local macOS Swift Package CLI. The MVP uses Apple Calendar
 
 This plan breaks the accepted MVP spec in `docs/specs/calrelay-eventkit-mvp-spec.md` into ordered implementation tasks that can be completed and verified incrementally.
 
+## MVP completion baseline
+
+The EventKit MVP implementation and validation are complete as of commit `845c717e14a1fe3f696906eaec140003452bff93` (`docs: document implemented CalRelay package structure`). Use this commit as the baseline before starting post-MVP phases, feature expansion, or architectural changes.
+
 ## Finalized assumptions and decisions
 
 - Use Swift Package Manager with executable command name `calrelay`.
