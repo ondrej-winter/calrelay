@@ -6,6 +6,10 @@ Implement the next app lifecycle milestone from `docs/specs/calrelay-app-lifecyc
 
 This plan deliberately defers manual sync, timer sync, EventKit notifications, launch-at-login, LaunchAgent/helper behavior, accessory-only mode, and background reconciliation.
 
+## Lifecycle/menu bar milestone baseline
+
+The app lifecycle and UI-only menu bar milestone implementation and machine validation are complete as of commit `5ca914d3051465a17b6e3b98243cc26000721751` (`feat(app): add optional menu bar control surface for CalRelay`). Use this commit as the baseline before starting the next lifecycle milestone. Real macOS GUI interaction checks are intentionally deferred to a future GUI/manual validation pass.
+
 ## Implementation status
 
 Status as of 2026-07-02:
