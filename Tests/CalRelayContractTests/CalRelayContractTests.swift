@@ -1,7 +1,7 @@
-import CalRelayAdapters
 import CalRelayCore
 import Foundation
 import Testing
+@testable import CalRelayAdapters
 
 @Suite("CalRelay contract tests")
 struct CalRelayContractTests {
@@ -45,6 +45,9 @@ struct CalRelayContractTests {
         try Self.testDefaultsSyncWindowDaysWhenOmitted()
         try Self.testReportsSafeYAMLShapeErrors()
         try Self.testReportsSettingsValidationErrorsFromYAML()
+        try Self.testMapsCurrentUserTentativeParticipantStatusToTentative()
+        try Self.testMapsCurrentUserDeclinedParticipantStatusToDeclined()
+        try Self.testMapsAcceptedParticipantStatusFromOverallEventStatus()
         try await Self.testDryRunPlansChangesWithoutMutatingCalendarStore()
         try await Self.testRejectsMissingCalendarSelectorDuringReconciliation()
         try await Self.testRejectsAmbiguousCalendarSelectorDuringReconciliation()
@@ -507,6 +510,33 @@ struct CalRelayContractTests {
         }
 
         throw ContractTestFailure("Expected settings validation error")
+    }
+
+    private static func testMapsCurrentUserTentativeParticipantStatusToTentative() throws {
+        let status = EventKitEventStatusMapper.mapStatus(
+            currentUserParticipantStatus: .tentative,
+            eventStatus: .confirmed
+        )
+
+        try expect(status == .tentative, "Current-user Maybe/Tentative attendee status should map to tentative even when the event is confirmed")
+    }
+
+    private static func testMapsCurrentUserDeclinedParticipantStatusToDeclined() throws {
+        let status = EventKitEventStatusMapper.mapStatus(
+            currentUserParticipantStatus: .declined,
+            eventStatus: .confirmed
+        )
+
+        try expect(status == .declined, "Current-user declined attendee status should map to declined even when the event is confirmed")
+    }
+
+    private static func testMapsAcceptedParticipantStatusFromOverallEventStatus() throws {
+        let status = EventKitEventStatusMapper.mapStatus(
+            currentUserParticipantStatus: .accepted,
+            eventStatus: .confirmed
+        )
+
+        try expect(status == .confirmed, "Accepted attendee status should preserve the overall EventKit event status")
     }
 
     private static func testDryRunPlansChangesWithoutMutatingCalendarStore() async throws {

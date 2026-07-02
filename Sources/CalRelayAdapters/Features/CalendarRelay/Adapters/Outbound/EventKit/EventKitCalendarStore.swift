@@ -34,6 +34,47 @@ public enum EventKitCalendarStoreError: Error, CustomStringConvertible {
     }
 }
 
+enum EventKitEventStatusSnapshot: Equatable, Sendable {
+    case confirmed
+    case tentative
+    case cancelled
+    case unknown
+}
+
+enum EventKitParticipantStatusSnapshot: Equatable, Sendable {
+    case accepted
+    case declined
+    case tentative
+    case other
+}
+
+enum EventKitEventStatusMapper {
+    static func mapStatus(
+        currentUserParticipantStatus: EventKitParticipantStatusSnapshot?,
+        eventStatus: EventKitEventStatusSnapshot
+    ) -> EventStatus {
+        switch currentUserParticipantStatus {
+        case .declined:
+            return .declined
+        case .tentative:
+            return .tentative
+        case .accepted, .other, nil:
+            break
+        }
+
+        switch eventStatus {
+        case .confirmed:
+            return .confirmed
+        case .tentative:
+            return .tentative
+        case .cancelled:
+            return .cancelled
+        case .unknown:
+            return .unknown
+        }
+    }
+}
+
 public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable {
     private let eventStore: EKEventStore
 
@@ -176,27 +217,45 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
         }
     }
 
-    /// Maps EventKit event status to `EventStatus`, treating an event as declined only when the
-    /// current user's own attendee record has declined. Other attendees declining a shared
-    /// meeting must not exclude the event from sync for the calendar owner.
+    /// Maps EventKit event status to `EventStatus`, prioritizing the current user's own attendee
+    /// response when it excludes the event from sync. Other attendees declining or tentatively
+    /// accepting a shared meeting must not exclude the event from sync for the calendar owner.
     private static func mapStatus(_ event: EKEvent) -> EventStatus {
-        if let currentUserAttendee = event.attendees?.first(where: { $0.isCurrentUser }),
-            currentUserAttendee.participantStatus == .declined
-        {
-            return .declined
-        }
+        EventKitEventStatusMapper.mapStatus(
+            currentUserParticipantStatus: event.attendees?
+                .first(where: { $0.isCurrentUser })
+                .map { mapParticipantStatus($0.participantStatus) },
+            eventStatus: mapEventStatus(event.status)
+        )
+    }
 
-        switch event.status {
+    private static func mapEventStatus(_ status: EKEventStatus) -> EventKitEventStatusSnapshot {
+        switch status {
         case .confirmed:
-            return .confirmed
+            .confirmed
         case .tentative:
-            return .tentative
+            .tentative
         case .canceled:
-            return .cancelled
+            .cancelled
         case .none:
-            return .unknown
+            .unknown
         @unknown default:
-            return .unknown
+            .unknown
+        }
+    }
+
+    private static func mapParticipantStatus(_ status: EKParticipantStatus) -> EventKitParticipantStatusSnapshot {
+        switch status {
+        case .accepted:
+            .accepted
+        case .declined:
+            .declined
+        case .tentative:
+            .tentative
+        case .unknown, .pending, .delegated, .completed, .inProcess:
+            .other
+        @unknown default:
+            .other
         }
     }
 }
