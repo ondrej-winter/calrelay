@@ -33,7 +33,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 - `Sources/CalRelayCore/`: pure domain/application logic for the `CalendarRelay` feature, including DTOs, ports, settings validation, projection, and reconciliation planning.
 - `Sources/CalRelayAdapters/`: YAML configuration, CLI output formatting, and EventKit outbound adapters.
 - `Sources/CalRelay/`: executable `calrelay` CLI command parsing and composition.
-- `Sources/CalRelayApp/`: minimal app wrapper used for macOS Calendar permission and EventKit capability checks.
+- `Sources/CalRelayApp/`: Dock-visible SwiftUI app control panel and UI-only menu bar surface used for macOS Calendar permission and EventKit capability checks.
 - `Tests/CalRelayContractTests/`: deterministic Swift Testing contract suite used by `swift test`; it uses fakes and does not require real EventKit access.
 - `docs/manual-validation.md`: app-backed EventKit validation recipe for local writable test calendars.
 
@@ -48,7 +48,9 @@ zsh scripts/build-calrelay-app.sh
 open .build/CalRelay.app
 ```
 
-The app uses bundle identifier `dev.owinter.CalRelay` and owns its own macOS Calendar permission prompt. Use the **List Calendars** button to request Calendar access and confirm visible calendars.
+The app uses bundle identifier `dev.owinter.CalRelay` and owns its own macOS Calendar permission prompt. Use the main control panel's **List Calendars** button to request Calendar access and confirm visible calendars.
+
+The app remains a normal Dock-visible macOS app. It includes an optional UI-only menu bar item, enabled by default, with **Open CalRelay** and **Quit** actions. The menu bar item can be shown or hidden from the app control panel. It does not run sync, schedule background work, or listen for Calendar changes; the CLI remains the current reconciliation interface. See the [app lifecycle spec](docs/specs/calrelay-app-lifecycle-spec.md) for the staged lifecycle direction.
 
 ### CLI
 

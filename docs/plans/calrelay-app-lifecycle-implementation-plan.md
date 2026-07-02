@@ -6,6 +6,38 @@ Implement the next app lifecycle milestone from `docs/specs/calrelay-app-lifecyc
 
 This plan deliberately defers manual sync, timer sync, EventKit notifications, launch-at-login, LaunchAgent/helper behavior, accessory-only mode, and background reconciliation.
 
+## Implementation status
+
+Status as of 2026-07-02:
+
+- Tasks 1-5 are implemented in the working tree.
+- `Sources/CalRelayApp/CalRelayApp.swift` now owns SwiftUI scene composition only.
+- `CalendarListViewModel`, `CalendarListView`, app settings keys, and menu bar actions now live in separate app-edge files under `Sources/CalRelayApp/`.
+- The app control panel now describes Calendar permission and visible-calendar checks as the current recovery/status surface.
+- The menu bar item uses SwiftUI `MenuBarExtra` and is controlled by `@AppStorage("showMenuBarItem")`, defaulting to enabled.
+- The menu contains only `Open CalRelay` and `Quit`; no sync, timer, EventKit notification, launch-at-login, helper, or background behavior was added.
+- `README.md` and `docs/manual-validation.md` were updated for the implemented control panel and UI-only menu bar behavior.
+
+Validation already run:
+
+- [x] `swift build` passed.
+- [x] `swift test` was attempted and hit the documented active Command Line Tools issue: `no such module 'Testing'`.
+- [x] `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` passed, including the Swift Testing contract suite.
+- [x] `zsh scripts/build-calrelay-app.sh` passed and rebuilt `.build/CalRelay.app`.
+- [x] Additional native app self-test verified bundle metadata, code signature, launch/process lifecycle, and preference persistence via CLI/AppleScript.
+- [ ] Visual menu bar interaction and Calendar permission/listing checks still need human confirmation in the real macOS UI.
+
+Native app self-test results:
+
+- [x] `.build/CalRelay.app/Contents/Info.plist` contains `CFBundleIdentifier = dev.owinter.CalRelay`.
+- [x] `.build/CalRelay.app/Contents/Info.plist` does not define `LSUIElement`, so this build does not opt into accessory-only/Dock-hidden mode.
+- [x] `.build/CalRelay.app/Contents/Info.plist` contains `CFBundleExecutable = CalRelayApp`.
+- [x] `codesign --verify --verbose=2 .build/CalRelay.app` passed.
+- [x] `open .build/CalRelay.app` launched the app process at `.build/CalRelay.app/Contents/MacOS/CalRelayApp`.
+- [x] `osascript` quit the app by bundle identifier and `pgrep` confirmed no remaining CalRelay app process.
+- [x] `defaults write/read dev.owinter.CalRelay showMenuBarItem` verified the app preference domain stores `showMenuBarItem` values and preserves them across an app launch/quit cycle.
+- [ ] System Events UI inspection was attempted, but native menu bar/window details were not reliably scriptable in this environment; use `docs/manual-validation.md` for the remaining visual checks.
+
 ## Current-state findings
 
 - `Sources/CalRelayApp/CalRelayApp.swift` is currently a single-file SwiftUI app with:
@@ -40,17 +72,17 @@ This plan deliberately defers manual sync, timer sync, EventKit notifications, l
 
 **Acceptance criteria:**
 
-- [ ] `CalRelayApp.swift` contains only the SwiftUI `@main` app entry and scene composition.
-- [ ] `CalendarListViewModel` lives in its own file and remains `@MainActor`.
-- [ ] `CalendarListView` lives in its own file.
-- [ ] The **List Calendars** flow still requests Calendar access and renders EventKit-visible calendars.
-- [ ] No EventKit types leak into `CalRelayCore`.
+- [x] `CalRelayApp.swift` contains only the SwiftUI `@main` app entry and scene composition.
+- [x] `CalendarListViewModel` lives in its own file and remains `@MainActor`.
+- [x] `CalendarListView` lives in its own file.
+- [x] The **List Calendars** flow still requests Calendar access and renders EventKit-visible calendars.
+- [x] No EventKit types leak into `CalRelayCore`.
 
 **Verification:**
 
-- [ ] `swift build`
-- [ ] `swift test`
-- [ ] `zsh scripts/build-calrelay-app.sh`
+- [x] `swift build`
+- [x] `swift test` via `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test`
+- [x] `zsh scripts/build-calrelay-app.sh`
 - [ ] Manual app check: open `.build/CalRelay.app`, click **List Calendars**, confirm existing behavior.
 
 **Dependencies:** None
@@ -69,15 +101,15 @@ This plan deliberately defers manual sync, timer sync, EventKit notifications, l
 
 **Acceptance criteria:**
 
-- [ ] Main window remains the primary recovery/status surface.
-- [ ] UI copy clearly says the app currently supports Calendar permission and visible-calendar checks.
-- [ ] UI does not expose `Dry Run Sync`, `Run Sync Now`, background sync, or scheduling controls.
-- [ ] Calendar permission/listing errors remain user-actionable.
+- [x] Main window remains the primary recovery/status surface.
+- [x] UI copy clearly says the app currently supports Calendar permission and visible-calendar checks.
+- [x] UI does not expose `Dry Run Sync`, `Run Sync Now`, background sync, or scheduling controls.
+- [x] Calendar permission/listing errors remain user-actionable.
 
 **Verification:**
 
-- [ ] `swift build`
-- [ ] `zsh scripts/build-calrelay-app.sh`
+- [x] `swift build`
+- [x] `zsh scripts/build-calrelay-app.sh`
 - [ ] Manual app check: control panel copy and **List Calendars** behavior.
 
 **Dependencies:** Task 1
@@ -92,9 +124,9 @@ This plan deliberately defers manual sync, timer sync, EventKit notifications, l
 ### Checkpoint: Stage 1 normal app baseline
 
 - [ ] App remains visible in Dock and app switcher.
-- [ ] Bundle identifier remains `dev.owinter.CalRelay`.
+- [x] Bundle identifier remains `dev.owinter.CalRelay`.
 - [ ] Calendar permission and visible-calendar listing still work through the app bundle.
-- [ ] No accessory-only, launch-at-login, helper, cron, or automatic sync behavior exists.
+- [x] No accessory-only, launch-at-login, helper, cron, or automatic sync behavior exists.
 
 ## Phase 2: User-configurable UI-only menu bar item
 
@@ -104,17 +136,18 @@ This plan deliberately defers manual sync, timer sync, EventKit notifications, l
 
 **Acceptance criteria:**
 
-- [ ] The main app UI has a user-facing toggle for showing/hiding the menu bar item.
-- [ ] The implementation uses a stable app-edge preference key, preferably `showMenuBarItem`.
-- [ ] The preference persists across app restarts.
-- [ ] The menu bar item defaults to **on**.
-- [ ] No runtime configuration keys are added to `CalRelayCore`.
+- [x] The main app UI has a user-facing toggle for showing/hiding the menu bar item.
+- [x] The implementation uses a stable app-edge preference key, preferably `showMenuBarItem`.
+- [x] The preference persists across app restarts.
+- [x] The menu bar item defaults to **on**.
+- [x] No runtime configuration keys are added to `CalRelayCore`.
 
 **Verification:**
 
-- [ ] `swift build`
-- [ ] `zsh scripts/build-calrelay-app.sh`
-- [ ] Manual app check: toggle preference, quit/reopen, confirm persistence.
+- [x] `swift build`
+- [x] `zsh scripts/build-calrelay-app.sh`
+- [x] CLI/AppleScript app check: preference value persisted across app launch/quit cycle.
+- [ ] Manual app check: toggle preference in the UI, quit/reopen, confirm visual persistence.
 
 **Dependencies:** Task 2
 
@@ -134,16 +167,16 @@ This plan deliberately defers manual sync, timer sync, EventKit notifications, l
 
 - [ ] When enabled, a CalRelay menu bar item appears.
 - [ ] When disabled, the status item is removed/hidden at runtime and remains hidden after restart.
-- [ ] Menu contains `Open CalRelay` and `Quit`.
+- [x] Menu contains `Open CalRelay` and `Quit`.
 - [ ] `Open CalRelay` opens or focuses the main app window.
-- [ ] `Quit` terminates the app through normal app lifecycle.
-- [ ] Menu actions do not instantiate `ReconcileCalendarsUseCase`, load YAML config, mutate calendars, start timers, or listen to EventKit changes.
+- [x] `Quit` terminates the app through normal app lifecycle.
+- [x] Menu actions do not instantiate `ReconcileCalendarsUseCase`, load YAML config, mutate calendars, start timers, or listen to EventKit changes.
 - [ ] App remains Dock-visible while menu item is enabled.
 
 **Verification:**
 
-- [ ] `swift build`
-- [ ] `zsh scripts/build-calrelay-app.sh`
+- [x] `swift build`
+- [x] `zsh scripts/build-calrelay-app.sh`
 - [ ] Manual app check: enable item, use `Open CalRelay`, close/reopen window if applicable, use `Quit`.
 
 **Dependencies:** Task 3
@@ -158,9 +191,9 @@ This plan deliberately defers manual sync, timer sync, EventKit notifications, l
 
 ### Checkpoint: First menu bar milestone
 
-- [ ] Menu bar item is user-configurable.
+- [x] Menu bar item is user-configurable.
 - [ ] App remains normal Dock-visible app.
-- [ ] Menu is UI-only: no sync, no timers, no EventKit notifications, no background behavior.
+- [x] Menu is UI-only: no sync, no timers, no EventKit notifications, no background behavior.
 - [ ] Manual real-app validation completed with `.build/CalRelay.app`.
 
 ## Phase 3: Documentation and validation closure
@@ -171,16 +204,16 @@ This plan deliberately defers manual sync, timer sync, EventKit notifications, l
 
 **Acceptance criteria:**
 
-- [ ] `README.md` app section mentions the control panel and optional menu bar item.
-- [ ] `README.md` links to `docs/specs/calrelay-app-lifecycle-spec.md` or this implementation plan so the UI-only lifecycle staging remains discoverable.
-- [ ] `docs/specs/calrelay-app-lifecycle-spec.md` remains the lifecycle source of truth; if changed, only update it to reflect accepted implementation details, not to expand scope.
-- [ ] `docs/manual-validation.md` includes a manual menu bar validation recipe if menu behavior is implemented.
-- [ ] Docs explicitly avoid implying background sync or automatic reconciliation.
+- [x] `README.md` app section mentions the control panel and optional menu bar item.
+- [x] `README.md` links to `docs/specs/calrelay-app-lifecycle-spec.md` or this implementation plan so the UI-only lifecycle staging remains discoverable.
+- [x] `docs/specs/calrelay-app-lifecycle-spec.md` remains the lifecycle source of truth; if changed, only update it to reflect accepted implementation details, not to expand scope.
+- [x] `docs/manual-validation.md` includes a manual menu bar validation recipe if menu behavior is implemented.
+- [x] Docs explicitly avoid implying background sync or automatic reconciliation.
 
 **Verification:**
 
-- [ ] Documentation review against implemented UI.
-- [ ] Commands in docs remain copy/pasteable:
+- [x] Documentation review against implemented UI.
+- [x] Commands in docs remain copy/pasteable:
   - `swift build`
   - `swift test`
   - `zsh scripts/build-calrelay-app.sh`
@@ -202,19 +235,21 @@ This plan deliberately defers manual sync, timer sync, EventKit notifications, l
 
 **Acceptance criteria:**
 
-- [ ] `swift build` passes.
-- [ ] `swift test` passes, using `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` if the active Command Line Tools Swift Testing runtime issue appears again.
-- [ ] `zsh scripts/build-calrelay-app.sh` succeeds.
-- [ ] Opening `.build/CalRelay.app` shows a normal Dock-visible app.
+- [x] `swift build` passes.
+- [x] `swift test` passes, using `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` if the active Command Line Tools Swift Testing runtime issue appears again.
+- [x] `zsh scripts/build-calrelay-app.sh` succeeds.
+- [x] Opening `.build/CalRelay.app` launches the built app process.
+- [ ] Visual Dock/app-switcher confirmation still needs human confirmation.
 - [ ] Calendar listing still works with bundle identifier `dev.owinter.CalRelay`.
 - [ ] Menu bar item can be enabled/disabled and remains UI-only.
-- [ ] No `Info.plist` change hides the Dock icon or changes the bundle identifier.
+- [x] No `Info.plist` change hides the Dock icon or changes the bundle identifier.
 
 **Verification:**
 
-- [ ] `swift build`
-- [ ] `swift test` or `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test`
-- [ ] `zsh scripts/build-calrelay-app.sh`
+- [x] `swift build`
+- [x] `swift test` or `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test`
+- [x] `zsh scripts/build-calrelay-app.sh`
+- [x] Native app metadata, signature, process lifecycle, and preference persistence self-test.
 - [ ] Manual app/menu lifecycle validation.
 
 **Dependencies:** Tasks 1-5
@@ -230,8 +265,8 @@ This plan deliberately defers manual sync, timer sync, EventKit notifications, l
 
 - [ ] All Stage 1 behavior remains intact.
 - [ ] Stage 2 UI-only menu bar item works and is user-configurable.
-- [ ] Spec non-goals are preserved.
-- [ ] Docs and manual validation notes match implemented behavior.
+- [x] Spec non-goals are preserved.
+- [x] Docs and manual validation notes match implemented behavior.
 - [ ] Ready for review before any Stage 3 manual sync planning.
 
 ## Explicit non-goals
