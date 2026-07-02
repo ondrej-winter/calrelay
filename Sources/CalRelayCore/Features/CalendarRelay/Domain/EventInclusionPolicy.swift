@@ -32,9 +32,9 @@ public enum EventInclusionPolicy {
         }
 
         switch event.availability {
-        case .busy, .tentative, .notSupported:
+        case .busy, .notSupported:
             return .included
-        case .free, .unavailable, .unknown:
+        case .tentative, .free, .unavailable, .unknown:
             return .unsupportedAvailability(event.availability)
         }
     }

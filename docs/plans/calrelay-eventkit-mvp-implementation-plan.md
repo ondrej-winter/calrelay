@@ -34,7 +34,7 @@ The EventKit MVP implementation and validation are complete as of commit `845c71
 - Default reconciliation mode is dry-run. Mutation requires `--apply`.
 - MVP event inclusion rules are hard-coded:
   - include timed busy events
-  - include timed tentative events
+  - skip timed tentative events
   - skip all-day events
   - skip declined events
   - skip cancelled events
@@ -184,7 +184,7 @@ SwiftPM executable/package skeleton
 **Acceptance criteria:**
 
 - [x] Timed busy events are included.
-- [x] Tentative timed events are included.
+- [x] Tentative timed events are skipped.
 - [x] All-day, declined, and cancelled events are skipped.
 - [x] Repeated titles and adjacent meetings remain distinct when start/end differ.
 

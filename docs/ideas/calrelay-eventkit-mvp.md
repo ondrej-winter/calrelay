@@ -40,7 +40,7 @@ Timezone normalization may be added after EventKit behavior is tested.
 For the first MVP, source-event inclusion should default to:
 
 - include timed busy events
-- include tentative timed events
+- skip tentative timed events
 - skip all-day events
 - skip declined events
 - skip cancelled events
@@ -223,7 +223,7 @@ The old projection is no longer expected, so it is deleted. The new projection i
 ## Open Questions Before Building
 
 - Should all-day, declined, and cancelled events remain hard-skipped after the MVP, or become configurable later?
-- Should tentative timed events remain included by default after real-world testing?
+- Should tentative timed events become configurable after real-world testing?
 - Can EventKit reliably expose recurring occurrences in a way that supports occurrence-by-occurrence projection inside the sync window?
 - Should hub events with a prefix for an unknown or removed work calendar be ignored or treated as stale managed events?
 - Is the 60-day default sync window sufficient, or should it become user-configurable immediately after the MVP?

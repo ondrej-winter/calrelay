@@ -62,7 +62,7 @@ The MVP is for a single user who wants one personal Apple Calendar work calendar
 For the first MVP:
 
 - Include timed busy events.
-- Include tentative timed events.
+- Skip tentative timed events.
 - Skip all-day events.
 - Skip declined events.
 - Skip cancelled events.
@@ -233,7 +233,7 @@ Unit-test set reconciliation for:
 - skipped declined events
 - skipped cancelled events
 - repeated titles and adjacent meetings
-- tentative timed event inclusion
+- tentative timed event exclusion
 - recurring occurrences treated as ordinary visible event snapshots when EventKit exposes them in the sync window
 - unknown prefixed hub events preserved rather than deleted as stale local projections
 - remote prefixed hub events projected into locally configured work calendars
@@ -273,7 +273,7 @@ Use fakes for calendar repository/EventKit ports in domain and application tests
 
 - Are source/title selectors stable enough across the user's Apple Calendar accounts, or will a fallback ID selector be needed later?
 - Should all-day, declined, and cancelled event handling remain hard-coded for MVP or become configurable from day one?
-- Should tentative timed events remain included by default after real-world testing?
+- Should tentative timed events become configurable after real-world testing?
 - Which exact `Yams` and `swift-argument-parser` versions should be pinned after the SwiftPM package is created?
 - Can EventKit reliably expose recurring occurrences as ordinary visible event snapshots inside the sync window?
 - Is the 60-day default sync window sufficient, or should the first implementation require explicit configuration?

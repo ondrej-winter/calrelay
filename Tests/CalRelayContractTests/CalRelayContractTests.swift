@@ -16,7 +16,7 @@ struct CalRelayContractTests {
         try Self.testRejectsDuplicateWorkPrefixes()
         try Self.testRejectsPersonalPrefixConflictingWithWorkPrefix()
         try Self.testIncludesTimedBusyEvents()
-        try Self.testIncludesTimedTentativeEvents()
+        try Self.testSkipsTimedTentativeEvents()
         try Self.testIncludesTimedEventsWhenAvailabilityIsNotSupported()
         try Self.testSkipsAllDayEvents()
         try Self.testSkipsDeclinedEvents()
@@ -25,6 +25,7 @@ struct CalRelayContractTests {
         try Self.testEvaluateReturnsAllDayReason()
         try Self.testEvaluateReturnsCancelledReason()
         try Self.testEvaluateReturnsDeclinedReason()
+        try Self.testEvaluateReturnsUnsupportedAvailabilityReasonForTentativeEvents()
         try Self.testEvaluateReturnsUnsupportedAvailabilityReasonForFreeEvents()
         try Self.testEvaluateReturnsUnsupportedAvailabilityReasonForUnavailableEvents()
         try Self.testVisibleEventKeysRemainDistinctForAdjacentMeetings()
@@ -175,10 +176,10 @@ struct CalRelayContractTests {
         try expect(EventInclusionPolicy.includes(event), "Timed busy events should be included")
     }
 
-    private static func testIncludesTimedTentativeEvents() throws {
+    private static func testSkipsTimedTentativeEvents() throws {
         let event = eventSnapshot(availability: .tentative, status: .tentative)
 
-        try expect(EventInclusionPolicy.includes(event), "Timed tentative events should be included")
+        try expect(!EventInclusionPolicy.includes(event), "Timed tentative events should be skipped by default")
     }
 
     private static func testIncludesTimedEventsWhenAvailabilityIsNotSupported() throws {
@@ -227,6 +228,15 @@ struct CalRelayContractTests {
         let event = eventSnapshot(availability: .busy, status: .declined)
 
         try expect(EventInclusionPolicy.evaluate(event) == .declined, "Declined events should evaluate with the declined reason")
+    }
+
+    private static func testEvaluateReturnsUnsupportedAvailabilityReasonForTentativeEvents() throws {
+        let event = eventSnapshot(availability: .tentative, status: .tentative)
+
+        try expect(
+            EventInclusionPolicy.evaluate(event) == .unsupportedAvailability(.tentative),
+            "Tentative events should evaluate with the unsupportedAvailability reason"
+        )
     }
 
     private static func testEvaluateReturnsUnsupportedAvailabilityReasonForFreeEvents() throws {
