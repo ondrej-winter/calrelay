@@ -126,7 +126,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
         let expectedHubEvents = workCalendars.flatMap { workCalendar in
             WorkToHubProjector.project(
                 events: workEventsByCalendarID[workCalendar.calendar.snapshot.id, default: []].filter { event in
-                    !isManagedProjection(event, managedPrefixes: managedPrefixes)
+                    !isRelayedWorkBlocker(event, managedPrefixes: managedPrefixes)
                 },
                 from: workCalendar.settings,
                 to: hubCalendar.reference
@@ -185,6 +185,14 @@ public struct ReconcileCalendarsUseCase: Sendable {
             status: event.status,
             reason: EventInclusionPolicy.evaluate(event)
         )
+    }
+
+    private func isRelayedWorkBlocker(_ event: EventSnapshot, managedPrefixes: Set<String>) -> Bool {
+        hasBracketedPrefix(event.title) || isManagedProjection(event, managedPrefixes: managedPrefixes)
+    }
+
+    private func hasBracketedPrefix(_ title: String) -> Bool {
+        title.hasPrefix("[") && title.contains("]")
     }
 
     private func isManagedProjection(_ event: EventSnapshot, managedPrefixes: Set<String>) -> Bool {

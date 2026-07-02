@@ -51,7 +51,8 @@ struct CalRelayContractTests {
         try await Self.testApplyCreatesAndDeletesPlannedChanges()
         try await Self.testDoesNotReprojectManagedWorkProjectionsToHub()
         try await Self.testProjectsWorkSourceToOtherWorkCalendarsInSamePlan()
-        try await Self.testProjectsUnknownPrefixedWorkBlockersToHub()
+        try await Self.testDoesNotDoublePrefixRelayedWorkBlockers()
+        try await Self.testDoesNotProjectUnknownPrefixedWorkBlockersToHub()
         try await Self.testReconciliationPropagatesCancellation()
         try await Self.testExplainReportsIncludedAndExcludedEvents()
         try Self.testFormatsEmptyReconciliationPlan()
@@ -643,7 +644,52 @@ struct CalRelayContractTests {
         try expect(plan.creates.contains { $0.destinationCalendar == betaReference && $0.title == "[ACME] Client Planning" }, "Work source events should project to other work calendars through the expected hub projection in the same plan")
     }
 
-    private static func testProjectsUnknownPrefixedWorkBlockersToHub() async throws {
+    private static func testDoesNotDoublePrefixRelayedWorkBlockers() async throws {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let hubCalendar = CalendarSnapshot(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: true)
+        let acmeCalendar = CalendarSnapshot(id: "acme-1", title: "ACME Work", sourceTitle: "Google", isWritable: true)
+        let betaCalendar = CalendarSnapshot(id: "beta-1", title: "BETA Work", sourceTitle: "Google", isWritable: true)
+        let acmeReference = CalendarReference(id: acmeCalendar.id, title: acmeCalendar.title, sourceTitle: acmeCalendar.sourceTitle)
+        let betaReference = CalendarReference(id: betaCalendar.id, title: betaCalendar.title, sourceTitle: betaCalendar.sourceTitle)
+        let sourceEvent = eventSnapshot(
+            id: "acme-source-1",
+            calendar: acmeReference,
+            title: "Client Planning",
+            start: Date(timeIntervalSince1970: 11_000),
+            end: Date(timeIntervalSince1970: 12_000)
+        )
+        let relayedWorkBlocker = eventSnapshot(
+            id: "beta-relayed-1",
+            calendar: betaReference,
+            title: "[ACME] Client Planning",
+            start: sourceEvent.start,
+            end: sourceEvent.end
+        )
+        let settings = CalendarRelaySettings(
+            hubCalendar: CalendarSelector(sourceTitle: hubCalendar.sourceTitle, calendarTitle: hubCalendar.title),
+            personalPrefix: "[ME]",
+            syncWindowDays: 1,
+            workCalendars: [
+                WorkCalendarSettings(name: "ACME", prefix: "[ACME]", calendar: CalendarSelector(sourceTitle: acmeCalendar.sourceTitle, calendarTitle: acmeCalendar.title)),
+                WorkCalendarSettings(name: "BETA", prefix: "[BETA]", calendar: CalendarSelector(sourceTitle: betaCalendar.sourceTitle, calendarTitle: betaCalendar.title))
+            ]
+        )
+        let store = FakeCalendarStore(
+            calendars: [hubCalendar, acmeCalendar, betaCalendar],
+            eventsByCalendarID: [
+                acmeCalendar.id: [sourceEvent],
+                betaCalendar.id: [relayedWorkBlocker]
+            ]
+        )
+        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+
+        let plan = try await useCase.dryRun(settings: settings, now: now)
+
+        try expect(!plan.creates.contains { $0.destinationCalendar.id == hubCalendar.id && $0.title == "[BETA] [ACME] Client Planning" }, "Relayed work blockers must not be treated as new source events and double-prefixed back into the hub")
+        try expect(plan.creates.contains { $0.destinationCalendar.id == hubCalendar.id && $0.title == "[ACME] Client Planning" }, "Original work source should still project to the hub")
+    }
+
+    private static func testDoesNotProjectUnknownPrefixedWorkBlockersToHub() async throws {
         let fixtures = applicationFixtures()
         let remoteWorkProjection = eventSnapshot(
             id: "remote-work-projection-1",
@@ -663,7 +709,7 @@ struct CalRelayContractTests {
 
         let plan = try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now)
 
-        try expect(plan.creates.contains { $0.destinationCalendar == fixtures.hubReference && $0.title == "[ACME] [REMOTE] Partner Planning" }, "Unknown prefixed work blockers should be treated as ordinary source events")
+        try expect(!plan.creates.contains { $0.destinationCalendar == fixtures.hubReference && $0.title == "[ACME] [REMOTE] Partner Planning" }, "Unknown prefixed work blockers should not be double-prefixed back into the hub")
         try expect(plan.deletes.isEmpty, "Unknown prefixed work blockers should be preserved rather than deleted")
     }
 
