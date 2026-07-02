@@ -27,6 +27,8 @@ public enum EventExplanationFormatter {
             "excluded (cancelled)"
         case .declined:
             "excluded (declined)"
+        case .tentative:
+            "excluded (tentative)"
         case .unsupportedAvailability(let availability):
             "excluded (unsupported availability: \(availability))"
         }

@@ -10,6 +10,7 @@ public enum EventInclusionReason: Equatable, Sendable {
     case allDay
     case cancelled
     case declined
+    case tentative
     case unsupportedAvailability(EventAvailability)
 }
 
@@ -29,6 +30,10 @@ public enum EventInclusionPolicy {
 
         guard event.status != .declined else {
             return .declined
+        }
+
+        guard event.status != .tentative else {
+            return .tentative
         }
 
         switch event.availability {

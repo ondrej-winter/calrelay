@@ -20,11 +20,13 @@ struct CalRelayContractTests {
         try Self.testIncludesTimedEventsWhenAvailabilityIsNotSupported()
         try Self.testSkipsAllDayEvents()
         try Self.testSkipsDeclinedEvents()
+        try Self.testSkipsTentativeStatusEvents()
         try Self.testSkipsCancelledEvents()
         try Self.testEvaluateReturnsIncludedForBusyEvents()
         try Self.testEvaluateReturnsAllDayReason()
         try Self.testEvaluateReturnsCancelledReason()
         try Self.testEvaluateReturnsDeclinedReason()
+        try Self.testEvaluateReturnsTentativeReason()
         try Self.testEvaluateReturnsUnsupportedAvailabilityReasonForTentativeEvents()
         try Self.testEvaluateReturnsUnsupportedAvailabilityReasonForFreeEvents()
         try Self.testEvaluateReturnsUnsupportedAvailabilityReasonForUnavailableEvents()
@@ -203,6 +205,12 @@ struct CalRelayContractTests {
         try expect(!EventInclusionPolicy.includes(event), "Declined events should be skipped")
     }
 
+    private static func testSkipsTentativeStatusEvents() throws {
+        let event = eventSnapshot(availability: .busy, status: .tentative)
+
+        try expect(!EventInclusionPolicy.includes(event), "Tentative status events should be skipped even when availability is busy")
+    }
+
     private static func testSkipsCancelledEvents() throws {
         let event = eventSnapshot(availability: .busy, status: .cancelled)
 
@@ -233,8 +241,14 @@ struct CalRelayContractTests {
         try expect(EventInclusionPolicy.evaluate(event) == .declined, "Declined events should evaluate with the declined reason")
     }
 
+    private static func testEvaluateReturnsTentativeReason() throws {
+        let event = eventSnapshot(availability: .busy, status: .tentative)
+
+        try expect(EventInclusionPolicy.evaluate(event) == .tentative, "Tentative status events should evaluate with the tentative reason")
+    }
+
     private static func testEvaluateReturnsUnsupportedAvailabilityReasonForTentativeEvents() throws {
-        let event = eventSnapshot(availability: .tentative, status: .tentative)
+        let event = eventSnapshot(availability: .tentative, status: .confirmed)
 
         try expect(
             EventInclusionPolicy.evaluate(event) == .unsupportedAvailability(.tentative),
