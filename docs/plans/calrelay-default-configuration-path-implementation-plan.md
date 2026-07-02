@@ -10,6 +10,24 @@ Implement the behavior specified in [`docs/specs/calrelay-default-configuration-
 - Configuration path mechanics remain at the CLI, app, or bootstrap edge and do not leak into `CalRelayCore`.
 - README and configuration docs show the new default-path workflow.
 
+## Progress status
+
+- [x] Add a CLI-edge configuration path helper.
+- [x] Make `--config` optional in `ReconcileCommand`.
+- [x] Add actionable missing-file diagnostics.
+- [x] Add focused deterministic tests.
+- [ ] Update documentation.
+- [x] Validate incrementally.
+
+Validation evidence so far:
+
+- [x] `swift build` passed.
+- [x] `swift test --filter ConfigurationFileSelectionTests` was attempted and hit the known active Command Line Tools Swift Testing issue: `no such module 'Testing'`.
+- [x] `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter ConfigurationFileSelectionTests` passed with 4 tests.
+- [x] `swift run calrelay reconcile --help` confirmed `USAGE: calrelay reconcile [--config <config>] [--apply]` and override-focused help text.
+- [x] `swift run calrelay reconcile --config ./.tmp/nonexistent-calrelay-config.yaml 2>&1` confirmed the explicit missing-config error before YAML parsing or EventKit access.
+- [x] `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` passed with 5 tests.
+
 ## Scope
 
 ### In scope
@@ -55,7 +73,7 @@ Implement the behavior specified in [`docs/specs/calrelay-default-configuration-
 
 ## Implementation sequence
 
-### 1. Add a CLI-edge configuration path helper
+### 1. Add a CLI-edge configuration path helper — Done
 
 Create a tiny CLI support library target so the helper can be tested cleanly without importing the executable target or moving path policy into core. Add the helper at:
 
@@ -94,7 +112,7 @@ The helper should support deterministic tests by allowing injection of:
 
 Keep the executable-facing API narrow. Prefer a small `public` API only for the selection behavior used by `ReconcileCommand`; keep implementation details internal. If tests need access to internal details, use `@testable import CalRelayCommandSupport` only in the focused CLI test target.
 
-### 2. Make `--config` optional in `ReconcileCommand`
+### 2. Make `--config` optional in `ReconcileCommand` — Done
 
 Update `ReconcileCommand` in `CalRelayCommand.swift` so that:
 
@@ -117,7 +135,7 @@ The command should resolve and validate the selected file before:
 
 Throw missing-file errors in a form that ArgumentParser renders as the intended user-facing text. Prefer `LocalizedError.errorDescription` for the exact multiline message and verify the live CLI output during validation.
 
-### 3. Add actionable missing-file diagnostics
+### 3. Add actionable missing-file diagnostics — Done
 
 For the default path, align with the spec's required message shape:
 
@@ -136,7 +154,7 @@ Check the path or pass a different --config <path>.
 
 This avoids implying that the canonical config was selected when the user deliberately provided an alternate file.
 
-### 4. Add focused deterministic tests
+### 4. Add focused deterministic tests — Done
 
 Prefer testing the pure helper instead of requiring real CLI execution or EventKit access.
 
@@ -162,7 +180,7 @@ Recommended cases:
 
 - If package changes are needed for helper access, keep them minimal and document that they exist only to test CLI-edge behavior without leaking path policy into core.
 
-### 5. Update documentation
+### 5. Update documentation — Pending
 
 Update `README.md` CLI examples to show default usage first:
 
@@ -192,7 +210,7 @@ Update `docs/configuration.md` with a “Configuration file location” section 
 
 Review `docs/manual-validation.md` during implementation. It contains explicit `--config calrelay.yml` examples for local validation workflows. Keep those override-based examples if they intentionally describe a safe local fixture workflow; otherwise update them separately from the everyday default-path examples in README/configuration docs.
 
-### 6. Validate incrementally
+### 6. Validate incrementally — Done for implemented slices
 
 Run focused and full checks after implementation:
 

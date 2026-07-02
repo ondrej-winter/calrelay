@@ -1,5 +1,6 @@
 import ArgumentParser
 import CalRelayAdapters
+import CalRelayCommandSupport
 import CalRelayCore
 import Foundation
 
@@ -33,14 +34,15 @@ struct ReconcileCommand: AsyncParsableCommand {
         discussion: "Dry-run is the default. Pass --apply to create/delete planned EventKit projections."
     )
 
-    @Option(name: .long, help: "Path to the CalRelay YAML configuration file.")
-    var config: String
+    @Option(name: .long, help: "Override path to the CalRelay YAML configuration file.")
+    var config: String?
 
     @Flag(name: .long, help: "Apply planned changes. Without this flag, reconciliation is a dry-run.")
     var apply = false
 
     func run() async throws {
-        let yaml = try String(contentsOfFile: config, encoding: .utf8)
+        let selectedFile = try ConfigurationFileSelection.select(overridePath: config)
+        let yaml = try String(contentsOfFile: selectedFile.path, encoding: .utf8)
         let settings = try YAMLCalendarRelaySettingsLoader.load(yaml)
         let useCase = ReconcileCalendarsUseCase(calendarStore: EventKitCalendarStore())
 
