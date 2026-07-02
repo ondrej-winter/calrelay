@@ -76,7 +76,8 @@ For the first MVP:
 - Prefixes are both human-readable source markers and CalRelay ownership markers.
 - CalRelay may delete stale prefixed events in configured managed calendars.
 - CalRelay must never delete unprefixed events from work/client calendars.
-- CalRelay must preserve unknown prefixed events by default rather than treating them as stale local projections.
+- CalRelay must preserve unknown prefixed hub events by default rather than treating them as stale local projections.
+- CalRelay must delete stale prefixed events from work calendars when they are no longer expected from the hub, even when the prefix belongs to a work calendar not configured on the current machine.
 - CalRelay must mutate only the hub calendar and locally configured writable work/client calendars for the current run.
 - Manual edits to prefixed generated events may be overwritten or deleted by reconciliation.
 
@@ -144,7 +145,7 @@ Personal Work: [BETA] Sales Call
 -> do not delete [BETA] Sales Call from Personal Work
 ```
 
-Unknown prefixed events in work calendars are preserved by default unless a future configuration explicitly opts into managing that prefix.
+Unknown prefixed events in the hub are preserved by default unless a future configuration explicitly opts into managing that prefix. Unknown prefixed events in work calendars are treated as relayed blockers and removed when absent from the expected hub-derived blocker set.
 
 ### Initial configuration shape
 
@@ -237,7 +238,7 @@ Unit-test set reconciliation for:
 - recurring occurrences treated as ordinary visible event snapshots when EventKit exposes them in the sync window
 - unknown prefixed hub events preserved rather than deleted as stale local projections
 - remote prefixed hub events projected into locally configured work calendars
-- unknown prefixed work-calendar events preserved by default
+- unknown prefixed work-calendar events deleted when absent from the expected hub-derived blocker set
 
 Use fakes for calendar repository/EventKit ports in domain and application tests. Reserve real EventKit checks for `CalRelay.app`-backed capability runs or explicit integration checks, because they depend on local Apple Calendar state, permissions, and writable calendars.
 

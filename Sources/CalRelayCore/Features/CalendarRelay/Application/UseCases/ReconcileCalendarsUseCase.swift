@@ -148,11 +148,20 @@ public struct ReconcileCalendarsUseCase: Sendable {
             personalPrefix: settings.personalPrefix
         )
 
-        let existingEvents = hubEvents + workEventsByCalendarID.values.flatMap { $0 }
-        let reconciliationPlan = ReconciliationPlanner.plan(
-            expected: expectedHubEvents + expectedWorkEvents,
-            existing: existingEvents,
+        let hubPlan = ReconciliationPlanner.plan(
+            expected: expectedHubEvents,
+            existing: hubEvents,
             managedPrefixes: managedPrefixes
+        )
+        let workPlan = ReconciliationPlanner.plan(
+            expected: expectedWorkEvents,
+            existing: workEventsByCalendarID.values.flatMap { $0 }
+        ) { event in
+            isRelayedWorkBlocker(event, managedPrefixes: managedPrefixes)
+        }
+        let reconciliationPlan = ReconciliationPlan(
+            creates: hubPlan.creates + workPlan.creates,
+            deletes: hubPlan.deletes + workPlan.deletes
         )
 
         return PlannedRun(

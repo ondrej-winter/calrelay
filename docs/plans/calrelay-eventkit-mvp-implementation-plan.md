@@ -252,7 +252,7 @@ SwiftPM executable/package skeleton
 
 ### Task 7: Implement conservative create/delete reconciliation plan
 
-**Description:** Compare expected projections to current visible events and produce a plan of creates/deletes. Apply deletion safety rules: delete stale configured-prefix generated events only; never delete unprefixed work/client events; preserve unknown prefixed events by default.
+**Description:** Compare expected projections to current visible events and produce a plan of creates/deletes. Apply deletion safety rules: delete stale configured-prefix generated events in the hub only; never delete unprefixed work/client events; preserve unknown prefixed hub events by default; delete stale bracket-prefixed work-calendar blockers when absent from the hub-derived expected set.
 
 **Acceptance criteria:**
 

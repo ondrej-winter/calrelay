@@ -58,7 +58,8 @@ struct CalRelayContractTests {
         try await Self.testDoesNotReprojectManagedWorkProjectionsToHub()
         try await Self.testProjectsWorkSourceToOtherWorkCalendarsInSamePlan()
         try await Self.testDoesNotDoublePrefixRelayedWorkBlockers()
-        try await Self.testDoesNotProjectUnknownPrefixedWorkBlockersToHub()
+        try await Self.testDeletesUnknownPrefixedWorkBlockersWhenAbsentFromHub()
+        try await Self.testPreservesUnknownPrefixedHubEvents()
         try await Self.testReconciliationPropagatesCancellation()
         try await Self.testExplainReportsIncludedAndExcludedEvents()
         try Self.testFormatsEmptyReconciliationPlan()
@@ -743,7 +744,7 @@ struct CalRelayContractTests {
         try expect(plan.creates.contains { $0.destinationCalendar.id == hubCalendar.id && $0.title == "[ACME] Client Planning" }, "Original work source should still project to the hub")
     }
 
-    private static func testDoesNotProjectUnknownPrefixedWorkBlockersToHub() async throws {
+    private static func testDeletesUnknownPrefixedWorkBlockersWhenAbsentFromHub() async throws {
         let fixtures = applicationFixtures()
         let remoteWorkProjection = eventSnapshot(
             id: "remote-work-projection-1",
@@ -764,7 +765,30 @@ struct CalRelayContractTests {
         let plan = try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now)
 
         try expect(!plan.creates.contains { $0.destinationCalendar == fixtures.hubReference && $0.title == "[ACME] [REMOTE] Partner Planning" }, "Unknown prefixed work blockers should not be double-prefixed back into the hub")
-        try expect(plan.deletes.isEmpty, "Unknown prefixed work blockers should be preserved rather than deleted")
+        try expect(plan.deletes == [remoteWorkProjection], "Unknown prefixed work blockers should be deleted from work calendars when absent from the hub")
+    }
+
+    private static func testPreservesUnknownPrefixedHubEvents() async throws {
+        let fixtures = applicationFixtures()
+        let remoteHubProjection = eventSnapshot(
+            id: "remote-hub-projection-1",
+            calendar: fixtures.hubReference,
+            title: "[REMOTE] Partner Planning",
+            start: Date(timeIntervalSince1970: 13_000),
+            end: Date(timeIntervalSince1970: 14_000)
+        )
+        let store = FakeCalendarStore(
+            calendars: [fixtures.hubCalendar, fixtures.workCalendar],
+            eventsByCalendarID: [
+                fixtures.hubCalendar.id: [remoteHubProjection],
+                fixtures.workCalendar.id: []
+            ]
+        )
+        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+
+        let plan = try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now)
+
+        try expect(!plan.deletes.contains(remoteHubProjection), "Unknown prefixed hub events should still be preserved")
     }
 
     private static func testReconciliationPropagatesCancellation() async throws {

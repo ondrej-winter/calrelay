@@ -6,6 +6,16 @@ public enum ReconciliationPlanner {
         existing: [EventSnapshot],
         managedPrefixes: Set<String>
     ) -> ReconciliationPlan {
+        plan(expected: expected, existing: existing) { event in
+            isManaged(event, by: managedPrefixes)
+        }
+    }
+
+    public static func plan(
+        expected: [ProjectedEvent],
+        existing: [EventSnapshot],
+        shouldDeleteStaleEvent: (EventSnapshot) -> Bool
+    ) -> ReconciliationPlan {
         let existingKeys = Set(existing.map(VisibleEventKey.init(event:)))
         let expectedKeys = Set(expected.map(visibleKey(for:)))
 
@@ -14,7 +24,7 @@ public enum ReconciliationPlanner {
         }
 
         let deletes = existing.filter { event in
-            !expectedKeys.contains(VisibleEventKey(event: event)) && isManaged(event, by: managedPrefixes)
+            !expectedKeys.contains(VisibleEventKey(event: event)) && shouldDeleteStaleEvent(event)
         }
 
         return ReconciliationPlan(creates: creates, deletes: deletes)
