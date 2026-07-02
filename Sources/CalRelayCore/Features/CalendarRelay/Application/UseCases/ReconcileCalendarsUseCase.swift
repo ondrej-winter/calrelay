@@ -31,6 +31,44 @@ public struct ReconcileCalendarsUseCase: Sendable {
         try await plan(settings: settings, now: now).plan
     }
 
+    /// Explains inclusion/exclusion decisions for every candidate hub and work event in the
+    /// sync window. This is diagnostic-only and does not affect reconciliation planning.
+    public func explain(settings: CalendarRelaySettings, now: Date) async throws -> [EventExplanation] {
+        try Task.checkCancellation()
+        try validate(settings)
+
+        let calendars = try await calendarStore.listCalendars()
+        try Task.checkCancellation()
+
+        let hubCalendar = try resolve(settings.hubCalendar, from: calendars)
+        let workCalendars = try settings.workCalendars.map { workCalendar in
+            WorkCalendarResolution(
+                settings: workCalendar,
+                calendar: try resolve(workCalendar.calendar, from: calendars)
+            )
+        }
+
+        let syncWindowEnd = now.addingTimeInterval(Double(settings.syncWindowDays) * 24 * 60 * 60)
+
+        var explanations: [EventExplanation] = []
+
+        let hubEvents = try await calendarStore.events(in: hubCalendar.reference, from: now, to: syncWindowEnd)
+        try Task.checkCancellation()
+        explanations.append(contentsOf: hubEvents.map(explanation(for:)))
+
+        for workCalendar in workCalendars {
+            try Task.checkCancellation()
+            let events = try await calendarStore.events(
+                in: workCalendar.calendar.reference,
+                from: now,
+                to: syncWindowEnd
+            )
+            explanations.append(contentsOf: events.map(explanation(for:)))
+        }
+
+        return explanations
+    }
+
     public func apply(settings: CalendarRelaySettings, now: Date) async throws -> ReconciliationPlan {
         let plannedRun = try await plan(settings: settings, now: now)
 
@@ -133,6 +171,19 @@ public struct ReconcileCalendarsUseCase: Sendable {
             isAllDay: event.isAllDay,
             availability: .busy,
             status: .confirmed
+        )
+    }
+
+    private func explanation(for event: EventSnapshot) -> EventExplanation {
+        EventExplanation(
+            calendar: event.calendar,
+            title: event.title,
+            start: event.start,
+            end: event.end,
+            isAllDay: event.isAllDay,
+            availability: event.availability,
+            status: event.status,
+            reason: EventInclusionPolicy.evaluate(event)
         )
     }
 

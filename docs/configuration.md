@@ -81,6 +81,12 @@ swift run calrelay reconcile --apply
 
 Review dry-run output before using `--apply`, especially when introducing new prefixes or changing calendar selectors.
 
+Use `--explain` to diagnose why specific events are or are not being synced. Instead of producing a reconciliation plan, this mode lists every candidate hub and work-calendar event in the sync window with its inclusion/exclusion reason (`included`, `excluded (all-day event)`, `excluded (cancelled)`, `excluded (declined)`, or `excluded (unsupported availability: <value>)`). `--explain` never mutates the calendar store and can be combined with `--config`:
+
+```sh
+swift run calrelay reconcile --explain
+```
+
 ## Validation and safety notes
 
 - At least one work calendar must be configured.
@@ -95,5 +101,7 @@ Review dry-run output before using `--apply`, especially when introducing new pr
 - CalRelay must never delete unprefixed original work/client events; deletion is limited to stale prefixed projections selected by the conservative reconciliation logic.
 - Work-calendar events whose titles start with a configured CalRelay-managed prefix are treated as existing projections and are not relayed back to the hub. Other bracket-prefixed titles are treated as ordinary source events.
 - Timed events from calendars that do not expose EventKit availability are treated as blocking events for MVP reconciliation, unless they are all-day, declined, or cancelled.
+- "Declined" status is evaluated from the current user's own attendee response, not from other attendees. A meeting where another invitee has declined is still synced as long as you have not personally declined it.
 
 For app-backed EventKit validation checks, see [`docs/manual-validation.md`](manual-validation.md).
+

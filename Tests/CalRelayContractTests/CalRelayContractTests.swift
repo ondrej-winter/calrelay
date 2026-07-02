@@ -21,7 +21,14 @@ struct CalRelayContractTests {
         try Self.testSkipsAllDayEvents()
         try Self.testSkipsDeclinedEvents()
         try Self.testSkipsCancelledEvents()
+        try Self.testEvaluateReturnsIncludedForBusyEvents()
+        try Self.testEvaluateReturnsAllDayReason()
+        try Self.testEvaluateReturnsCancelledReason()
+        try Self.testEvaluateReturnsDeclinedReason()
+        try Self.testEvaluateReturnsUnsupportedAvailabilityReasonForFreeEvents()
+        try Self.testEvaluateReturnsUnsupportedAvailabilityReasonForUnavailableEvents()
         try Self.testVisibleEventKeysRemainDistinctForAdjacentMeetings()
+
         try Self.testProjectsIncludedWorkEventToHub()
         try Self.testDoesNotProjectExcludedWorkEventToHub()
         try Self.testProjectsPrefixedHubEventToOtherWorkCalendars()
@@ -46,10 +53,13 @@ struct CalRelayContractTests {
         try await Self.testProjectsWorkSourceToOtherWorkCalendarsInSamePlan()
         try await Self.testProjectsUnknownPrefixedWorkBlockersToHub()
         try await Self.testReconciliationPropagatesCancellation()
+        try await Self.testExplainReportsIncludedAndExcludedEvents()
         try Self.testFormatsEmptyReconciliationPlan()
         try Self.testFormatsPlannedCreatesAndDeletes()
         try Self.testReconciliationPlanOutputAvoidsDebugDumps()
         try Self.testFormatsCalendarList()
+        try Self.testFormatsEventExplanations()
+        try Self.testFormatsEmptyEventExplanations()
     }
 
     private static func testAcceptsValidSettings() throws {
@@ -192,6 +202,48 @@ struct CalRelayContractTests {
         let event = eventSnapshot(availability: .busy, status: .cancelled)
 
         try expect(!EventInclusionPolicy.includes(event), "Cancelled events should be skipped")
+    }
+
+    private static func testEvaluateReturnsIncludedForBusyEvents() throws {
+        let event = eventSnapshot(availability: .busy, status: .confirmed)
+
+        try expect(EventInclusionPolicy.evaluate(event) == .included, "Busy timed events should evaluate as included")
+    }
+
+    private static func testEvaluateReturnsAllDayReason() throws {
+        let event = eventSnapshot(isAllDay: true, availability: .busy, status: .confirmed)
+
+        try expect(EventInclusionPolicy.evaluate(event) == .allDay, "All-day events should evaluate with the allDay reason")
+    }
+
+    private static func testEvaluateReturnsCancelledReason() throws {
+        let event = eventSnapshot(availability: .busy, status: .cancelled)
+
+        try expect(EventInclusionPolicy.evaluate(event) == .cancelled, "Cancelled events should evaluate with the cancelled reason")
+    }
+
+    private static func testEvaluateReturnsDeclinedReason() throws {
+        let event = eventSnapshot(availability: .busy, status: .declined)
+
+        try expect(EventInclusionPolicy.evaluate(event) == .declined, "Declined events should evaluate with the declined reason")
+    }
+
+    private static func testEvaluateReturnsUnsupportedAvailabilityReasonForFreeEvents() throws {
+        let event = eventSnapshot(availability: .free, status: .confirmed)
+
+        try expect(
+            EventInclusionPolicy.evaluate(event) == .unsupportedAvailability(.free),
+            "Free events should evaluate with the unsupportedAvailability reason"
+        )
+    }
+
+    private static func testEvaluateReturnsUnsupportedAvailabilityReasonForUnavailableEvents() throws {
+        let event = eventSnapshot(availability: .unavailable, status: .confirmed)
+
+        try expect(
+            EventInclusionPolicy.evaluate(event) == .unsupportedAvailability(.unavailable),
+            "Unavailable events should evaluate with the unsupportedAvailability reason"
+        )
     }
 
     private static func testVisibleEventKeysRemainDistinctForAdjacentMeetings() throws {
@@ -674,6 +726,78 @@ struct CalRelayContractTests {
 
         try expect(!output.contains("ProjectedEvent("), "Output should not expose Swift debug dumps")
         try expect(!output.contains("CalendarReference("), "Output should not expose Swift type internals")
+    }
+
+    private static func testExplainReportsIncludedAndExcludedEvents() async throws {
+        let fixtures = applicationFixtures()
+        let excludedWorkEvent = eventSnapshot(
+            id: "acme-excluded-1",
+            calendar: fixtures.workReference,
+            title: "AI QA Learning path sync",
+            start: Date(timeIntervalSince1970: 15_000),
+            end: Date(timeIntervalSince1970: 16_000),
+            availability: .free,
+            status: .confirmed
+        )
+        let store = FakeCalendarStore(
+            calendars: [fixtures.hubCalendar, fixtures.workCalendar],
+            eventsByCalendarID: [
+                fixtures.hubCalendar.id: [],
+                fixtures.workCalendar.id: [fixtures.workEvent, excludedWorkEvent]
+            ]
+        )
+        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+
+        let explanations = try await useCase.explain(settings: fixtures.settings, now: fixtures.now)
+
+        try expect(
+            explanations.contains { $0.title == fixtures.workEvent.title && $0.reason == .included },
+            "Explain should report included events with the included reason"
+        )
+        try expect(
+            explanations.contains { $0.title == "AI QA Learning path sync" && $0.reason == .unsupportedAvailability(.free) },
+            "Explain should report excluded events with their exclusion reason"
+        )
+        try expect((await store.createdEvents()).isEmpty, "Explain should never mutate the calendar store")
+        try expect((await store.deletedEvents()).isEmpty, "Explain should never mutate the calendar store")
+    }
+
+    private static func testFormatsEventExplanations() throws {
+        let output = EventExplanationFormatter.format([
+            EventExplanation(
+                calendar: CalendarReference(id: "acme-1", title: "ACME Work", sourceTitle: "Google"),
+                title: "Client Planning",
+                start: Date(timeIntervalSince1970: 1_000),
+                end: Date(timeIntervalSince1970: 2_000),
+                isAllDay: false,
+                availability: .busy,
+                status: .confirmed,
+                reason: .included
+            ),
+            EventExplanation(
+                calendar: CalendarReference(id: "acme-1", title: "ACME Work", sourceTitle: "Google"),
+                title: "AI QA Learning path sync",
+                start: Date(timeIntervalSince1970: 3_000),
+                end: Date(timeIntervalSince1970: 4_000),
+                isAllDay: false,
+                availability: .free,
+                status: .confirmed,
+                reason: .unsupportedAvailability(.free)
+            )
+        ])
+
+        try expect(output.contains("Google / ACME Work"), "Explanation output should include calendar selector")
+        try expect(output.contains("Client Planning"), "Explanation output should include event title")
+        try expect(output.contains("-> included"), "Explanation output should show the included reason")
+        try expect(output.contains("AI QA Learning path sync"), "Explanation output should include excluded event title")
+        try expect(output.contains("excluded (unsupported availability: free)"), "Explanation output should explain the exclusion reason")
+        try expect(!output.contains("EventExplanation("), "Explanation output should not expose Swift debug dumps")
+    }
+
+    private static func testFormatsEmptyEventExplanations() throws {
+        let output = EventExplanationFormatter.format([])
+
+        try expect(output.contains("No candidate events found in the sync window."), "Empty explanations should produce understandable output")
     }
 
     private static func testFormatsCalendarList() throws {

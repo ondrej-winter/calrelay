@@ -176,8 +176,13 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
         }
     }
 
+    /// Maps EventKit event status to `EventStatus`, treating an event as declined only when the
+    /// current user's own attendee record has declined. Other attendees declining a shared
+    /// meeting must not exclude the event from sync for the calendar owner.
     private static func mapStatus(_ event: EKEvent) -> EventStatus {
-        if event.attendees?.contains(where: { $0.participantStatus == .declined }) == true {
+        if let currentUserAttendee = event.attendees?.first(where: { $0.isCurrentUser }),
+            currentUserAttendee.participantStatus == .declined
+        {
             return .declined
         }
 
