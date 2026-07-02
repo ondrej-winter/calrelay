@@ -4,6 +4,8 @@ CalRelay's default local test gate is deterministic and does not require real Ap
 
 Use harmless test calendars before relying on CalRelay for real calendars.
 
+The examples below use `--config calrelay.yml` as an explicit local validation fixture override. Everyday CLI usage defaults to `~/.config/calrelay/config.yaml`; see [`configuration.md`](configuration.md) for the canonical configuration location.
+
 ## Build and open the app
 
 ```sh

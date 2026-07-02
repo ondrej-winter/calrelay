@@ -16,7 +16,7 @@ Implement the behavior specified in [`docs/specs/calrelay-default-configuration-
 - [x] Make `--config` optional in `ReconcileCommand`.
 - [x] Add actionable missing-file diagnostics.
 - [x] Add focused deterministic tests.
-- [ ] Update documentation.
+- [x] Update documentation.
 - [x] Validate incrementally.
 
 Validation evidence so far:
@@ -27,6 +27,7 @@ Validation evidence so far:
 - [x] `swift run calrelay reconcile --help` confirmed `USAGE: calrelay reconcile [--config <config>] [--apply]` and override-focused help text.
 - [x] `swift run calrelay reconcile --config ./.tmp/nonexistent-calrelay-config.yaml 2>&1` confirmed the explicit missing-config error before YAML parsing or EventKit access.
 - [x] `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` passed with 5 tests.
+- [x] README and configuration documentation updated to show default-path usage and explicit override semantics.
 
 ## Scope
 
@@ -180,7 +181,7 @@ Recommended cases:
 
 - If package changes are needed for helper access, keep them minimal and document that they exist only to test CLI-edge behavior without leaking path policy into core.
 
-### 5. Update documentation — Pending
+### 5. Update documentation — Done
 
 Update `README.md` CLI examples to show default usage first:
 

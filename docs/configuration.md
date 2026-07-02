@@ -2,6 +2,22 @@
 
 CalRelay reads YAML configuration that identifies one hub calendar and one or more work calendars by Calendar source title and calendar title.
 
+## Configuration file location
+
+By default, the CLI reads the canonical user configuration file at:
+
+```text
+~/.config/calrelay/config.yaml
+```
+
+For normal use, create the YAML configuration there. CalRelay does not create this file automatically and does not search arbitrary directories for configuration files.
+
+Use `--config <path>` when you want an explicit override for tests, experiments, or temporary alternate configurations:
+
+```sh
+swift run calrelay reconcile --config ./calrelay.yml
+```
+
 ## Example
 
 ```yaml
@@ -48,13 +64,19 @@ The listing includes EventKit calendar IDs for troubleshooting, but IDs are not 
 Dry-run reconciliation is the default and performs no calendar mutations:
 
 ```sh
-swift run calrelay reconcile --config calrelay.yml
+swift run calrelay reconcile
+```
+
+To use a temporary alternate configuration file, pass an explicit override:
+
+```sh
+swift run calrelay reconcile --config ./calrelay.yml
 ```
 
 Apply mode creates missing prefixed projection events and deletes stale prefixed projections selected by the reconciliation plan:
 
 ```sh
-swift run calrelay reconcile --config calrelay.yml --apply
+swift run calrelay reconcile --apply
 ```
 
 Review dry-run output before using `--apply`, especially when introducing new prefixes or changing calendar selectors.

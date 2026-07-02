@@ -60,16 +60,22 @@ List visible EventKit calendars, their source titles, local calendar IDs, and wr
 swift run calrelay calendars
 ```
 
-Run reconciliation in dry-run mode. This reads the configured calendars and prints planned creates/deletes without mutating Apple Calendar:
+Run reconciliation in dry-run mode. By default, this reads `~/.config/calrelay/config.yaml`, reads the configured calendars, and prints planned creates/deletes without mutating Apple Calendar:
 
 ```sh
-swift run calrelay reconcile --config calrelay.yml
+swift run calrelay reconcile
+```
+
+Use `--config <path>` for tests, experiments, or temporary alternate configurations:
+
+```sh
+swift run calrelay reconcile --config ./calrelay.yml
 ```
 
 Apply the planned reconciliation. Mutation only happens when `--apply` is passed:
 
 ```sh
-swift run calrelay reconcile --config calrelay.yml --apply
+swift run calrelay reconcile --apply
 ```
 
 See [`docs/configuration.md`](docs/configuration.md) for the YAML schema, selector semantics, and safety notes. Use `CalRelay.app` for EventKit permission checks; see [`docs/manual-validation.md`](docs/manual-validation.md) for the app-backed validation recipe.
