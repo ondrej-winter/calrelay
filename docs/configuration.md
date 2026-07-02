@@ -93,6 +93,7 @@ Review dry-run output before using `--apply`, especially when introducing new pr
 - CalRelay requires full Calendar access. If macOS denies or restricts access, listing and reconciliation fail safely.
 - Apply mode requires writable target calendars. Read-only calendars are rejected before planned mutations are executed.
 - CalRelay must never delete unprefixed original work/client events; deletion is limited to stale prefixed projections selected by the conservative reconciliation logic.
+- Work-calendar events whose titles start with a configured CalRelay-managed prefix are treated as existing projections and are not relayed back to the hub. Other bracket-prefixed titles are treated as ordinary source events.
 - Timed events from calendars that do not expose EventKit availability are treated as blocking events for MVP reconciliation, unless they are all-day, declined, or cancelled.
 
 For app-backed EventKit validation checks, see [`docs/manual-validation.md`](manual-validation.md).

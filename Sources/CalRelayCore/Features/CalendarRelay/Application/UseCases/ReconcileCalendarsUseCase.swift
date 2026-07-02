@@ -88,7 +88,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
         let expectedHubEvents = workCalendars.flatMap { workCalendar in
             WorkToHubProjector.project(
                 events: workEventsByCalendarID[workCalendar.calendar.snapshot.id, default: []].filter { event in
-                    !isPrefixedProjection(event)
+                    !isManagedProjection(event, managedPrefixes: managedPrefixes)
                 },
                 from: workCalendar.settings,
                 to: hubCalendar.reference
@@ -136,8 +136,10 @@ public struct ReconcileCalendarsUseCase: Sendable {
         )
     }
 
-    private func isPrefixedProjection(_ event: EventSnapshot) -> Bool {
-        event.title.hasPrefix("[")
+    private func isManagedProjection(_ event: EventSnapshot, managedPrefixes: Set<String>) -> Bool {
+        managedPrefixes.contains { prefix in
+            event.title.hasPrefix(prefix)
+        }
     }
 
     private func validate(_ settings: CalendarRelaySettings) throws {
