@@ -28,6 +28,10 @@ let package = Package(
             ],
             path: "Sources/CalRelayAdapters"
         ),
+        .target(
+            name: "CalRelayCommandSupport",
+            path: "Sources/CalRelayCommandSupport"
+        ),
         .executableTarget(
             name: "CalRelayApp",
             dependencies: [
@@ -41,9 +45,17 @@ let package = Package(
             dependencies: [
                 "CalRelayCore",
                 "CalRelayAdapters",
+                "CalRelayCommandSupport",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ],
             path: "Sources/CalRelay"
+        ),
+        .testTarget(
+            name: "CalRelayCLITests",
+            dependencies: [
+                "CalRelayCommandSupport"
+            ],
+            path: "Tests/CalRelayCLITests"
         ),
         .testTarget(
             name: "CalRelayContractTests",
