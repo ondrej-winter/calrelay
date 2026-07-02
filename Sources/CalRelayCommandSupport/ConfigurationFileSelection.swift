@@ -20,17 +20,11 @@ public struct SelectedConfigurationFile: Equatable, Sendable {
 public struct MissingConfigurationFileError: Error, CustomStringConvertible, LocalizedError, Equatable, Sendable {
     public let selectedFile: SelectedConfigurationFile
 
-    public init(selectedFile: SelectedConfigurationFile) {
-        self.selectedFile = selectedFile
-    }
+    public init(selectedFile: SelectedConfigurationFile) { self.selectedFile = selectedFile }
 
-    public var description: String {
-        message
-    }
+    public var description: String { message }
 
-    public var errorDescription: String? {
-        message
-    }
+    public var errorDescription: String? { message }
 
     private var message: String {
         switch selectedFile.source {
@@ -54,36 +48,24 @@ public enum ConfigurationFileSelection {
     public static let defaultDisplayPath = "~/.config/calrelay/config.yaml"
 
     public static func select(
-        overridePath: String?,
-        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+        overridePath: String?, homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
         fileExists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
     ) throws -> SelectedConfigurationFile {
         let selectedFile = selectedFile(overridePath: overridePath, homeDirectory: homeDirectory)
 
-        guard fileExists(selectedFile.path) else {
-            throw MissingConfigurationFileError(selectedFile: selectedFile)
-        }
+        guard fileExists(selectedFile.path) else { throw MissingConfigurationFileError(selectedFile: selectedFile) }
 
         return selectedFile
     }
 
     public static func selectedFile(
-        overridePath: String?,
-        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+        overridePath: String?, homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
     ) -> SelectedConfigurationFile {
         if let overridePath, !overridePath.isEmpty {
-            return SelectedConfigurationFile(
-                path: overridePath,
-                displayPath: overridePath,
-                source: .explicitOverride
-            )
+            return SelectedConfigurationFile(path: overridePath, displayPath: overridePath, source: .explicitOverride)
         }
 
         let path = homeDirectory.appendingPathComponent(defaultRelativePath).path
-        return SelectedConfigurationFile(
-            path: path,
-            displayPath: defaultDisplayPath,
-            source: .defaultPath
-        )
+        return SelectedConfigurationFile(path: path, displayPath: defaultDisplayPath, source: .defaultPath)
     }
 }

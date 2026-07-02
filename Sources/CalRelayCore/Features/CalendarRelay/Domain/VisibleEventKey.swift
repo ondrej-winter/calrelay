@@ -17,11 +17,6 @@ public struct VisibleEventKey: Equatable, Hashable, Sendable {
 
     public init(event: EventSnapshot) {
         self.init(
-            calendar: event.calendar,
-            title: event.title,
-            start: event.start,
-            end: event.end,
-            isAllDay: event.isAllDay
-        )
+            calendar: event.calendar, title: event.title, start: event.start, end: event.end, isAllDay: event.isAllDay)
     }
 }

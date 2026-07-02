@@ -11,14 +11,8 @@ public struct EventSnapshot: Equatable, Identifiable, Sendable {
     public let status: EventStatus
 
     public init(
-        id: String,
-        calendar: CalendarReference,
-        title: String,
-        start: Date,
-        end: Date,
-        isAllDay: Bool,
-        availability: EventAvailability,
-        status: EventStatus
+        id: String, calendar: CalendarReference, title: String, start: Date, end: Date, isAllDay: Bool,
+        availability: EventAvailability, status: EventStatus
     ) {
         self.id = id
         self.calendar = calendar

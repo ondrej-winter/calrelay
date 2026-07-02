@@ -9,7 +9,7 @@ The examples below use `--config calrelay.yml` as an explicit local validation f
 ## Build and open the app
 
 ```sh
-zsh scripts/build-calrelay-app.sh
+make app
 open .build/CalRelay.app
 ```
 

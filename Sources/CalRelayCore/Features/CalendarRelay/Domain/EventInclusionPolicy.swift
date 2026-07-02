@@ -15,32 +15,20 @@ public enum EventInclusionReason: Equatable, Sendable {
 }
 
 public enum EventInclusionPolicy {
-    public static func includes(_ event: EventSnapshot) -> Bool {
-        evaluate(event) == .included
-    }
+    public static func includes(_ event: EventSnapshot) -> Bool { evaluate(event) == .included }
 
     public static func evaluate(_ event: EventSnapshot) -> EventInclusionReason {
-        guard !event.isAllDay else {
-            return .allDay
-        }
+        guard !event.isAllDay else { return .allDay }
 
-        guard event.status != .cancelled else {
-            return .cancelled
-        }
+        guard event.status != .cancelled else { return .cancelled }
 
-        guard event.status != .declined else {
-            return .declined
-        }
+        guard event.status != .declined else { return .declined }
 
-        guard event.status != .tentative else {
-            return .tentative
-        }
+        guard event.status != .tentative else { return .tentative }
 
         switch event.availability {
-        case .busy, .notSupported:
-            return .included
-        case .tentative, .free, .unavailable, .unknown:
-            return .unsupportedAvailability(event.availability)
+        case .busy, .notSupported: return .included
+        case .tentative, .free, .unavailable, .unknown: return .unsupportedAvailability(event.availability)
         }
     }
 }

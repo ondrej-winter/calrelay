@@ -8,14 +8,11 @@ public enum ReconcileCalendarsError: Error, Equatable, CustomStringConvertible, 
 
     public var description: String {
         switch self {
-        case .invalidSettings(let message):
-            "Invalid settings: \(message)"
-        case .calendarNotFound(let selector):
-            "Calendar not found: \(selector.sourceTitle) / \(selector.calendarTitle)."
+        case .invalidSettings(let message): "Invalid settings: \(message)"
+        case .calendarNotFound(let selector): "Calendar not found: \(selector.sourceTitle) / \(selector.calendarTitle)."
         case .calendarAmbiguous(let selector):
             "Calendar selector is ambiguous: \(selector.sourceTitle) / \(selector.calendarTitle)."
-        case .calendarReadOnly(let calendar):
-            "Calendar is read-only: \(calendar.sourceTitle) / \(calendar.title)."
+        case .calendarReadOnly(let calendar): "Calendar is read-only: \(calendar.sourceTitle) / \(calendar.title)."
         }
     }
 }
@@ -23,9 +20,7 @@ public enum ReconcileCalendarsError: Error, Equatable, CustomStringConvertible, 
 public struct ReconcileCalendarsUseCase: Sendable {
     private let calendarStore: CalendarStorePort
 
-    public init(calendarStore: CalendarStorePort) {
-        self.calendarStore = calendarStore
-    }
+    public init(calendarStore: CalendarStorePort) { self.calendarStore = calendarStore }
 
     public func dryRun(settings: CalendarRelaySettings, now: Date) async throws -> ReconciliationPlan {
         try await plan(settings: settings, now: now).plan
@@ -43,9 +38,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
         let hubCalendar = try resolve(settings.hubCalendar, from: calendars)
         let workCalendars = try settings.workCalendars.map { workCalendar in
             WorkCalendarResolution(
-                settings: workCalendar,
-                calendar: try resolve(workCalendar.calendar, from: calendars)
-            )
+                settings: workCalendar, calendar: try resolve(workCalendar.calendar, from: calendars))
         }
 
         let syncWindowEnd = now.addingTimeInterval(Double(settings.syncWindowDays) * 24 * 60 * 60)
@@ -59,10 +52,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
         for workCalendar in workCalendars {
             try Task.checkCancellation()
             let events = try await calendarStore.events(
-                in: workCalendar.calendar.reference,
-                from: now,
-                to: syncWindowEnd
-            )
+                in: workCalendar.calendar.reference, from: now, to: syncWindowEnd)
             explanations.append(contentsOf: events.map(explanation(for:)))
         }
 
@@ -97,123 +87,77 @@ public struct ReconcileCalendarsUseCase: Sendable {
         let hubCalendar = try resolve(settings.hubCalendar, from: calendars)
         let workCalendars = try settings.workCalendars.map { workCalendar in
             WorkCalendarResolution(
-                settings: workCalendar,
-                calendar: try resolve(workCalendar.calendar, from: calendars)
-            )
+                settings: workCalendar, calendar: try resolve(workCalendar.calendar, from: calendars))
         }
 
         let syncWindowEnd = now.addingTimeInterval(Double(settings.syncWindowDays) * 24 * 60 * 60)
 
         let managedPrefixes = Set(settings.workCalendars.map(\.prefix) + [settings.personalPrefix])
 
-        let hubEvents = try await calendarStore.events(
-            in: hubCalendar.reference,
-            from: now,
-            to: syncWindowEnd
-        )
+        let hubEvents = try await calendarStore.events(in: hubCalendar.reference, from: now, to: syncWindowEnd)
         try Task.checkCancellation()
 
         var workEventsByCalendarID: [String: [EventSnapshot]] = [:]
         for workCalendar in workCalendars {
             try Task.checkCancellation()
             workEventsByCalendarID[workCalendar.calendar.snapshot.id] = try await calendarStore.events(
-                in: workCalendar.calendar.reference,
-                from: now,
-                to: syncWindowEnd
-            )
+                in: workCalendar.calendar.reference, from: now, to: syncWindowEnd)
         }
 
         let expectedHubEvents = workCalendars.flatMap { workCalendar in
             WorkToHubProjector.project(
                 events: workEventsByCalendarID[workCalendar.calendar.snapshot.id, default: []].filter { event in
                     !isRelayedWorkBlocker(event, managedPrefixes: managedPrefixes)
-                },
-                from: workCalendar.settings,
-                to: hubCalendar.reference
-            )
+                }, from: workCalendar.settings, to: hubCalendar.reference)
         }
 
         let workTargets = workCalendars.map { workCalendar in
-            WorkCalendarProjectionTarget(
-                settings: workCalendar.settings,
-                calendar: workCalendar.calendar.reference
-            )
+            WorkCalendarProjectionTarget(settings: workCalendar.settings, calendar: workCalendar.calendar.reference)
         }
         let expectedHubEventSnapshots = expectedHubEvents.map { projectedEvent in
             snapshot(for: projectedEvent, idPrefix: "expected-hub")
         }
         let expectedWorkEvents = HubToWorkProjector.project(
-            hubEvents: hubEvents + expectedHubEventSnapshots,
-            to: workTargets,
-            personalPrefix: settings.personalPrefix
-        )
+            hubEvents: hubEvents + expectedHubEventSnapshots, to: workTargets, personalPrefix: settings.personalPrefix)
 
         let hubPlan = ReconciliationPlanner.plan(
-            expected: expectedHubEvents,
-            existing: hubEvents,
-            managedPrefixes: managedPrefixes
-        )
+            expected: expectedHubEvents, existing: hubEvents, managedPrefixes: managedPrefixes)
         let workPlan = ReconciliationPlanner.plan(
-            expected: expectedWorkEvents,
-            existing: workEventsByCalendarID.values.flatMap { $0 }
-        ) { event in
-            isRelayedWorkBlocker(event, managedPrefixes: managedPrefixes)
-        }
+            expected: expectedWorkEvents, existing: workEventsByCalendarID.values.flatMap { $0 }
+        ) { event in isRelayedWorkBlocker(event, managedPrefixes: managedPrefixes) }
         let reconciliationPlan = ReconciliationPlan(
-            creates: hubPlan.creates + workPlan.creates,
-            deletes: hubPlan.deletes + workPlan.deletes
-        )
+            creates: hubPlan.creates + workPlan.creates, deletes: hubPlan.deletes + workPlan.deletes)
 
         return PlannedRun(
-            plan: reconciliationPlan,
-            calendarsByID: Dictionary(uniqueKeysWithValues: calendars.map { ($0.id, $0) })
-        )
+            plan: reconciliationPlan, calendarsByID: Dictionary(uniqueKeysWithValues: calendars.map { ($0.id, $0) }))
     }
 
     private func snapshot(for event: ProjectedEvent, idPrefix: String) -> EventSnapshot {
         EventSnapshot(
-            id: "\(idPrefix)-\(event.destinationCalendar.id)-\(event.title)-\(event.start.timeIntervalSince1970)-\(event.end.timeIntervalSince1970)",
-            calendar: event.destinationCalendar,
-            title: event.title,
-            start: event.start,
-            end: event.end,
-            isAllDay: event.isAllDay,
-            availability: .busy,
-            status: .confirmed
-        )
+            id:
+                "\(idPrefix)-\(event.destinationCalendar.id)-\(event.title)-\(event.start.timeIntervalSince1970)-\(event.end.timeIntervalSince1970)",
+            calendar: event.destinationCalendar, title: event.title, start: event.start, end: event.end,
+            isAllDay: event.isAllDay, availability: .busy, status: .confirmed)
     }
 
     private func explanation(for event: EventSnapshot) -> EventExplanation {
         EventExplanation(
-            calendar: event.calendar,
-            title: event.title,
-            start: event.start,
-            end: event.end,
-            isAllDay: event.isAllDay,
-            availability: event.availability,
-            status: event.status,
-            reason: EventInclusionPolicy.evaluate(event)
-        )
+            calendar: event.calendar, title: event.title, start: event.start, end: event.end, isAllDay: event.isAllDay,
+            availability: event.availability, status: event.status, reason: EventInclusionPolicy.evaluate(event))
     }
 
     private func isRelayedWorkBlocker(_ event: EventSnapshot, managedPrefixes: Set<String>) -> Bool {
         hasBracketedPrefix(event.title) || isManagedProjection(event, managedPrefixes: managedPrefixes)
     }
 
-    private func hasBracketedPrefix(_ title: String) -> Bool {
-        title.hasPrefix("[") && title.contains("]")
-    }
+    private func hasBracketedPrefix(_ title: String) -> Bool { title.hasPrefix("[") && title.contains("]") }
 
     private func isManagedProjection(_ event: EventSnapshot, managedPrefixes: Set<String>) -> Bool {
-        managedPrefixes.contains { prefix in
-            event.title.hasPrefix(prefix)
-        }
+        managedPrefixes.contains { prefix in event.title.hasPrefix(prefix) }
     }
 
     private func validate(_ settings: CalendarRelaySettings) throws {
-        do {
-            try SettingsValidator.validate(settings)
-        } catch let error as SettingsValidationError {
+        do { try SettingsValidator.validate(settings) } catch let error as SettingsValidationError {
             throw ReconcileCalendarsError.invalidSettings(error.description)
         }
     }
@@ -223,34 +167,22 @@ public struct ReconcileCalendarsUseCase: Sendable {
             calendar.sourceTitle == selector.sourceTitle && calendar.title == selector.calendarTitle
         }
 
-        guard let match = matches.first else {
-            throw ReconcileCalendarsError.calendarNotFound(selector)
-        }
+        guard let match = matches.first else { throw ReconcileCalendarsError.calendarNotFound(selector) }
 
-        guard matches.count == 1 else {
-            throw ReconcileCalendarsError.calendarAmbiguous(selector)
-        }
+        guard matches.count == 1 else { throw ReconcileCalendarsError.calendarAmbiguous(selector) }
 
         return ResolvedCalendar(snapshot: match)
     }
 
-    private func validateWritableCalendars(
-        for plan: ReconciliationPlan,
-        calendarsByID: [String: CalendarSnapshot]
-    ) throws {
-        for event in plan.creates {
-            try validateWritable(event.destinationCalendar, calendarsByID: calendarsByID)
-        }
+    private func validateWritableCalendars(for plan: ReconciliationPlan, calendarsByID: [String: CalendarSnapshot])
+        throws
+    {
+        for event in plan.creates { try validateWritable(event.destinationCalendar, calendarsByID: calendarsByID) }
 
-        for event in plan.deletes {
-            try validateWritable(event.calendar, calendarsByID: calendarsByID)
-        }
+        for event in plan.deletes { try validateWritable(event.calendar, calendarsByID: calendarsByID) }
     }
 
-    private func validateWritable(
-        _ calendar: CalendarReference,
-        calendarsByID: [String: CalendarSnapshot]
-    ) throws {
+    private func validateWritable(_ calendar: CalendarReference, calendarsByID: [String: CalendarSnapshot]) throws {
         guard calendarsByID[calendar.id]?.isWritable == true else {
             throw ReconcileCalendarsError.calendarReadOnly(calendar)
         }

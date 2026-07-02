@@ -8,10 +8,8 @@ public enum YAMLCalendarRelaySettingsError: Error, CustomStringConvertible, Send
 
     public var description: String {
         switch self {
-        case .invalidConfiguration:
-            "Invalid configuration. Check the YAML shape and required fields."
-        case .invalidSettings(let message):
-            "Invalid configuration: \(message)"
+        case .invalidConfiguration: "Invalid configuration. Check the YAML shape and required fields."
+        case .invalidSettings(let message): "Invalid configuration: \(message)"
         }
     }
 }
@@ -21,21 +19,15 @@ public enum YAMLCalendarRelaySettingsLoader {
         let decoder = YAMLDecoder()
 
         let rawSettings: RawCalendarRelaySettings
-        do {
-            rawSettings = try decoder.decode(RawCalendarRelaySettings.self, from: yaml)
-        } catch {
+        do { rawSettings = try decoder.decode(RawCalendarRelaySettings.self, from: yaml) } catch {
             throw YAMLCalendarRelaySettingsError.invalidConfiguration
         }
 
         let settings = rawSettings.toSettings()
 
-        do {
-            try SettingsValidator.validate(settings)
-        } catch let error as SettingsValidationError {
+        do { try SettingsValidator.validate(settings) } catch let error as SettingsValidationError {
             throw YAMLCalendarRelaySettingsError.invalidSettings(error.description)
-        } catch {
-            throw YAMLCalendarRelaySettingsError.invalidConfiguration
-        }
+        } catch { throw YAMLCalendarRelaySettingsError.invalidConfiguration }
 
         return settings
     }
@@ -49,11 +41,8 @@ private struct RawCalendarRelaySettings: Decodable {
 
     func toSettings() -> CalendarRelaySettings {
         CalendarRelaySettings(
-            hubCalendar: hubCalendar.toSelector(),
-            personalPrefix: personalPrefix,
-            syncWindowDays: syncWindowDays ?? 60,
-            workCalendars: workCalendars.map { $0.toSettings() }
-        )
+            hubCalendar: hubCalendar.toSelector(), personalPrefix: personalPrefix, syncWindowDays: syncWindowDays ?? 60,
+            workCalendars: workCalendars.map { $0.toSettings() })
     }
 }
 
@@ -63,11 +52,7 @@ private struct RawWorkCalendarSettings: Decodable {
     let calendar: RawCalendarSelector
 
     func toSettings() -> WorkCalendarSettings {
-        WorkCalendarSettings(
-            name: name,
-            prefix: prefix,
-            calendar: calendar.toSelector()
-        )
+        WorkCalendarSettings(name: name, prefix: prefix, calendar: calendar.toSelector())
     }
 }
 
@@ -75,7 +60,5 @@ private struct RawCalendarSelector: Decodable {
     let sourceTitle: String
     let calendarTitle: String
 
-    func toSelector() -> CalendarSelector {
-        CalendarSelector(sourceTitle: sourceTitle, calendarTitle: calendarTitle)
-    }
+    func toSelector() -> CalendarSelector { CalendarSelector(sourceTitle: sourceTitle, calendarTitle: calendarTitle) }
 }

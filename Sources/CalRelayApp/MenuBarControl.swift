@@ -12,8 +12,6 @@ struct MenuBarControl: View {
 
         Divider()
 
-        Button("Quit") {
-            NSApp.terminate(nil)
-        }
+        Button("Quit") { NSApp.terminate(nil) }
     }
 }

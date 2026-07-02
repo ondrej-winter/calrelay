@@ -7,9 +7,7 @@ public struct CalendarRelaySettings: Equatable, Sendable {
     public let workCalendars: [WorkCalendarSettings]
 
     public init(
-        hubCalendar: CalendarSelector,
-        personalPrefix: String,
-        syncWindowDays: Int,
+        hubCalendar: CalendarSelector, personalPrefix: String, syncWindowDays: Int,
         workCalendars: [WorkCalendarSettings]
     ) {
         self.hubCalendar = hubCalendar

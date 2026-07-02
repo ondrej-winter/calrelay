@@ -10,23 +10,42 @@ Implementation work is broken down in the [CalRelay EventKit MVP implementation 
 
 - macOS 26+
 - Swift 6.2+
+- `make` for the canonical local development commands
+- `swift-format` for formatting checks
+- SwiftLint for lint checks
 - Full Calendar access for `CalRelay.app` when prompted by macOS
 - Writable Apple Calendar/EventKit calendars for any calendar that CalRelay should mutate
 
 ## Build and test
 
+Use the `Makefile` as the canonical local tooling entrypoint:
+
 ```sh
-swift build
-swift test
+make help
+make check
+make app
+```
+
+`make check` runs linting, build, deterministic tests with full Xcode selected, and a CLI help smoke check. The underlying commands remain ordinary SwiftPM commands and can still be run directly when debugging a specific step:
+
+```sh
+make format-check
+make format
+make lint
+make build
+make test
 swift run calrelay --help
-zsh scripts/build-calrelay-app.sh
 ```
 
-`swift test` is the local deterministic test gate. It does not require real EventKit access or real calendars. If the active Command Line Tools toolchain cannot load Swift Testing, run tests with full Xcode selected for the command:
+`make format-check` and `make format` use the repository `swift-format` configuration. The formatter is available as a separate target so a future formatting-only change can adopt it without mixing mechanical formatting churn into feature work.
+
+`make test` is the local deterministic test gate. It does not require real EventKit access or real calendars. If the active Command Line Tools toolchain cannot load Swift Testing, run tests with full Xcode selected:
 
 ```sh
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
+make test-xcode
 ```
+
+The package manifest (`Package.swift`) is the source of truth for products, targets, and dependencies. Keep `Package.resolved` committed with intentional dependency resolution updates.
 
 ## Repository layout
 
@@ -44,7 +63,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
 Build and open the app bundle:
 
 ```sh
-zsh scripts/build-calrelay-app.sh
+make app
 open .build/CalRelay.app
 ```
 

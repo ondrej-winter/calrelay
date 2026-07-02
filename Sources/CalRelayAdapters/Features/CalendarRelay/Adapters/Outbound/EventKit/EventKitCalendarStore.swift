@@ -14,18 +14,14 @@ public enum EventKitCalendarStoreError: Error, CustomStringConvertible {
 
     public var description: String {
         switch self {
-        case .accessDenied:
-            "Calendar access was denied. Enable full calendar access for CalRelay in System Settings."
-        case .accessRestricted:
-            "Calendar access is restricted on this Mac."
+        case .accessDenied: "Calendar access was denied. Enable full calendar access for CalRelay in System Settings."
+        case .accessRestricted: "Calendar access is restricted on this Mac."
         case .writeOnlyAccess:
             "Calendar access is write-only. CalRelay needs full access to list and reconcile calendars."
-        case .accessNotGranted:
-            "Full calendar access was not granted."
+        case .accessNotGranted: "Full calendar access was not granted."
         case .calendarNotFound(let calendar):
             "Calendar is no longer available: \(calendar.sourceTitle) / \(calendar.title)."
-        case .calendarReadOnly(let calendar):
-            "Calendar is read-only: \(calendar.sourceTitle) / \(calendar.title)."
+        case .calendarReadOnly(let calendar): "Calendar is read-only: \(calendar.sourceTitle) / \(calendar.title)."
         case .eventNotFound(let event):
             "Event is no longer available for deletion: \(event.calendar.sourceTitle) / \(event.calendar.title)."
         case .eventCalendarMismatch(let expected):
@@ -50,27 +46,19 @@ enum EventKitParticipantStatusSnapshot: Equatable, Sendable {
 
 enum EventKitEventStatusMapper {
     static func mapStatus(
-        currentUserParticipantStatus: EventKitParticipantStatusSnapshot?,
-        eventStatus: EventKitEventStatusSnapshot
+        currentUserParticipantStatus: EventKitParticipantStatusSnapshot?, eventStatus: EventKitEventStatusSnapshot
     ) -> EventStatus {
         switch currentUserParticipantStatus {
-        case .declined:
-            return .declined
-        case .tentative:
-            return .tentative
-        case .accepted, .other, nil:
-            break
+        case .declined: return .declined
+        case .tentative: return .tentative
+        case .accepted, .other, nil: break
         }
 
         switch eventStatus {
-        case .confirmed:
-            return .confirmed
-        case .tentative:
-            return .tentative
-        case .cancelled:
-            return .cancelled
-        case .unknown:
-            return .unknown
+        case .confirmed: return .confirmed
+        case .tentative: return .tentative
+        case .cancelled: return .cancelled
+        case .unknown: return .unknown
         }
     }
 }
@@ -78,51 +66,32 @@ enum EventKitEventStatusMapper {
 public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable {
     private let eventStore: EKEventStore
 
-    public init(eventStore: EKEventStore = EKEventStore()) {
-        self.eventStore = eventStore
-    }
+    public init(eventStore: EKEventStore = EKEventStore()) { self.eventStore = eventStore }
 
     public func listCalendars() async throws -> [CalendarSnapshot] {
         try await requestFullCalendarAccessIfNeeded()
 
         return eventStore.calendars(for: .event).map { calendar in
             CalendarSnapshot(
-                id: calendar.calendarIdentifier,
-                title: calendar.title,
-                sourceTitle: calendar.source.title,
-                isWritable: calendar.allowsContentModifications
-            )
+                id: calendar.calendarIdentifier, title: calendar.title, sourceTitle: calendar.source.title,
+                isWritable: calendar.allowsContentModifications)
         }
     }
 
-    public func events(
-        in calendar: CalendarReference,
-        from start: Date,
-        to end: Date
-    ) async throws -> [EventSnapshot] {
+    public func events(in calendar: CalendarReference, from start: Date, to end: Date) async throws -> [EventSnapshot] {
         try await requestFullCalendarAccessIfNeeded()
 
         guard let eventKitCalendar = eventStore.calendar(withIdentifier: calendar.id) else {
             throw EventKitCalendarStoreError.calendarNotFound(calendar)
         }
 
-        let predicate = eventStore.predicateForEvents(
-            withStart: start,
-            end: end,
-            calendars: [eventKitCalendar]
-        )
+        let predicate = eventStore.predicateForEvents(withStart: start, end: end, calendars: [eventKitCalendar])
 
         return eventStore.events(matching: predicate).map { event in
             EventSnapshot(
-                id: event.eventIdentifier ?? event.calendarItemIdentifier,
-                calendar: calendar,
-                title: event.title ?? "",
-                start: event.startDate,
-                end: event.endDate,
-                isAllDay: event.isAllDay,
-                availability: Self.mapAvailability(event.availability),
-                status: Self.mapStatus(event)
-            )
+                id: event.eventIdentifier ?? event.calendarItemIdentifier, calendar: calendar, title: event.title ?? "",
+                start: event.startDate, end: event.endDate, isAllDay: event.isAllDay,
+                availability: Self.mapAvailability(event.availability), status: Self.mapStatus(event))
         }
     }
 
@@ -170,50 +139,33 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
 
     private func requestFullCalendarAccessIfNeeded() async throws {
         switch EKEventStore.authorizationStatus(for: .event) {
-        case .fullAccess:
-            return
+        case .fullAccess: return
         case .notDetermined:
             let granted = try await requestFullAccessToEvents()
-            guard granted else {
-                throw EventKitCalendarStoreError.accessNotGranted
-            }
-        case .denied:
-            throw EventKitCalendarStoreError.accessDenied
-        case .restricted:
-            throw EventKitCalendarStoreError.accessRestricted
-        case .writeOnly:
-            throw EventKitCalendarStoreError.writeOnlyAccess
-        @unknown default:
-            throw EventKitCalendarStoreError.accessNotGranted
+            guard granted else { throw EventKitCalendarStoreError.accessNotGranted }
+        case .denied: throw EventKitCalendarStoreError.accessDenied
+        case .restricted: throw EventKitCalendarStoreError.accessRestricted
+        case .writeOnly: throw EventKitCalendarStoreError.writeOnlyAccess
+        @unknown default: throw EventKitCalendarStoreError.accessNotGranted
         }
     }
 
     private func requestFullAccessToEvents() async throws -> Bool {
         try await withCheckedThrowingContinuation { continuation in
             eventStore.requestFullAccessToEvents { granted, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else {
-                    continuation.resume(returning: granted)
-                }
+                if let error { continuation.resume(throwing: error) } else { continuation.resume(returning: granted) }
             }
         }
     }
 
     private static func mapAvailability(_ availability: EKEventAvailability) -> EventAvailability {
         switch availability {
-        case .busy:
-            .busy
-        case .tentative:
-            .tentative
-        case .free:
-            .free
-        case .unavailable:
-            .unavailable
-        case .notSupported:
-            .notSupported
-        @unknown default:
-            .unknown
+        case .busy: .busy
+        case .tentative: .tentative
+        case .free: .free
+        case .unavailable: .unavailable
+        case .notSupported: .notSupported
+        @unknown default: .unknown
         }
     }
 
@@ -222,40 +174,28 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
     /// accepting a shared meeting must not exclude the event from sync for the calendar owner.
     private static func mapStatus(_ event: EKEvent) -> EventStatus {
         EventKitEventStatusMapper.mapStatus(
-            currentUserParticipantStatus: event.attendees?
-                .first(where: { $0.isCurrentUser })
-                .map { mapParticipantStatus($0.participantStatus) },
-            eventStatus: mapEventStatus(event.status)
-        )
+            currentUserParticipantStatus: event.attendees?.first(where: { $0.isCurrentUser }).map {
+                mapParticipantStatus($0.participantStatus)
+            }, eventStatus: mapEventStatus(event.status))
     }
 
     private static func mapEventStatus(_ status: EKEventStatus) -> EventKitEventStatusSnapshot {
         switch status {
-        case .confirmed:
-            .confirmed
-        case .tentative:
-            .tentative
-        case .canceled:
-            .cancelled
-        case .none:
-            .unknown
-        @unknown default:
-            .unknown
+        case .confirmed: .confirmed
+        case .tentative: .tentative
+        case .canceled: .cancelled
+        case .none: .unknown
+        @unknown default: .unknown
         }
     }
 
     private static func mapParticipantStatus(_ status: EKParticipantStatus) -> EventKitParticipantStatusSnapshot {
         switch status {
-        case .accepted:
-            .accepted
-        case .declined:
-            .declined
-        case .tentative:
-            .tentative
-        case .unknown, .pending, .delegated, .completed, .inProcess:
-            .other
-        @unknown default:
-            .other
+        case .accepted: .accepted
+        case .declined: .declined
+        case .tentative: .tentative
+        case .unknown, .pending, .delegated, .completed, .inProcess: .other
+        @unknown default: .other
         }
     }
 }

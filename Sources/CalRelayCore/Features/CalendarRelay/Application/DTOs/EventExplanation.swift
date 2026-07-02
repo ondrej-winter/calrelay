@@ -17,14 +17,8 @@ public struct EventExplanation: Equatable, Sendable {
     public let reason: EventInclusionReason
 
     public init(
-        calendar: CalendarReference,
-        title: String,
-        start: Date,
-        end: Date,
-        isAllDay: Bool,
-        availability: EventAvailability,
-        status: EventStatus,
-        reason: EventInclusionReason
+        calendar: CalendarReference, title: String, start: Date, end: Date, isAllDay: Bool,
+        availability: EventAvailability, status: EventStatus, reason: EventInclusionReason
     ) {
         self.calendar = calendar
         self.title = title

@@ -1,3 +1,1 @@
-enum AppSettingsKeys {
-    static let showMenuBarItem = "showMenuBarItem"
-}
+enum AppSettingsKeys { static let showMenuBarItem = "showMenuBarItem" }

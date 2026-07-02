@@ -3,67 +3,30 @@
 import PackageDescription
 
 let package = Package(
-    name: "CalRelay",
-    platforms: [
-        .macOS(.v26)
-    ],
+    name: "CalRelay", platforms: [.macOS(.v26)],
     products: [
-        .executable(name: "calrelay", targets: ["CalRelay"]),
-        .executable(name: "CalRelayApp", targets: ["CalRelayApp"])
+        .executable(name: "calrelay", targets: ["CalRelay"]), .executable(name: "CalRelayApp", targets: ["CalRelayApp"])
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
         .package(url: "https://github.com/jpsim/Yams.git", from: "6.0.0")
     ],
     targets: [
+        .target(name: "CalRelayCore", path: "Sources/CalRelayCore"),
         .target(
-            name: "CalRelayCore",
-            path: "Sources/CalRelayCore"
-        ),
-        .target(
-            name: "CalRelayAdapters",
-            dependencies: [
-                "CalRelayCore",
-                .product(name: "Yams", package: "Yams")
-            ],
-            path: "Sources/CalRelayAdapters"
-        ),
-        .target(
-            name: "CalRelayCommandSupport",
-            path: "Sources/CalRelayCommandSupport"
-        ),
+            name: "CalRelayAdapters", dependencies: ["CalRelayCore", .product(name: "Yams", package: "Yams")],
+            path: "Sources/CalRelayAdapters"),
+        .target(name: "CalRelayCommandSupport", path: "Sources/CalRelayCommandSupport"),
         .executableTarget(
-            name: "CalRelayApp",
-            dependencies: [
-                "CalRelayCore",
-                "CalRelayAdapters"
-            ],
-            path: "Sources/CalRelayApp"
-        ),
+            name: "CalRelayApp", dependencies: ["CalRelayCore", "CalRelayAdapters"], path: "Sources/CalRelayApp"),
         .executableTarget(
             name: "CalRelay",
             dependencies: [
-                "CalRelayCore",
-                "CalRelayAdapters",
-                "CalRelayCommandSupport",
+                "CalRelayCore", "CalRelayAdapters", "CalRelayCommandSupport",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
-            ],
-            path: "Sources/CalRelay"
-        ),
+            ], path: "Sources/CalRelay"),
+        .testTarget(name: "CalRelayCLITests", dependencies: ["CalRelayCommandSupport"], path: "Tests/CalRelayCLITests"),
         .testTarget(
-            name: "CalRelayCLITests",
-            dependencies: [
-                "CalRelayCommandSupport"
-            ],
-            path: "Tests/CalRelayCLITests"
-        ),
-        .testTarget(
-            name: "CalRelayContractTests",
-            dependencies: [
-                "CalRelayCore",
-                "CalRelayAdapters"
-            ],
-            path: "Tests/CalRelayContractTests"
-        )
-    ]
-)
+            name: "CalRelayContractTests", dependencies: ["CalRelayCore", "CalRelayAdapters"],
+            path: "Tests/CalRelayContractTests")
+    ])

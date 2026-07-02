@@ -3,9 +3,7 @@ import Foundation
 
 public enum CalendarListFormatter {
     public static func format(_ calendars: [CalendarSnapshot]) -> String {
-        if calendars.isEmpty {
-            return "No calendars found."
-        }
+        if calendars.isEmpty { return "No calendars found." }
 
         var lines: [String] = ["Calendars (\(calendars.count))"]
         lines.append(contentsOf: calendars.map(formatCalendar))

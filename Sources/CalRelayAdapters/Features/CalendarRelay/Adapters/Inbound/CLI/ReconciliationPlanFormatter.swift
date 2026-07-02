@@ -3,9 +3,7 @@ import Foundation
 
 public enum ReconciliationPlanFormatter {
     public static func format(_ plan: ReconciliationPlan) -> String {
-        if plan.creates.isEmpty && plan.deletes.isEmpty {
-            return "No changes planned."
-        }
+        if plan.creates.isEmpty && plan.deletes.isEmpty { return "No changes planned." }
 
         var lines: [String] = []
         lines.append("Creates (\(plan.creates.count))")
@@ -28,7 +26,5 @@ public enum ReconciliationPlanFormatter {
         "\(calendar.sourceTitle) / \(calendar.title)"
     }
 
-    private static func formatRange(start: Date, end: Date) -> String {
-        "\(start.description) → \(end.description)"
-    }
+    private static func formatRange(start: Date, end: Date) -> String { "\(start.description) → \(end.description)" }
 }

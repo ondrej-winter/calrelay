@@ -1,0 +1,39 @@
+included:
+  - Package.swift
+  - Sources
+  - Tests
+
+excluded:
+  - .build
+  - .agents
+  - .clinerules
+  - .git
+  - tmp
+
+analyzer_rules: []
+
+opt_in_rules: []
+
+disabled_rules:
+  - file_length
+  - line_length
+  - opening_brace
+  - todo
+  - trailing_comma
+  - trailing_newline
+  - type_body_length
+  - vertical_parameter_alignment
+
+function_body_length:
+  warning: 80
+  error: 120
+
+identifier_name:
+  min_length:
+    warning: 2
+  excluded:
+    - id
+    - to
+    - in
+    - x
+    - y
