@@ -1,4 +1,4 @@
-.PHONY: help resolve build test test-xcode lint format format-check check app clean sync-rules require-swift-format require-swiftlint
+.PHONY: help resolve build test lint format format-check check app clean sync-rules require-swift-format require-swiftlint
 
 SWIFT_FORMAT ?= $(shell command -v swift-format 2>/dev/null || xcrun --find swift-format 2>/dev/null || printf '%s' swift-format)
 SWIFTLINT ?= $(shell command -v swiftlint 2>/dev/null || test ! -x /opt/homebrew/bin/swiftlint || printf '%s' /opt/homebrew/bin/swiftlint || printf '%s' swiftlint)
@@ -12,7 +12,6 @@ help:
 	@printf '  %-14s %s\n' 'resolve' 'Resolve Swift package dependencies and update Package.resolved when needed'
 	@printf '  %-14s %s\n' 'build' 'Build all SwiftPM products'
 	@printf '  %-14s %s\n' 'test' 'Run deterministic SwiftPM tests'
-	@printf '  %-14s %s\n' 'test-xcode' 'Run tests with full Xcode selected as DEVELOPER_DIR'
 	@printf '  %-14s %s\n' 'format-check' 'Check Swift formatting without modifying files'
 	@printf '  %-14s %s\n' 'format' 'Apply Swift formatting in place'
 	@printf '  %-14s %s\n' 'lint' 'Run SwiftLint'
@@ -28,10 +27,7 @@ build:
 	swift build
 
 test:
-	swift test
-
-test-xcode:
-	DEVELOPER_DIR="$(XCODE_DEVELOPER_DIR)" swift test
+	swift run CalRelayKitTests
 
 format-check: require-swift-format
 	$(SWIFT_FORMAT) lint --recursive $(SWIFT_FORMAT_PATHS)
@@ -42,7 +38,7 @@ format: require-swift-format
 lint: require-swiftlint
 	DEVELOPER_DIR="$(XCODE_DEVELOPER_DIR)" $(SWIFTLINT) lint --strict --config .swiftlint.yml $(SWIFTLINT_PATHS)
 
-check: lint build test-xcode
+check: lint build test
 	swift run calrelay --help >/dev/null
 
 app:

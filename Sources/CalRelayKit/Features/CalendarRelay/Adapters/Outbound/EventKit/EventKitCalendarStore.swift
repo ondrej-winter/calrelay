@@ -29,22 +29,22 @@ public enum EventKitCalendarStoreError: Error, CustomStringConvertible {
     }
 }
 
-enum EventKitEventStatusValue: Equatable, Sendable {
+public enum EventKitEventStatusValue: Equatable, Sendable {
     case confirmed
     case tentative
     case cancelled
     case unknown
 }
 
-enum EventKitParticipantStatusValue: Equatable, Sendable {
+public enum EventKitParticipantStatusValue: Equatable, Sendable {
     case accepted
     case declined
     case tentative
     case other
 }
 
-enum EventKitEventStatusMapper {
-    static func mapStatus(
+public enum EventKitEventStatusMapper {
+    public static func mapStatus(
         currentUserParticipantStatus: EventKitParticipantStatusValue?, eventStatus: EventKitEventStatusValue
     ) -> EventStatus {
         switch currentUserParticipantStatus {

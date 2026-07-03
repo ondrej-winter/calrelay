@@ -21,6 +21,5 @@ let package = Package(
                 "CalRelayKit",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ], path: "Sources/CalRelayCLI"),
-        .testTarget(name: "CalRelayCLITests", dependencies: ["CalRelayKit"], path: "Tests/CalRelayCLITests"),
-        .testTarget(name: "CalRelayContractTests", dependencies: ["CalRelayKit"], path: "Tests/CalRelayContractTests")
+        .executableTarget(name: "CalRelayKitTests", dependencies: ["CalRelayKit"], path: "Tests/CalRelayKitTests")
     ])

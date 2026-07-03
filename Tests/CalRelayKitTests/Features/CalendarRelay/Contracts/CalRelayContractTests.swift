@@ -1,10 +1,8 @@
 import Foundation
-import Testing
+import CalRelayKit
 
-@testable import CalRelayKit
-
-@Suite("CalRelay contract tests") struct CalRelayContractTests {
-    @Test("Deterministic contract suite") func contractSuite() async throws {
+enum CalRelayContractTests {
+    static func runAll() async throws {
         try Self.testAcceptsValidSettings()
         try Self.testRejectsMissingWorkCalendars()
         try Self.testRejectsEmptyHubSelectorFields()

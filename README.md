@@ -26,7 +26,7 @@ make check
 make app
 ```
 
-`make check` runs linting, build, deterministic tests with full Xcode selected, and a CLI help smoke check. The underlying commands remain ordinary SwiftPM commands and can still be run directly when debugging a specific step:
+`make check` runs linting, a SwiftPM build, the deterministic SwiftPM executable test runner, and a CLI help smoke check. The underlying commands remain ordinary SwiftPM commands and can still be run directly when debugging a specific step:
 
 ```sh
 make format-check
@@ -39,11 +39,7 @@ swift run calrelay --help
 
 `make format-check` and `make format` use the repository `swift-format` configuration. The formatter is available as a separate target so a future formatting-only change can adopt it without mixing mechanical formatting churn into feature work.
 
-`make test` is the local deterministic test gate. It does not require real EventKit access or real calendars. If the active Command Line Tools toolchain cannot load Swift Testing, run tests with full Xcode selected:
-
-```sh
-make test-xcode
-```
+`make test` is the local deterministic test gate. It runs `swift run CalRelayKitTests` and does not require real EventKit access, real calendars, `CalRelay.app`, Swift Testing, XCTest, or a separately selected full Xcode toolchain.
 
 The package manifest (`Package.swift`) is the source of truth for products, targets, and dependencies. Keep `Package.resolved` committed with intentional dependency resolution updates.
 
@@ -52,7 +48,7 @@ The package manifest (`Package.swift`) is the source of truth for products, targ
 - `Sources/CalRelayKit/`: shared `CalendarRelay` library target containing pure domain/application logic, DTOs, ports, settings validation, projection, reconciliation planning, YAML configuration loading, CLI output formatting, and EventKit outbound adapters.
 - `Sources/CalRelayCLI/`: executable `calrelay` CLI command parsing and composition.
 - `Sources/CalRelayApp/`: Dock-visible SwiftUI app control panel and UI-only menu bar surface used for macOS Calendar permission and EventKit capability checks.
-- `Tests/CalRelayContractTests/`: deterministic Swift Testing contract suite used by `swift test`; it uses fakes and does not require real EventKit access.
+- `Tests/CalRelayKitTests/`: consolidated deterministic executable test runner for shared library, CLI-support, and contract behavior; it uses fakes and does not require real EventKit access.
 - `docs/manual-validation.md`: app-backed EventKit validation recipe for local writable test calendars.
 
 ## Usage
