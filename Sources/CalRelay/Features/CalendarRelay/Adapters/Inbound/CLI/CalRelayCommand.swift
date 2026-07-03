@@ -1,7 +1,5 @@
 import ArgumentParser
-import CalRelayAdapters
-import CalRelayCommandSupport
-import CalRelayCore
+import CalRelayKit
 import Foundation
 
 @main @available(macOS 10.15, macCatalyst 13, iOS 13, tvOS 13, watchOS 6, *)

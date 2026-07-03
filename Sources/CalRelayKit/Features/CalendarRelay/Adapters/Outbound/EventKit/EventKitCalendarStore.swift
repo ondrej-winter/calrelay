@@ -1,4 +1,3 @@
-import CalRelayCore
 @preconcurrency import EventKit
 import Foundation
 

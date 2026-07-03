@@ -1,8 +1,7 @@
-import CalRelayCore
 import Foundation
 import Testing
 
-@testable import CalRelayAdapters
+@testable import CalRelayKit
 
 @Suite("CalRelay contract tests") struct CalRelayContractTests {
     @Test("Deterministic contract suite") func contractSuite() async throws {

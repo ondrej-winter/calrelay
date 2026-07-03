@@ -44,11 +44,11 @@ The EventKit MVP implementation and validation are complete as of commit `845c71
 
 The completed MVP keeps the same `CalendarRelay` vertical-slice vocabulary, but the SwiftPM package is split into focused targets so architecture boundaries are clearer:
 
-- `Sources/CalRelayCore/Features/CalendarRelay/Domain/`: pure reconciliation and projection rules.
-- `Sources/CalRelayCore/Features/CalendarRelay/Application/`: DTOs, ports, settings validation, and reconciliation use-case orchestration.
-- `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Inbound/Config/`: YAML configuration loading and defaulting.
-- `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Inbound/CLI/`: user-facing output formatting.
-- `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Outbound/EventKit/`: EventKit permission, calendar, event-read, create, and delete adapter.
+- `Sources/CalRelayKit/Features/CalendarRelay/Domain/`: pure reconciliation and projection rules.
+- `Sources/CalRelayKit/Features/CalendarRelay/Application/`: DTOs, ports, settings validation, and reconciliation use-case orchestration.
+- `Sources/CalRelayKit/Features/CalendarRelay/Adapters/Inbound/Config/`: YAML configuration loading and defaulting.
+- `Sources/CalRelayKit/Features/CalendarRelay/Adapters/Inbound/CLI/`: user-facing output formatting.
+- `Sources/CalRelayKit/Features/CalendarRelay/Adapters/Outbound/EventKit/`: EventKit permission, calendar, event-read, create, and delete adapter.
 - `Sources/CalRelay/Features/CalendarRelay/Adapters/Inbound/CLI/`: executable `calrelay` command parsing and composition.
 - `Sources/CalRelayApp/`: app-bundle wrapper for macOS Calendar permission and EventKit capability checks.
 - `Tests/CalRelayContractTests/`: deterministic Swift Testing contract suite run by `swift test` without real EventKit access.

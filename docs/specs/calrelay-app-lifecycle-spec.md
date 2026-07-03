@@ -108,8 +108,8 @@ For this spec-only step, the validation is review of this document before any im
 Expected future implementation locations, if this spec is accepted:
 
 - `Sources/CalRelayApp/`: app lifecycle, SwiftUI window, AppKit status item integration, and app-level composition.
-- `Sources/CalRelayCore/Features/CalendarRelay/`: pure application/domain behavior for reconciliation remains here.
-- `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Outbound/EventKit/`: EventKit access and permissions remain here.
+- `Sources/CalRelayKit/Features/CalendarRelay/`: pure application/domain behavior for reconciliation remains here.
+- `Sources/CalRelayKit/Features/CalendarRelay/Adapters/Outbound/EventKit/`: EventKit access and permissions remain here.
 - `docs/specs/`: durable product and lifecycle specifications.
 - `docs/plans/`: implementation plans only after the relevant spec is accepted.
 

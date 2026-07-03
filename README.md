@@ -49,8 +49,7 @@ The package manifest (`Package.swift`) is the source of truth for products, targ
 
 ## Repository layout
 
-- `Sources/CalRelayCore/`: pure domain/application logic for the `CalendarRelay` feature, including DTOs, ports, settings validation, projection, and reconciliation planning.
-- `Sources/CalRelayAdapters/`: YAML configuration, CLI output formatting, and EventKit outbound adapters.
+- `Sources/CalRelayKit/`: shared `CalendarRelay` library target containing pure domain/application logic, DTOs, ports, settings validation, projection, reconciliation planning, YAML configuration loading, CLI output formatting, and EventKit outbound adapters.
 - `Sources/CalRelay/`: executable `calrelay` CLI command parsing and composition.
 - `Sources/CalRelayApp/`: Dock-visible SwiftUI app control panel and UI-only menu bar surface used for macOS Calendar permission and EventKit capability checks.
 - `Tests/CalRelayContractTests/`: deterministic Swift Testing contract suite used by `swift test`; it uses fakes and does not require real EventKit access.

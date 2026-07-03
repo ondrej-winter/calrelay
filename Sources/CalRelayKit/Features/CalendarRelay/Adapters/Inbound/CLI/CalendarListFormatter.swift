@@ -1,4 +1,3 @@
-import CalRelayCore
 import Foundation
 
 public enum CalendarListFormatter {

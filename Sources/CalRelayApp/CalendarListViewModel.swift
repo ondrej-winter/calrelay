@@ -1,4 +1,4 @@
-import CalRelayAdapters
+import CalRelayKit
 import SwiftUI
 
 @MainActor final class CalendarListViewModel: ObservableObject {

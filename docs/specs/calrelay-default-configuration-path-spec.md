@@ -16,7 +16,7 @@ This improves everyday local use by allowing `calrelay reconcile` to work withou
 
 - The CLI currently requires `calrelay reconcile --config <path>`.
 - YAML parsing is implemented in `YAMLCalendarRelaySettingsLoader` under the inbound configuration adapter.
-- Reconciliation settings remain application DTOs in `CalRelayCore`.
+- Reconciliation settings remain application DTOs in `CalRelayKit`.
 - The current app is a Dock-visible SwiftUI control panel and UI-only menu bar surface.
 - The app lifecycle spec says future manual sync actions require visible configuration validity before exposing sync controls.
 - Configuration source mechanics must remain outside domain/application core.
@@ -85,7 +85,7 @@ See docs/configuration.md for an example.
 ## Project structure
 
 - `Sources/CalRelay/Features/CalendarRelay/Adapters/Inbound/CLI/`: CLI option defaulting, path resolution, and command-facing errors.
-- `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Inbound/Config/`: YAML string-to-settings parsing, defaulting, and validation. Filesystem policy should stay out of this loader unless a focused file-loading adapter is introduced.
+- `Sources/CalRelayKit/Features/CalendarRelay/Adapters/Inbound/Config/`: YAML string-to-settings parsing, defaulting, and validation. Filesystem policy should stay out of this loader unless a focused file-loading adapter is introduced.
 - `Sources/CalRelayApp/`: future app configuration-status UI should reuse the same default path convention at the app/bootstrap edge.
 - `docs/configuration.md`: default path and usage examples.
 - `README.md`: concise usage examples showing default and override behavior.
@@ -111,7 +111,7 @@ See docs/configuration.md for an example.
 - Always: keep `--config <path>` override support.
 - Always: default to `~/.config/calrelay/config.yaml` when no override is provided.
 - Always: fail before EventKit access when the selected config file is missing.
-- Always: keep default path resolution out of `CalRelayCore`.
+- Always: keep default path resolution out of `CalRelayKit` domain/application code.
 - Ask first: before adding environment variable overrides such as `CALRELAY_CONFIG`.
 - Ask first: before adding profile support or multiple config discovery paths.
 - Ask first: before adding a "Choose Config..." UI or remembered alternate app config path.

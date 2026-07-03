@@ -77,8 +77,8 @@ public struct ReconcileCalendarsUseCase: Sendable {
 
         let hubPlan = ReconciliationPlanner.plan(
             expected: expectedHubEvents, existing: context.hubEvents, managedPrefixes: context.managedPrefixes)
-        let workPlan = ReconciliationPlanner.plan(expected: expectedWorkEvents, existing: context.allWorkEvents) {
-            event in titlePolicy.isRelayedWorkBlocker(event)
+        let workPlan = ReconciliationPlanner.plan(expected: expectedWorkEvents, existing: context.allWorkEvents) { event in
+            titlePolicy.isRelayedWorkBlocker(event)
         }
         let reconciliationPlan = ReconciliationPlan(
             creates: hubPlan.creates + workPlan.creates, deletes: hubPlan.deletes + workPlan.deletes)

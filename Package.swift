@@ -12,21 +12,15 @@ let package = Package(
         .package(url: "https://github.com/jpsim/Yams.git", from: "6.0.0")
     ],
     targets: [
-        .target(name: "CalRelayCore", path: "Sources/CalRelayCore"),
         .target(
-            name: "CalRelayAdapters", dependencies: ["CalRelayCore", .product(name: "Yams", package: "Yams")],
-            path: "Sources/CalRelayAdapters"),
-        .target(name: "CalRelayCommandSupport", path: "Sources/CalRelayCommandSupport"),
-        .executableTarget(
-            name: "CalRelayApp", dependencies: ["CalRelayCore", "CalRelayAdapters"], path: "Sources/CalRelayApp"),
+            name: "CalRelayKit", dependencies: [.product(name: "Yams", package: "Yams")], path: "Sources/CalRelayKit"),
+        .executableTarget(name: "CalRelayApp", dependencies: ["CalRelayKit"], path: "Sources/CalRelayApp"),
         .executableTarget(
             name: "CalRelay",
             dependencies: [
-                "CalRelayCore", "CalRelayAdapters", "CalRelayCommandSupport",
+                "CalRelayKit",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ], path: "Sources/CalRelay"),
-        .testTarget(name: "CalRelayCLITests", dependencies: ["CalRelayCommandSupport"], path: "Tests/CalRelayCLITests"),
-        .testTarget(
-            name: "CalRelayContractTests", dependencies: ["CalRelayCore", "CalRelayAdapters"],
-            path: "Tests/CalRelayContractTests")
+        .testTarget(name: "CalRelayCLITests", dependencies: ["CalRelayKit"], path: "Tests/CalRelayCLITests"),
+        .testTarget(name: "CalRelayContractTests", dependencies: ["CalRelayKit"], path: "Tests/CalRelayContractTests")
     ])

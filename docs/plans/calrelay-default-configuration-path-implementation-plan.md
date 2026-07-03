@@ -7,7 +7,7 @@ Implement the behavior specified in [`docs/specs/calrelay-default-configuration-
 - `swift run calrelay reconcile` defaults to `~/.config/calrelay/config.yaml`.
 - `swift run calrelay reconcile --config <path>` remains an explicit override.
 - Missing configuration fails before YAML parsing or EventKit access with an actionable user-facing error.
-- Configuration path mechanics remain at the CLI, app, or bootstrap edge and do not leak into `CalRelayCore`.
+- Configuration path mechanics remain at the CLI, app, or bootstrap edge and do not leak into `CalRelayKit` domain/application code.
 - README and configuration docs show the new default-path workflow.
 
 ## Progress status
@@ -52,8 +52,8 @@ Validation evidence so far:
 ## Current context
 
 - `Sources/CalRelay/Features/CalendarRelay/Adapters/Inbound/CLI/CalRelayCommand.swift` currently requires `@Option var config: String` for `reconcile`.
-- `YAMLCalendarRelaySettingsLoader` in `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Inbound/Config/` parses YAML strings into application DTOs and should not own filesystem policy.
-- `CalRelayCore` owns settings DTOs, validation, and reconciliation orchestration and should remain unaware of filesystem paths.
+- `YAMLCalendarRelaySettingsLoader` in `Sources/CalRelayKit/Features/CalendarRelay/Adapters/Inbound/Config/` parses YAML strings into application DTOs and should not own filesystem policy.
+- `CalRelayKit` owns settings DTOs, validation, and reconciliation orchestration; its domain/application code should remain unaware of filesystem paths.
 - `README.md` and `docs/configuration.md` currently show `--config calrelay.yml` as the ordinary reconciliation path.
 - Existing deterministic tests cover YAML parsing and reconciliation behavior but do not yet cover CLI configuration path selection.
 
@@ -61,12 +61,12 @@ Validation evidence so far:
 
 - `Sources/CalRelay/Features/CalendarRelay/Adapters/Inbound/CLI/CalRelayCommand.swift`
   - Make `--config` optional and call the CLI-edge selection helper before loading YAML.
-- `Sources/CalRelayCommandSupport/ConfigurationFileSelection.swift`
-  - New CLI-edge support helper for default path construction, override selection, file-existence checks, and CLI-facing errors.
+- `Sources/CalRelayKit/Features/CalendarRelay/Adapters/Inbound/CLI/ConfigurationFileSelection.swift`
+  - CLI-edge support helper for default path construction, override selection, file-existence checks, and CLI-facing errors.
 - `Tests/CalRelayCLITests/ConfigurationFileSelectionTests.swift` or equivalent focused CLI-support test file
   - Add deterministic tests for selection and error messaging without adding more cases to the already-large contract test suite.
 - `Package.swift`
-  - Add a tiny CLI support library target and focused CLI test target so tests can access the CLI-edge helper without moving filesystem policy into `CalRelayCore`.
+  - Keep the focused CLI test target depending on `CalRelayKit` so tests can access the CLI-edge helper without moving filesystem policy into domain/application code.
 - `README.md`
   - Update CLI usage examples.
 - `docs/configuration.md`
@@ -79,14 +79,14 @@ Validation evidence so far:
 Create a tiny CLI support library target so the helper can be tested cleanly without importing the executable target or moving path policy into core. Add the helper at:
 
 ```text
-Sources/CalRelayCommandSupport/ConfigurationFileSelection.swift
+Sources/CalRelayKit/Features/CalendarRelay/Adapters/Inbound/CLI/ConfigurationFileSelection.swift
 ```
 
 Update `Package.swift` so:
 
-- executable target `CalRelay` depends on the new `CalRelayCommandSupport` target;
-- focused test target `CalRelayCLITests` depends on `CalRelayCommandSupport`;
-- `CalRelayCore` remains free of filesystem path-resolution policy.
+- executable target `CalRelay` depends on the consolidated `CalRelayKit` target;
+- focused test target `CalRelayCLITests` depends on `CalRelayKit`;
+- `CalRelayKit` domain/application code remains free of filesystem path-resolution policy.
 
 Responsibilities:
 
@@ -111,7 +111,7 @@ The helper should support deterministic tests by allowing injection of:
 - home directory URL or path;
 - file-existence check closure.
 
-Keep the executable-facing API narrow. Prefer a small `public` API only for the selection behavior used by `ReconcileCommand`; keep implementation details internal. If tests need access to internal details, use `@testable import CalRelayCommandSupport` only in the focused CLI test target.
+Keep the executable-facing API narrow. Prefer a small `public` API only for the selection behavior used by `ReconcileCommand`; keep implementation details internal. If tests need access to internal details, use `@testable import CalRelayKit` only in the focused CLI test target.
 
 ### 2. Make `--config` optional in `ReconcileCommand` — Done
 
@@ -159,14 +159,14 @@ This avoids implying that the canonical config was selected when the user delibe
 
 Prefer testing the pure helper instead of requiring real CLI execution or EventKit access.
 
-Use a focused CLI/support test location rather than adding more cases to `Tests/CalRelayContractTests/CalRelayContractTests.swift`. The current contract test target depends only on `CalRelayCore` and `CalRelayAdapters`, so it cannot access a helper that lives only in the `CalRelay` executable target without an intentional package change.
+Use a focused CLI/support test location rather than adding more cases to `Tests/CalRelayContractTests/CalRelayContractTests.swift`. The contract test target depends on `CalRelayKit`, so it can cover shared library behavior without making tests depend on the executable target.
 
 Package/test strategy:
 
-1. Introduce a tiny library target named `CalRelayCommandSupport` for command-support behavior that is not domain/application logic.
-2. Have the `CalRelay` executable target and the focused `CalRelayCLITests` test target depend on it.
-3. Do not move the helper into `CalRelayCore`; default-path and filesystem policy are adapter/bootstrap concerns.
-4. Keep the new support target scoped to CLI command support. If future app configuration-status UI needs shared canonical path behavior, split a neutral shared configuration-support target later rather than making the app depend on CLI-specific error wording.
+1. Keep command-support behavior that is not domain/application logic in `CalRelayKit` under the CLI inbound adapter path.
+2. Have the `CalRelay` executable target and the focused `CalRelayCLITests` test target depend on `CalRelayKit`.
+3. Do not move the helper into `CalRelayKit` domain/application code; default-path and filesystem policy are adapter/bootstrap concerns.
+4. Keep the support API scoped to CLI command support. If future app configuration-status UI needs shared canonical path behavior, split neutral shared configuration support later rather than making the app depend on CLI-specific error wording.
 
 Recommended cases:
 
@@ -247,7 +247,7 @@ Mitigation: inject home directory and file-existence behavior into the helper te
 
 ### CLI helper is hard to test from the current package layout
 
-Mitigation: use the planned `CalRelayCommandSupport` library target plus a focused `CalRelayCLITests` test target. Do not move filesystem policy into `CalRelayCore` just to make tests easier.
+Mitigation: use the `CalRelayKit` CLI inbound adapter path plus a focused `CalRelayCLITests` test target. Do not move filesystem policy into `CalRelayKit` domain/application code just to make tests easier.
 
 ### CLI errors render as Swift debug descriptions
 

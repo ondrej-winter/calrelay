@@ -1,4 +1,4 @@
-import CalRelayCommandSupport
+@testable import CalRelayKit
 import Foundation
 import Testing
 

@@ -51,8 +51,8 @@ Native app self-test results:
   - direct construction of `EventKitCalendarStore()` inside the view model.
 - `Resources/CalRelayApp/Info.plist` preserves bundle identifier `dev.owinter.CalRelay`; this must not change.
 - The app bundle is built by `scripts/build-calrelay-app.sh` and signed ad hoc.
-- Core reconciliation already lives in `Sources/CalRelayCore/Features/CalendarRelay/...`.
-- EventKit access already lives in `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Outbound/EventKit/EventKitCalendarStore.swift`.
+- Core reconciliation already lives in `Sources/CalRelayKit/Features/CalendarRelay/...`.
+- EventKit access already lives in `Sources/CalRelayKit/Features/CalendarRelay/Adapters/Outbound/EventKit/EventKitCalendarStore.swift`.
 - CLI reconciliation exists in `Sources/CalRelay/Features/CalendarRelay/Adapters/Inbound/CLI/CalRelayCommand.swift`, but this plan does **not** move sync actions into the app or menu yet.
 
 ## Architecture decisions
@@ -80,7 +80,7 @@ Native app self-test results:
 - [x] `CalendarListViewModel` lives in its own file and remains `@MainActor`.
 - [x] `CalendarListView` lives in its own file.
 - [x] The **List Calendars** flow still requests Calendar access and renders EventKit-visible calendars.
-- [x] No EventKit types leak into `CalRelayCore`.
+- [x] No EventKit types leak into `CalRelayKit` domain/application code.
 
 **Verification:**
 
@@ -144,7 +144,7 @@ Native app self-test results:
 - [x] The implementation uses a stable app-edge preference key, preferably `showMenuBarItem`.
 - [x] The preference persists across app restarts.
 - [x] The menu bar item defaults to **on**.
-- [x] No runtime configuration keys are added to `CalRelayCore`.
+- [x] No runtime configuration keys are added to `CalRelayKit` domain/application code.
 
 **Verification:**
 
@@ -282,7 +282,7 @@ Native app self-test results:
 - Do not add launch-at-login, LoginItems, helper apps, LaunchAgents, or system cron.
 - Do not hide the Dock icon or make the app accessory-only.
 - Do not change `CFBundleIdentifier` from `dev.owinter.CalRelay`.
-- Do not move EventKit APIs into `CalRelayCore`.
+- Do not move EventKit APIs into `CalRelayKit` domain/application code.
 
 ## Implementation notes for the first pass
 

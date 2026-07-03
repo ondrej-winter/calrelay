@@ -188,13 +188,13 @@ Initial commands once the SwiftPM package exists:
 ## Project structure
 
 - `Package.swift`: SwiftPM package manifest.
-- `Sources/CalRelayCore/Features/CalendarRelay/Domain/`: pure projection and reconciliation rules.
-- `Sources/CalRelayCore/Features/CalendarRelay/Application/UseCases/`: use-case orchestration.
-- `Sources/CalRelayCore/Features/CalendarRelay/Application/Ports/`: EventKit/calendar store outbound port protocols.
-- `Sources/CalRelayCore/Features/CalendarRelay/Application/DTOs/`: settings, snapshots, reconciliation plans, commands, queries, and results that cross application boundaries.
-- `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Inbound/CLI/`: user-facing output formatting.
-- `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Inbound/Config/`: YAML configuration parsing, defaulting, and mapping into application DTOs.
-- `Sources/CalRelayAdapters/Features/CalendarRelay/Adapters/Outbound/EventKit/`: EventKit calendar adapter, permission handling, and platform mapping.
+- `Sources/CalRelayKit/Features/CalendarRelay/Domain/`: pure projection and reconciliation rules.
+- `Sources/CalRelayKit/Features/CalendarRelay/Application/UseCases/`: use-case orchestration.
+- `Sources/CalRelayKit/Features/CalendarRelay/Application/Ports/`: EventKit/calendar store outbound port protocols.
+- `Sources/CalRelayKit/Features/CalendarRelay/Application/DTOs/`: settings, snapshots, reconciliation plans, commands, queries, and results that cross application boundaries.
+- `Sources/CalRelayKit/Features/CalendarRelay/Adapters/Inbound/CLI/`: user-facing output formatting.
+- `Sources/CalRelayKit/Features/CalendarRelay/Adapters/Inbound/Config/`: YAML configuration parsing, defaulting, and mapping into application DTOs.
+- `Sources/CalRelayKit/Features/CalendarRelay/Adapters/Outbound/EventKit/`: EventKit calendar adapter, permission handling, and platform mapping.
 - `Sources/CalRelay/Features/CalendarRelay/Adapters/Inbound/CLI/`: executable CLI command parsing and composition.
 - `Sources/CalRelayApp/`: minimal app wrapper used for app-bundle Calendar permission and capability validation.
 - `Tests/CalRelayContractTests/`: deterministic domain/application/adapter contract tests with fakes. This target is the default `swift test` gate and does not require real EventKit access.
