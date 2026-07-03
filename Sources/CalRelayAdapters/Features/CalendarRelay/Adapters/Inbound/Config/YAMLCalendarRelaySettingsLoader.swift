@@ -41,7 +41,8 @@ private struct RawCalendarRelaySettings: Decodable {
 
     func toSettings() -> CalendarRelaySettings {
         CalendarRelaySettings(
-            hubCalendar: hubCalendar.toSelector(), personalPrefix: personalPrefix, syncWindowDays: syncWindowDays ?? 60,
+            hubCalendar: HubCalendarSettings(calendar: hubCalendar.toSelector()), personalPrefix: personalPrefix,
+            syncWindowDays: syncWindowDays ?? 60,
             workCalendars: workCalendars.map { $0.toSettings() })
     }
 }

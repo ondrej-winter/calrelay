@@ -83,11 +83,13 @@ import Testing
     private static func testRejectsEmptyHubSelectorFields() throws {
         try expectValidationError(
             .emptyHubCalendarSourceTitle,
-            for: validSettings(hubCalendar: CalendarSelector(sourceTitle: "", calendarTitle: "Personal Work")))
+            for: validSettings(hubCalendar: HubCalendarSettings(
+                calendar: CalendarSelector(sourceTitle: "", calendarTitle: "Personal Work"))))
 
         try expectValidationError(
             .emptyHubCalendarTitle,
-            for: validSettings(hubCalendar: CalendarSelector(sourceTitle: "iCloud", calendarTitle: "")))
+            for: validSettings(hubCalendar: HubCalendarSettings(
+                calendar: CalendarSelector(sourceTitle: "iCloud", calendarTitle: ""))))
     }
 
     private static func testRejectsEmptyWorkCalendarSelectorFields() throws {
@@ -508,7 +510,7 @@ import Testing
         let useCase = ReconcileCalendarsUseCase(calendarStore: store)
 
         try await expectReconciliationError(
-            .calendarNotFound(fixtures.settings.hubCalendar),
+            .calendarNotFound(fixtures.settings.hubCalendar.calendar),
             from: { try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now) })
     }
 
@@ -521,7 +523,7 @@ import Testing
         let useCase = ReconcileCalendarsUseCase(calendarStore: store)
 
         try await expectReconciliationError(
-            .calendarAmbiguous(fixtures.settings.hubCalendar),
+            .calendarAmbiguous(fixtures.settings.hubCalendar.calendar),
             from: { try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now) })
     }
 
@@ -596,7 +598,8 @@ import Testing
             id: "acme-source-1", calendar: acmeReference, title: "Client Planning",
             start: Date(timeIntervalSince1970: 11_000), end: Date(timeIntervalSince1970: 12_000))
         let settings = CalendarRelaySettings(
-            hubCalendar: CalendarSelector(sourceTitle: hubCalendar.sourceTitle, calendarTitle: hubCalendar.title),
+            hubCalendar: HubCalendarSettings(
+                calendar: CalendarSelector(sourceTitle: hubCalendar.sourceTitle, calendarTitle: hubCalendar.title)),
             personalPrefix: "[ME]", syncWindowDays: 1,
             workCalendars: [
                 WorkCalendarSettings(
@@ -636,7 +639,8 @@ import Testing
             id: "beta-relayed-1", calendar: betaReference, title: "[ACME] Client Planning", start: sourceEvent.start,
             end: sourceEvent.end)
         let settings = CalendarRelaySettings(
-            hubCalendar: CalendarSelector(sourceTitle: hubCalendar.sourceTitle, calendarTitle: hubCalendar.title),
+            hubCalendar: HubCalendarSettings(
+                calendar: CalendarSelector(sourceTitle: hubCalendar.sourceTitle, calendarTitle: hubCalendar.title)),
             personalPrefix: "[ME]", syncWindowDays: 1,
             workCalendars: [
                 WorkCalendarSettings(
@@ -829,7 +833,8 @@ import Testing
     }
 
     private static func validSettings(
-        hubCalendar: CalendarSelector = CalendarSelector(sourceTitle: "iCloud", calendarTitle: "Personal Work"),
+        hubCalendar: HubCalendarSettings = HubCalendarSettings(
+            calendar: CalendarSelector(sourceTitle: "iCloud", calendarTitle: "Personal Work")),
         personalPrefix: String = "[ME]", syncWindowDays: Int = 60,
         workCalendars: [WorkCalendarSettings] = [
             WorkCalendarSettings(

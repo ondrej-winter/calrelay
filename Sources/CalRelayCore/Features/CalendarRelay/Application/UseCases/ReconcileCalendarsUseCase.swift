@@ -35,7 +35,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
         let calendars = try await calendarStore.listCalendars()
         try Task.checkCancellation()
 
-        let hubCalendar = try resolve(settings.hubCalendar, from: calendars)
+        let hubCalendar = try resolve(settings.hubCalendar.calendar, from: calendars)
         let workCalendars = try settings.workCalendars.map { workCalendar in
             WorkCalendarResolution(
                 settings: workCalendar, calendar: try resolve(workCalendar.calendar, from: calendars))
@@ -84,7 +84,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
         let calendars = try await calendarStore.listCalendars()
         try Task.checkCancellation()
 
-        let hubCalendar = try resolve(settings.hubCalendar, from: calendars)
+        let hubCalendar = try resolve(settings.hubCalendar.calendar, from: calendars)
         let workCalendars = try settings.workCalendars.map { workCalendar in
             WorkCalendarResolution(
                 settings: workCalendar, calendar: try resolve(workCalendar.calendar, from: calendars))
