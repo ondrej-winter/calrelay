@@ -2,7 +2,7 @@
 name: using-agent-skills
 description: Discovers and invokes agent skills. Use when starting a session or when you need to discover which skill applies to the current task. This is the meta-skill that governs how all other skills are discovered and invoked.
 metadata:
-  version: "1.0.8"
+  version: "1.1.0"
   dependencies:
     tools: []
     skills:
@@ -26,6 +26,9 @@ metadata:
         required: false
       - name: code-simplification
         purpose: Route behavior-preserving complexity reduction work.
+        required: false
+      - name: conventional-commits
+        purpose: Route Conventional Commits message writing, review, and validation work.
         required: false
       - name: context-engineering
         purpose: Route work that needs better task context before implementation.
@@ -132,6 +135,7 @@ Task arrives
   - Security concerns: security-and-hardening
   - Performance concerns: performance-optimization
 - Committing or branching: git-workflow-and-versioning
+  - Need Conventional Commits syntax or review: conventional-commits
 - CI/CD pipeline work: ci-cd-and-automation
 - Deprecating or migrating: deprecation-and-migration
 - Writing docs or ADRs: documentation-and-adrs
@@ -254,9 +258,10 @@ For a complete feature, the typical skill sequence is:
 10. code-review-and-quality: Review before merge
 11. code-simplification: Reduce unnecessary complexity while preserving behavior
 12. git-workflow-and-versioning: Clean commit history
-13. documentation-and-adrs: Document decisions
-14. deprecation-and-migration: Retire old systems and move users safely when needed
-15. shipping-and-launch: Deploy safely
+13. conventional-commits: Write or review Conventional Commits messages when used
+14. documentation-and-adrs: Document decisions
+15. deprecation-and-migration: Retire old systems and move users safely when needed
+16. shipping-and-launch: Deploy safely
 ```
 
 Not every task needs every skill. A bug fix might only need `debugging-and-error-recovery`, then `test-driven-development`, then `code-review-and-quality`.
@@ -286,6 +291,7 @@ Not every task needs every skill. A bug fix might only need `debugging-and-error
 | Review | security-and-hardening       | OWASP prevention, input validation, least privilege                                                  |
 | Review | performance-optimization     | Measure first, optimize only what matters                                                            |
 | Ship   | git-workflow-and-versioning  | Atomic commits, clean history                                                                        |
+| Ship   | conventional-commits         | Conventional Commits message syntax, semantics, and breaking-change notation                         |
 | Ship   | ci-cd-and-automation         | Automated quality gates on every change                                                              |
 | Ship   | deprecation-and-migration    | Remove old systems and migrate users safely                                                          |
 | Ship   | documentation-and-adrs       | Document the why, not just the what                                                                  |
