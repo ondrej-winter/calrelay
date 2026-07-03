@@ -28,7 +28,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
 
     /// Explains inclusion/exclusion decisions for every candidate hub and work event in the
     /// sync window. This is diagnostic-only and does not affect reconciliation planning.
-    public func explain(settings: CalendarRelaySettings, now: Date) async throws -> [EventExplanation] {
+    public func explain(settings: CalendarRelaySettings, now: Date) async throws -> ReconciliationExplanation {
         try Task.checkCancellation()
         try validate(settings)
 
@@ -43,20 +43,20 @@ public struct ReconcileCalendarsUseCase: Sendable {
 
         let syncWindowEnd = now.addingTimeInterval(Double(settings.syncWindowDays) * 24 * 60 * 60)
 
-        var explanations: [EventExplanation] = []
+        var candidates: [CandidateEventExplanation] = []
 
         let hubEvents = try await calendarStore.events(in: hubCalendar.reference, from: now, to: syncWindowEnd)
         try Task.checkCancellation()
-        explanations.append(contentsOf: hubEvents.map(explanation(for:)))
+        candidates.append(contentsOf: hubEvents.map(candidateExplanation(for:)))
 
         for workCalendar in workCalendars {
             try Task.checkCancellation()
             let events = try await calendarStore.events(
                 in: workCalendar.calendar.reference, from: now, to: syncWindowEnd)
-            explanations.append(contentsOf: events.map(explanation(for:)))
+            candidates.append(contentsOf: events.map(candidateExplanation(for:)))
         }
 
-        return explanations
+        return ReconciliationExplanation(candidates: candidates)
     }
 
     public func apply(settings: CalendarRelaySettings, now: Date) async throws -> ReconciliationPlan {
@@ -140,10 +140,8 @@ public struct ReconcileCalendarsUseCase: Sendable {
             isAllDay: event.isAllDay, availability: .busy, status: .confirmed)
     }
 
-    private func explanation(for event: CalendarEvent) -> EventExplanation {
-        EventExplanation(
-            calendar: event.calendar, title: event.title, start: event.start, end: event.end, isAllDay: event.isAllDay,
-            availability: event.availability, status: event.status, reason: EventInclusionPolicy.evaluate(event))
+    private func candidateExplanation(for event: CalendarEvent) -> CandidateEventExplanation {
+        CandidateEventExplanation(event: event, inclusion: EventInclusionPolicy.evaluate(event))
     }
 
     private func isRelayedWorkBlocker(_ event: CalendarEvent, managedPrefixes: Set<String>) -> Bool {

@@ -772,32 +772,33 @@ import Testing
             ])
         let useCase = ReconcileCalendarsUseCase(calendarStore: store)
 
-        let explanations = try await useCase.explain(settings: fixtures.settings, now: fixtures.now)
+        let explanation = try await useCase.explain(settings: fixtures.settings, now: fixtures.now)
 
         try expect(
-            explanations.contains { $0.title == fixtures.workEvent.title && $0.reason == .included },
+            explanation.candidates.contains { $0.event.title == fixtures.workEvent.title && $0.inclusion == .included },
             "Explain should report included events with the included reason")
         try expect(
-            explanations.contains {
-                $0.title == "AI QA Learning path sync" && $0.reason == .unsupportedAvailability(.free)
+            explanation.candidates.contains {
+                $0.event.title == "AI QA Learning path sync" && $0.inclusion == .unsupportedAvailability(.free)
             }, "Explain should report excluded events with their exclusion reason")
         try expect((await store.createdEvents()).isEmpty, "Explain should never mutate the calendar store")
         try expect((await store.deletedEvents()).isEmpty, "Explain should never mutate the calendar store")
     }
 
     private static func testFormatsEventExplanations() throws {
-        let output = EventExplanationFormatter.format([
-            EventExplanation(
-                calendar: CalendarIdentity(id: "acme-1", title: "ACME Work", sourceTitle: "Google"),
-                title: "Client Planning", start: Date(timeIntervalSince1970: 1_000),
-                end: Date(timeIntervalSince1970: 2_000), isAllDay: false, availability: .busy, status: .confirmed,
-                reason: .included),
-            EventExplanation(
-                calendar: CalendarIdentity(id: "acme-1", title: "ACME Work", sourceTitle: "Google"),
-                title: "AI QA Learning path sync", start: Date(timeIntervalSince1970: 3_000),
-                end: Date(timeIntervalSince1970: 4_000), isAllDay: false, availability: .free, status: .confirmed,
-                reason: .unsupportedAvailability(.free))
-        ])
+        let calendar = CalendarIdentity(id: "acme-1", title: "ACME Work", sourceTitle: "Google")
+        let output = EventExplanationFormatter.format(ReconciliationExplanation(candidates: [
+            CandidateEventExplanation(
+                event: calendarEvent(
+                    calendar: calendar, title: "Client Planning", start: Date(timeIntervalSince1970: 1_000),
+                    end: Date(timeIntervalSince1970: 2_000), availability: .busy, status: .confirmed),
+                inclusion: .included),
+            CandidateEventExplanation(
+                event: calendarEvent(
+                    calendar: calendar, title: "AI QA Learning path sync", start: Date(timeIntervalSince1970: 3_000),
+                    end: Date(timeIntervalSince1970: 4_000), availability: .free, status: .confirmed),
+                inclusion: .unsupportedAvailability(.free))
+        ]))
 
         try expect(output.contains("Google / ACME Work"), "Explanation output should include calendar selector")
         try expect(output.contains("Client Planning"), "Explanation output should include event title")
@@ -811,7 +812,7 @@ import Testing
     }
 
     private static func testFormatsEmptyEventExplanations() throws {
-        let output = EventExplanationFormatter.format([])
+        let output = EventExplanationFormatter.format(ReconciliationExplanation(candidates: []))
 
         try expect(
             output.contains("No candidate events found in the sync window."),

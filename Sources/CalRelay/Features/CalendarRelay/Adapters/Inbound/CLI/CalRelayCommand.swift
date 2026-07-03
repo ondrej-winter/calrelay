@@ -45,8 +45,8 @@ struct ReconcileCommand: AsyncParsableCommand {
         let now = Date()
 
         if explain {
-            let explanations = try await useCase.explain(settings: settings, now: now)
-            print(EventExplanationFormatter.format(explanations))
+            let explanation = try await useCase.explain(settings: settings, now: now)
+            print(EventExplanationFormatter.format(explanation))
             return
         }
 
