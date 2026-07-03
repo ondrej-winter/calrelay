@@ -29,32 +29,9 @@ public struct ReconcileCalendarsUseCase: Sendable {
     /// Explains inclusion/exclusion decisions for every candidate hub and work event in the
     /// sync window. This is diagnostic-only and does not affect reconciliation planning.
     public func explain(settings: CalendarRelaySettings, now: Date) async throws -> ReconciliationExplanation {
-        try Task.checkCancellation()
-        try validate(settings)
-
-        let calendars = try await calendarStore.listCalendars()
-        try Task.checkCancellation()
-
-        let hubCalendar = try resolve(settings.hubCalendar.calendar, from: calendars)
-        let workCalendars = try settings.workCalendars.map { workCalendar in
-            WorkCalendarResolution(
-                settings: workCalendar, calendar: try resolve(workCalendar.calendar, from: calendars))
-        }
-
-        let syncWindowEnd = now.addingTimeInterval(Double(settings.syncWindowDays) * 24 * 60 * 60)
-
-        var candidates: [CandidateEventExplanation] = []
-
-        let hubEvents = try await calendarStore.events(in: hubCalendar.reference, from: now, to: syncWindowEnd)
-        try Task.checkCancellation()
-        candidates.append(contentsOf: hubEvents.map(candidateExplanation(for:)))
-
-        for workCalendar in workCalendars {
-            try Task.checkCancellation()
-            let events = try await calendarStore.events(
-                in: workCalendar.calendar.reference, from: now, to: syncWindowEnd)
-            candidates.append(contentsOf: events.map(candidateExplanation(for:)))
-        }
+        let context = try await loadRunContext(settings: settings, now: now)
+        let candidates = (context.hubEvents + context.workEventsByCalendarID.values.flatMap { $0 }).map(
+            candidateExplanation(for:))
 
         return ReconciliationExplanation(candidates: candidates)
     }
@@ -78,6 +55,37 @@ public struct ReconcileCalendarsUseCase: Sendable {
     }
 
     private func plan(settings: CalendarRelaySettings, now: Date) async throws -> PlannedRun {
+        let context = try await loadRunContext(settings: settings, now: now)
+
+        let expectedHubEvents = context.workCalendars.flatMap { workCalendar in
+            WorkToHubProjector.project(
+                events: context.workEvents(for: workCalendar).filter { event in
+                    !isRelayedWorkBlocker(event, managedPrefixes: context.managedPrefixes)
+                }, from: workCalendar.settings, to: context.hubCalendar.reference)
+        }
+
+        let workTargets = context.workCalendars.map { workCalendar in
+            WorkCalendarProjectionTarget(settings: workCalendar.settings, calendar: workCalendar.calendar.reference)
+        }
+        let expectedHubCalendarEvents = expectedHubEvents.map { calendarEventProjection in
+            calendarEvent(for: calendarEventProjection, idPrefix: "expected-hub")
+        }
+        let expectedWorkEvents = HubToWorkProjector.project(
+            hubEvents: context.hubEvents + expectedHubCalendarEvents, to: workTargets,
+            personalPrefix: settings.personalPrefix)
+
+        let hubPlan = ReconciliationPlanner.plan(
+            expected: expectedHubEvents, existing: context.hubEvents, managedPrefixes: context.managedPrefixes)
+        let workPlan = ReconciliationPlanner.plan(expected: expectedWorkEvents, existing: context.allWorkEvents) {
+            event in isRelayedWorkBlocker(event, managedPrefixes: context.managedPrefixes)
+        }
+        let reconciliationPlan = ReconciliationPlan(
+            creates: hubPlan.creates + workPlan.creates, deletes: hubPlan.deletes + workPlan.deletes)
+
+        return PlannedRun(plan: reconciliationPlan, calendarsByID: context.calendarsByID)
+    }
+
+    private func loadRunContext(settings: CalendarRelaySettings, now: Date) async throws -> ReconciliationRunContext {
         try Task.checkCancellation()
         try validate(settings)
 
@@ -91,7 +99,6 @@ public struct ReconcileCalendarsUseCase: Sendable {
         }
 
         let syncWindowEnd = now.addingTimeInterval(Double(settings.syncWindowDays) * 24 * 60 * 60)
-
         let managedPrefixes = Set(settings.workCalendars.map(\.prefix) + [settings.personalPrefix])
 
         let hubEvents = try await calendarStore.events(in: hubCalendar.reference, from: now, to: syncWindowEnd)
@@ -104,32 +111,10 @@ public struct ReconcileCalendarsUseCase: Sendable {
                 in: workCalendar.calendar.reference, from: now, to: syncWindowEnd)
         }
 
-        let expectedHubEvents = workCalendars.flatMap { workCalendar in
-            WorkToHubProjector.project(
-                events: workEventsByCalendarID[workCalendar.calendar.snapshot.id, default: []].filter { event in
-                    !isRelayedWorkBlocker(event, managedPrefixes: managedPrefixes)
-                }, from: workCalendar.settings, to: hubCalendar.reference)
-        }
-
-        let workTargets = workCalendars.map { workCalendar in
-            WorkCalendarProjectionTarget(settings: workCalendar.settings, calendar: workCalendar.calendar.reference)
-        }
-        let expectedHubCalendarEvents = expectedHubEvents.map { calendarEventProjection in
-            calendarEvent(for: calendarEventProjection, idPrefix: "expected-hub")
-        }
-        let expectedWorkEvents = HubToWorkProjector.project(
-            hubEvents: hubEvents + expectedHubCalendarEvents, to: workTargets, personalPrefix: settings.personalPrefix)
-
-        let hubPlan = ReconciliationPlanner.plan(
-            expected: expectedHubEvents, existing: hubEvents, managedPrefixes: managedPrefixes)
-        let workPlan = ReconciliationPlanner.plan(
-            expected: expectedWorkEvents, existing: workEventsByCalendarID.values.flatMap { $0 }
-        ) { event in isRelayedWorkBlocker(event, managedPrefixes: managedPrefixes) }
-        let reconciliationPlan = ReconciliationPlan(
-            creates: hubPlan.creates + workPlan.creates, deletes: hubPlan.deletes + workPlan.deletes)
-
-        return PlannedRun(
-            plan: reconciliationPlan, calendarsByID: Dictionary(uniqueKeysWithValues: calendars.map { ($0.id, $0) }))
+        return ReconciliationRunContext(
+            hubCalendar: hubCalendar, workCalendars: workCalendars, managedPrefixes: managedPrefixes,
+            hubEvents: hubEvents, workEventsByCalendarID: workEventsByCalendarID,
+            calendarsByID: Dictionary(uniqueKeysWithValues: calendars.map { ($0.id, $0) }))
     }
 
     private func calendarEvent(for event: CalendarEventProjection, idPrefix: String) -> CalendarEvent {
@@ -172,8 +157,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
         return ResolvedCalendar(snapshot: match)
     }
 
-    private func validateWritableCalendars(for plan: ReconciliationPlan, calendarsByID: [String: RelayCalendar])
-        throws
+    private func validateWritableCalendars(for plan: ReconciliationPlan, calendarsByID: [String: RelayCalendar]) throws
     {
         for event in plan.creates { try validateWritable(event.destinationCalendar, calendarsByID: calendarsByID) }
 
@@ -190,6 +174,21 @@ public struct ReconcileCalendarsUseCase: Sendable {
 private struct PlannedRun {
     let plan: ReconciliationPlan
     let calendarsByID: [String: RelayCalendar]
+}
+
+private struct ReconciliationRunContext {
+    let hubCalendar: ResolvedCalendar
+    let workCalendars: [WorkCalendarResolution]
+    let managedPrefixes: Set<String>
+    let hubEvents: [CalendarEvent]
+    let workEventsByCalendarID: [String: [CalendarEvent]]
+    let calendarsByID: [String: RelayCalendar]
+
+    var allWorkEvents: [CalendarEvent] { workEventsByCalendarID.values.flatMap { $0 } }
+
+    func workEvents(for workCalendar: WorkCalendarResolution) -> [CalendarEvent] {
+        workEventsByCalendarID[workCalendar.calendar.snapshot.id, default: []]
+    }
 }
 
 private struct WorkCalendarResolution {
