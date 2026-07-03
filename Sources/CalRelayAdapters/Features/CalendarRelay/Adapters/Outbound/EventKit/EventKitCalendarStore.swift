@@ -7,10 +7,10 @@ public enum EventKitCalendarStoreError: Error, CustomStringConvertible {
     case accessRestricted
     case writeOnlyAccess
     case accessNotGranted
-    case calendarNotFound(CalendarReference)
-    case calendarReadOnly(CalendarReference)
-    case eventNotFound(EventSnapshot)
-    case eventCalendarMismatch(expected: CalendarReference)
+    case calendarNotFound(CalendarIdentity)
+    case calendarReadOnly(CalendarIdentity)
+    case eventNotFound(CalendarEventIdentity)
+    case eventCalendarMismatch(expected: CalendarIdentity)
 
     public var description: String {
         switch self {
@@ -30,14 +30,14 @@ public enum EventKitCalendarStoreError: Error, CustomStringConvertible {
     }
 }
 
-enum EventKitEventStatusSnapshot: Equatable, Sendable {
+enum EventKitEventStatusValue: Equatable, Sendable {
     case confirmed
     case tentative
     case cancelled
     case unknown
 }
 
-enum EventKitParticipantStatusSnapshot: Equatable, Sendable {
+enum EventKitParticipantStatusValue: Equatable, Sendable {
     case accepted
     case declined
     case tentative
@@ -46,7 +46,7 @@ enum EventKitParticipantStatusSnapshot: Equatable, Sendable {
 
 enum EventKitEventStatusMapper {
     static func mapStatus(
-        currentUserParticipantStatus: EventKitParticipantStatusSnapshot?, eventStatus: EventKitEventStatusSnapshot
+        currentUserParticipantStatus: EventKitParticipantStatusValue?, eventStatus: EventKitEventStatusValue
     ) -> EventStatus {
         switch currentUserParticipantStatus {
         case .declined: return .declined
@@ -68,17 +68,17 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
 
     public init(eventStore: EKEventStore = EKEventStore()) { self.eventStore = eventStore }
 
-    public func listCalendars() async throws -> [CalendarSnapshot] {
+    public func listCalendars() async throws -> [RelayCalendar] {
         try await requestFullCalendarAccessIfNeeded()
 
         return eventStore.calendars(for: .event).map { calendar in
-            CalendarSnapshot(
+            RelayCalendar(
                 id: calendar.calendarIdentifier, title: calendar.title, sourceTitle: calendar.source.title,
                 isWritable: calendar.allowsContentModifications)
         }
     }
 
-    public func events(in calendar: CalendarReference, from start: Date, to end: Date) async throws -> [EventSnapshot] {
+    public func events(in calendar: CalendarIdentity, from start: Date, to end: Date) async throws -> [CalendarEvent] {
         try await requestFullCalendarAccessIfNeeded()
 
         guard let eventKitCalendar = eventStore.calendar(withIdentifier: calendar.id) else {
@@ -88,14 +88,14 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
         let predicate = eventStore.predicateForEvents(withStart: start, end: end, calendars: [eventKitCalendar])
 
         return eventStore.events(matching: predicate).map { event in
-            EventSnapshot(
+            CalendarEvent(
                 id: event.eventIdentifier ?? event.calendarItemIdentifier, calendar: calendar, title: event.title ?? "",
                 start: event.startDate, end: event.endDate, isAllDay: event.isAllDay,
                 availability: Self.mapAvailability(event.availability), status: Self.mapStatus(event))
         }
     }
 
-    public func createEvent(_ event: ProjectedEvent) async throws {
+    public func createEvent(_ event: CalendarEventProjection) async throws {
         try await requestFullCalendarAccessIfNeeded()
 
         let calendar = try writableEventKitCalendar(for: event.destinationCalendar)
@@ -109,7 +109,7 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
         try eventStore.save(eventKitEvent, span: .thisEvent, commit: true)
     }
 
-    public func deleteEvent(_ event: EventSnapshot) async throws {
+    public func deleteEvent(_ event: CalendarEventIdentity) async throws {
         try await requestFullCalendarAccessIfNeeded()
 
         _ = try writableEventKitCalendar(for: event.calendar)
@@ -125,7 +125,7 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
         try eventStore.remove(eventKitEvent, span: .thisEvent, commit: true)
     }
 
-    private func writableEventKitCalendar(for calendar: CalendarReference) throws -> EKCalendar {
+    private func writableEventKitCalendar(for calendar: CalendarIdentity) throws -> EKCalendar {
         guard let eventKitCalendar = eventStore.calendar(withIdentifier: calendar.id) else {
             throw EventKitCalendarStoreError.calendarNotFound(calendar)
         }
@@ -179,7 +179,7 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
             }, eventStatus: mapEventStatus(event.status))
     }
 
-    private static func mapEventStatus(_ status: EKEventStatus) -> EventKitEventStatusSnapshot {
+    private static func mapEventStatus(_ status: EKEventStatus) -> EventKitEventStatusValue {
         switch status {
         case .confirmed: .confirmed
         case .tentative: .tentative
@@ -189,7 +189,7 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
         }
     }
 
-    private static func mapParticipantStatus(_ status: EKParticipantStatus) -> EventKitParticipantStatusSnapshot {
+    private static func mapParticipantStatus(_ status: EKParticipantStatus) -> EventKitParticipantStatusValue {
         switch status {
         case .accepted: .accepted
         case .declined: .declined

@@ -7,7 +7,7 @@ import Foundation
 /// never be used to drive reconciliation decisions; `ReconciliationPlan` remains the single
 /// source of truth for planned mutations.
 public struct EventExplanation: Equatable, Sendable {
-    public let calendar: CalendarReference
+    public let calendar: CalendarIdentity
     public let title: String
     public let start: Date
     public let end: Date
@@ -17,7 +17,7 @@ public struct EventExplanation: Equatable, Sendable {
     public let reason: EventInclusionReason
 
     public init(
-        calendar: CalendarReference, title: String, start: Date, end: Date, isAllDay: Bool,
+        calendar: CalendarIdentity, title: String, start: Date, end: Date, isAllDay: Bool,
         availability: EventAvailability, status: EventStatus, reason: EventInclusionReason
     ) {
         self.calendar = calendar

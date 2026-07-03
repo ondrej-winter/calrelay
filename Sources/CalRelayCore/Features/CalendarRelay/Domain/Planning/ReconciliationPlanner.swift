@@ -1,12 +1,12 @@
 import Foundation
 
 public enum ReconciliationPlanner {
-    public static func plan(expected: [ProjectedEvent], existing: [EventSnapshot], managedPrefixes: Set<String>)
+    public static func plan(expected: [CalendarEventProjection], existing: [CalendarEvent], managedPrefixes: Set<String>)
         -> ReconciliationPlan
     { plan(expected: expected, existing: existing) { event in isManaged(event, by: managedPrefixes) } }
 
     public static func plan(
-        expected: [ProjectedEvent], existing: [EventSnapshot], shouldDeleteStaleEvent: (EventSnapshot) -> Bool
+        expected: [CalendarEventProjection], existing: [CalendarEvent], shouldDeleteStaleEvent: (CalendarEvent) -> Bool
     ) -> ReconciliationPlan {
         let existingKeys = Set(existing.map(VisibleEventKey.init(event:)))
         let expectedKeys = Set(expected.map(visibleKey(for:)))
@@ -20,13 +20,13 @@ public enum ReconciliationPlanner {
         return ReconciliationPlan(creates: creates, deletes: deletes)
     }
 
-    private static func visibleKey(for projection: ProjectedEvent) -> VisibleEventKey {
+    private static func visibleKey(for projection: CalendarEventProjection) -> VisibleEventKey {
         VisibleEventKey(
             calendar: projection.destinationCalendar, title: projection.title, start: projection.start,
             end: projection.end, isAllDay: projection.isAllDay)
     }
 
-    private static func isManaged(_ event: EventSnapshot, by managedPrefixes: Set<String>) -> Bool {
+    private static func isManaged(_ event: CalendarEvent, by managedPrefixes: Set<String>) -> Bool {
         managedPrefixes.contains { prefix in event.title.hasPrefix(prefix) }
     }
 }

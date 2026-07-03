@@ -26,7 +26,7 @@ public enum EventExplanationFormatter {
         }
     }
 
-    private static func formatCalendar(_ calendar: CalendarReference) -> String {
+    private static func formatCalendar(_ calendar: CalendarIdentity) -> String {
         "\(calendar.sourceTitle) / \(calendar.title)"
     }
 

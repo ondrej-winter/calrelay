@@ -1,33 +1,23 @@
 import Foundation
 
-public struct WorkCalendarProjectionTarget: Equatable, Sendable {
-    public let settings: WorkCalendarSettings
-    public let calendar: CalendarReference
-
-    public init(settings: WorkCalendarSettings, calendar: CalendarReference) {
-        self.settings = settings
-        self.calendar = calendar
-    }
-}
-
 public enum HubToWorkProjector {
     public static func project(
-        hubEvents: [EventSnapshot], to workCalendars: [WorkCalendarProjectionTarget], personalPrefix: String
-    ) -> [ProjectedEvent] {
+        hubEvents: [CalendarEvent], to workCalendars: [WorkCalendarProjectionTarget], personalPrefix: String
+    ) -> [CalendarEventProjection] {
         hubEvents.filter(EventInclusionPolicy.includes).flatMap { event in
             project(event: event, to: workCalendars, personalPrefix: personalPrefix)
         }
     }
 
     private static func project(
-        event: EventSnapshot, to workCalendars: [WorkCalendarProjectionTarget], personalPrefix: String
-    ) -> [ProjectedEvent] {
+        event: CalendarEvent, to workCalendars: [WorkCalendarProjectionTarget], personalPrefix: String
+    ) -> [CalendarEventProjection] {
         let matchingSourcePrefix = workCalendars.map(\.settings.prefix).first { event.title.hasPrefix($0) }
 
         return workCalendars.compactMap { target in
             if target.settings.prefix == matchingSourcePrefix { return nil }
 
-            return ProjectedEvent(
+            return CalendarEventProjection(
                 destinationCalendar: target.calendar,
                 title: projectedTitle(
                     for: event.title, matchingSourcePrefix: matchingSourcePrefix, personalPrefix: personalPrefix),

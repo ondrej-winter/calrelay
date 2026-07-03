@@ -4,7 +4,7 @@ public enum ReconcileCalendarsError: Error, Equatable, CustomStringConvertible, 
     case invalidSettings(String)
     case calendarNotFound(CalendarSelector)
     case calendarAmbiguous(CalendarSelector)
-    case calendarReadOnly(CalendarReference)
+    case calendarReadOnly(CalendarIdentity)
 
     public var description: String {
         switch self {
@@ -71,7 +71,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
 
         for event in plannedRun.plan.deletes {
             try Task.checkCancellation()
-            try await calendarStore.deleteEvent(event)
+            try await calendarStore.deleteEvent(event.identity)
         }
 
         return plannedRun.plan
@@ -97,7 +97,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
         let hubEvents = try await calendarStore.events(in: hubCalendar.reference, from: now, to: syncWindowEnd)
         try Task.checkCancellation()
 
-        var workEventsByCalendarID: [String: [EventSnapshot]] = [:]
+        var workEventsByCalendarID: [String: [CalendarEvent]] = [:]
         for workCalendar in workCalendars {
             try Task.checkCancellation()
             workEventsByCalendarID[workCalendar.calendar.snapshot.id] = try await calendarStore.events(
@@ -114,11 +114,11 @@ public struct ReconcileCalendarsUseCase: Sendable {
         let workTargets = workCalendars.map { workCalendar in
             WorkCalendarProjectionTarget(settings: workCalendar.settings, calendar: workCalendar.calendar.reference)
         }
-        let expectedHubEventSnapshots = expectedHubEvents.map { projectedEvent in
-            snapshot(for: projectedEvent, idPrefix: "expected-hub")
+        let expectedHubCalendarEvents = expectedHubEvents.map { calendarEventProjection in
+            calendarEvent(for: calendarEventProjection, idPrefix: "expected-hub")
         }
         let expectedWorkEvents = HubToWorkProjector.project(
-            hubEvents: hubEvents + expectedHubEventSnapshots, to: workTargets, personalPrefix: settings.personalPrefix)
+            hubEvents: hubEvents + expectedHubCalendarEvents, to: workTargets, personalPrefix: settings.personalPrefix)
 
         let hubPlan = ReconciliationPlanner.plan(
             expected: expectedHubEvents, existing: hubEvents, managedPrefixes: managedPrefixes)
@@ -132,27 +132,27 @@ public struct ReconcileCalendarsUseCase: Sendable {
             plan: reconciliationPlan, calendarsByID: Dictionary(uniqueKeysWithValues: calendars.map { ($0.id, $0) }))
     }
 
-    private func snapshot(for event: ProjectedEvent, idPrefix: String) -> EventSnapshot {
-        EventSnapshot(
+    private func calendarEvent(for event: CalendarEventProjection, idPrefix: String) -> CalendarEvent {
+        CalendarEvent(
             id:
                 "\(idPrefix)-\(event.destinationCalendar.id)-\(event.title)-\(event.start.timeIntervalSince1970)-\(event.end.timeIntervalSince1970)",
             calendar: event.destinationCalendar, title: event.title, start: event.start, end: event.end,
             isAllDay: event.isAllDay, availability: .busy, status: .confirmed)
     }
 
-    private func explanation(for event: EventSnapshot) -> EventExplanation {
+    private func explanation(for event: CalendarEvent) -> EventExplanation {
         EventExplanation(
             calendar: event.calendar, title: event.title, start: event.start, end: event.end, isAllDay: event.isAllDay,
             availability: event.availability, status: event.status, reason: EventInclusionPolicy.evaluate(event))
     }
 
-    private func isRelayedWorkBlocker(_ event: EventSnapshot, managedPrefixes: Set<String>) -> Bool {
+    private func isRelayedWorkBlocker(_ event: CalendarEvent, managedPrefixes: Set<String>) -> Bool {
         hasBracketedPrefix(event.title) || isManagedProjection(event, managedPrefixes: managedPrefixes)
     }
 
     private func hasBracketedPrefix(_ title: String) -> Bool { title.hasPrefix("[") && title.contains("]") }
 
-    private func isManagedProjection(_ event: EventSnapshot, managedPrefixes: Set<String>) -> Bool {
+    private func isManagedProjection(_ event: CalendarEvent, managedPrefixes: Set<String>) -> Bool {
         managedPrefixes.contains { prefix in event.title.hasPrefix(prefix) }
     }
 
@@ -162,7 +162,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
         }
     }
 
-    private func resolve(_ selector: CalendarSelector, from calendars: [CalendarSnapshot]) throws -> ResolvedCalendar {
+    private func resolve(_ selector: CalendarSelector, from calendars: [RelayCalendar]) throws -> ResolvedCalendar {
         let matches = calendars.filter { calendar in
             calendar.sourceTitle == selector.sourceTitle && calendar.title == selector.calendarTitle
         }
@@ -174,7 +174,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
         return ResolvedCalendar(snapshot: match)
     }
 
-    private func validateWritableCalendars(for plan: ReconciliationPlan, calendarsByID: [String: CalendarSnapshot])
+    private func validateWritableCalendars(for plan: ReconciliationPlan, calendarsByID: [String: RelayCalendar])
         throws
     {
         for event in plan.creates { try validateWritable(event.destinationCalendar, calendarsByID: calendarsByID) }
@@ -182,7 +182,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
         for event in plan.deletes { try validateWritable(event.calendar, calendarsByID: calendarsByID) }
     }
 
-    private func validateWritable(_ calendar: CalendarReference, calendarsByID: [String: CalendarSnapshot]) throws {
+    private func validateWritable(_ calendar: CalendarIdentity, calendarsByID: [String: RelayCalendar]) throws {
         guard calendarsByID[calendar.id]?.isWritable == true else {
             throw ReconcileCalendarsError.calendarReadOnly(calendar)
         }
@@ -191,7 +191,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
 
 private struct PlannedRun {
     let plan: ReconciliationPlan
-    let calendarsByID: [String: CalendarSnapshot]
+    let calendarsByID: [String: RelayCalendar]
 }
 
 private struct WorkCalendarResolution {
@@ -200,9 +200,9 @@ private struct WorkCalendarResolution {
 }
 
 private struct ResolvedCalendar {
-    let snapshot: CalendarSnapshot
+    let snapshot: RelayCalendar
 
-    var reference: CalendarReference {
-        CalendarReference(id: snapshot.id, title: snapshot.title, sourceTitle: snapshot.sourceTitle)
+    var reference: CalendarIdentity {
+        CalendarIdentity(id: snapshot.id, title: snapshot.title, sourceTitle: snapshot.sourceTitle)
     }
 }

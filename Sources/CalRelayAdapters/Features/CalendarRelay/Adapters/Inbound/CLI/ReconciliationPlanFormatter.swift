@@ -14,15 +14,15 @@ public enum ReconciliationPlanFormatter {
         return lines.joined(separator: "\n")
     }
 
-    private static func formatCreate(_ event: ProjectedEvent) -> String {
+    private static func formatCreate(_ event: CalendarEventProjection) -> String {
         "- create \(formatCalendar(event.destinationCalendar)): \(event.title) [\(formatRange(start: event.start, end: event.end))]"
     }
 
-    private static func formatDelete(_ event: EventSnapshot) -> String {
+    private static func formatDelete(_ event: CalendarEvent) -> String {
         "- delete \(formatCalendar(event.calendar)): \(event.title) [\(formatRange(start: event.start, end: event.end))]"
     }
 
-    private static func formatCalendar(_ calendar: CalendarReference) -> String {
+    private static func formatCalendar(_ calendar: CalendarIdentity) -> String {
         "\(calendar.sourceTitle) / \(calendar.title)"
     }
 

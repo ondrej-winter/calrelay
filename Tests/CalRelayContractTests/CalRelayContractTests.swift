@@ -150,19 +150,19 @@ import Testing
     }
 
     private static func testIncludesTimedBusyEvents() throws {
-        let event = eventSnapshot(availability: .busy, status: .confirmed)
+        let event = calendarEvent(availability: .busy, status: .confirmed)
 
         try expect(EventInclusionPolicy.includes(event), "Timed busy events should be included")
     }
 
     private static func testSkipsTimedTentativeEvents() throws {
-        let event = eventSnapshot(availability: .tentative, status: .tentative)
+        let event = calendarEvent(availability: .tentative, status: .tentative)
 
         try expect(!EventInclusionPolicy.includes(event), "Timed tentative events should be skipped by default")
     }
 
     private static func testIncludesTimedEventsWhenAvailabilityIsNotSupported() throws {
-        let event = eventSnapshot(availability: .notSupported, status: .confirmed)
+        let event = calendarEvent(availability: .notSupported, status: .confirmed)
 
         try expect(
             EventInclusionPolicy.includes(event),
@@ -170,19 +170,19 @@ import Testing
     }
 
     private static func testSkipsAllDayEvents() throws {
-        let event = eventSnapshot(isAllDay: true, availability: .busy, status: .confirmed)
+        let event = calendarEvent(isAllDay: true, availability: .busy, status: .confirmed)
 
         try expect(!EventInclusionPolicy.includes(event), "All-day events should be skipped")
     }
 
     private static func testSkipsDeclinedEvents() throws {
-        let event = eventSnapshot(availability: .busy, status: .declined)
+        let event = calendarEvent(availability: .busy, status: .declined)
 
         try expect(!EventInclusionPolicy.includes(event), "Declined events should be skipped")
     }
 
     private static func testSkipsTentativeStatusEvents() throws {
-        let event = eventSnapshot(availability: .busy, status: .tentative)
+        let event = calendarEvent(availability: .busy, status: .tentative)
 
         try expect(
             !EventInclusionPolicy.includes(event),
@@ -190,26 +190,26 @@ import Testing
     }
 
     private static func testSkipsCancelledEvents() throws {
-        let event = eventSnapshot(availability: .busy, status: .cancelled)
+        let event = calendarEvent(availability: .busy, status: .cancelled)
 
         try expect(!EventInclusionPolicy.includes(event), "Cancelled events should be skipped")
     }
 
     private static func testEvaluateReturnsIncludedForBusyEvents() throws {
-        let event = eventSnapshot(availability: .busy, status: .confirmed)
+        let event = calendarEvent(availability: .busy, status: .confirmed)
 
         try expect(EventInclusionPolicy.evaluate(event) == .included, "Busy timed events should evaluate as included")
     }
 
     private static func testEvaluateReturnsAllDayReason() throws {
-        let event = eventSnapshot(isAllDay: true, availability: .busy, status: .confirmed)
+        let event = calendarEvent(isAllDay: true, availability: .busy, status: .confirmed)
 
         try expect(
             EventInclusionPolicy.evaluate(event) == .allDay, "All-day events should evaluate with the allDay reason")
     }
 
     private static func testEvaluateReturnsCancelledReason() throws {
-        let event = eventSnapshot(availability: .busy, status: .cancelled)
+        let event = calendarEvent(availability: .busy, status: .cancelled)
 
         try expect(
             EventInclusionPolicy.evaluate(event) == .cancelled,
@@ -217,7 +217,7 @@ import Testing
     }
 
     private static func testEvaluateReturnsDeclinedReason() throws {
-        let event = eventSnapshot(availability: .busy, status: .declined)
+        let event = calendarEvent(availability: .busy, status: .declined)
 
         try expect(
             EventInclusionPolicy.evaluate(event) == .declined,
@@ -225,7 +225,7 @@ import Testing
     }
 
     private static func testEvaluateReturnsTentativeReason() throws {
-        let event = eventSnapshot(availability: .busy, status: .tentative)
+        let event = calendarEvent(availability: .busy, status: .tentative)
 
         try expect(
             EventInclusionPolicy.evaluate(event) == .tentative,
@@ -233,7 +233,7 @@ import Testing
     }
 
     private static func testEvaluateReturnsUnsupportedAvailabilityReasonForTentativeEvents() throws {
-        let event = eventSnapshot(availability: .tentative, status: .confirmed)
+        let event = calendarEvent(availability: .tentative, status: .confirmed)
 
         try expect(
             EventInclusionPolicy.evaluate(event) == .unsupportedAvailability(.tentative),
@@ -241,7 +241,7 @@ import Testing
     }
 
     private static func testEvaluateReturnsUnsupportedAvailabilityReasonForFreeEvents() throws {
-        let event = eventSnapshot(availability: .free, status: .confirmed)
+        let event = calendarEvent(availability: .free, status: .confirmed)
 
         try expect(
             EventInclusionPolicy.evaluate(event) == .unsupportedAvailability(.free),
@@ -249,7 +249,7 @@ import Testing
     }
 
     private static func testEvaluateReturnsUnsupportedAvailabilityReasonForUnavailableEvents() throws {
-        let event = eventSnapshot(availability: .unavailable, status: .confirmed)
+        let event = calendarEvent(availability: .unavailable, status: .confirmed)
 
         try expect(
             EventInclusionPolicy.evaluate(event) == .unsupportedAvailability(.unavailable),
@@ -257,10 +257,10 @@ import Testing
     }
 
     private static func testVisibleEventKeysRemainDistinctForAdjacentMeetings() throws {
-        let first = eventSnapshot(
+        let first = calendarEvent(
             id: "event-1", title: "Planning", start: Date(timeIntervalSince1970: 1_000),
             end: Date(timeIntervalSince1970: 2_000))
-        let adjacent = eventSnapshot(
+        let adjacent = calendarEvent(
             id: "event-2", title: "Planning", start: Date(timeIntervalSince1970: 2_000),
             end: Date(timeIntervalSince1970: 3_000))
 
@@ -270,9 +270,9 @@ import Testing
     }
 
     private static func testProjectsIncludedWorkEventToHub() throws {
-        let hubCalendar = CalendarReference(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud")
-        let sourceEvent = eventSnapshot(
-            id: "acme-1", calendar: CalendarReference(id: "acme-1", title: "ACME Work", sourceTitle: "Google"),
+        let hubCalendar = CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud")
+        let sourceEvent = calendarEvent(
+            id: "acme-1", calendar: CalendarIdentity(id: "acme-1", title: "ACME Work", sourceTitle: "Google"),
             title: "Client Planning", start: Date(timeIntervalSince1970: 1_000),
             end: Date(timeIntervalSince1970: 2_000), isAllDay: false, availability: .busy, status: .confirmed)
 
@@ -288,18 +288,18 @@ import Testing
     }
 
     private static func testDoesNotProjectExcludedWorkEventToHub() throws {
-        let sourceEvent = eventSnapshot(isAllDay: true, availability: .busy, status: .confirmed)
+        let sourceEvent = calendarEvent(isAllDay: true, availability: .busy, status: .confirmed)
 
         let projections = WorkToHubProjector.project(
             events: [sourceEvent], from: workCalendarSettings(),
-            to: CalendarReference(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"))
+            to: CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"))
 
         try expect(projections.isEmpty, "Excluded source events should not produce hub projections")
     }
 
     private static func testProjectsPrefixedHubEventToOtherWorkCalendars() throws {
-        let hubEvent = eventSnapshot(
-            calendar: CalendarReference(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
+        let hubEvent = calendarEvent(
+            calendar: CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
             title: "[ACME] Client Planning")
 
         let projections = HubToWorkProjector.project(
@@ -320,8 +320,8 @@ import Testing
     }
 
     private static func testProjectsUnprefixedHubEventToAllWorkCalendarsWithPersonalPrefix() throws {
-        let hubEvent = eventSnapshot(
-            calendar: CalendarReference(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"), title: "Dentist")
+        let hubEvent = calendarEvent(
+            calendar: CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"), title: "Dentist")
 
         let projections = HubToWorkProjector.project(
             hubEvents: [hubEvent], to: workCalendarTargets(), personalPrefix: "[ME]")
@@ -332,8 +332,8 @@ import Testing
     }
 
     private static func testProjectsRemotePrefixedHubEventToLocalWorkCalendars() throws {
-        let hubEvent = eventSnapshot(
-            calendar: CalendarReference(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
+        let hubEvent = calendarEvent(
+            calendar: CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
             title: "[BETA] Sales Call")
 
         let projections = HubToWorkProjector.project(
@@ -350,7 +350,7 @@ import Testing
     }
 
     private static func testPlansCreateForMissingExpectedProjection() throws {
-        let expected = projectedEvent(title: "[ACME] Client Planning")
+        let expected = calendarEventProjection(title: "[ACME] Client Planning")
 
         let plan = ReconciliationPlanner.plan(expected: [expected], existing: [], managedPrefixes: ["[ACME]"])
 
@@ -359,7 +359,7 @@ import Testing
     }
 
     private static func testPlansDeleteForStaleManagedProjection() throws {
-        let stale = eventSnapshot(title: "[ACME] Old Planning")
+        let stale = calendarEvent(title: "[ACME] Old Planning")
 
         let plan = ReconciliationPlanner.plan(expected: [], existing: [stale], managedPrefixes: ["[ACME]"])
 
@@ -368,7 +368,7 @@ import Testing
     }
 
     private static func testNeverDeletesUnprefixedEvents() throws {
-        let original = eventSnapshot(title: "Client Planning")
+        let original = calendarEvent(title: "Client Planning")
 
         let plan = ReconciliationPlanner.plan(expected: [], existing: [original], managedPrefixes: ["[ACME]"])
 
@@ -376,7 +376,7 @@ import Testing
     }
 
     private static func testPreservesUnknownPrefixedEvents() throws {
-        let remote = eventSnapshot(title: "[BETA] Sales Call")
+        let remote = calendarEvent(title: "[BETA] Sales Call")
 
         let plan = ReconciliationPlanner.plan(expected: [], existing: [remote], managedPrefixes: ["[ACME]"])
 
@@ -384,8 +384,8 @@ import Testing
     }
 
     private static func testPlansRenameAsDeleteOldAndCreateNew() throws {
-        let old = eventSnapshot(title: "[ACME] Old Planning")
-        let new = projectedEvent(title: "[ACME] New Planning")
+        let old = calendarEvent(title: "[ACME] Old Planning")
+        let new = calendarEventProjection(title: "[ACME] New Planning")
 
         let plan = ReconciliationPlanner.plan(expected: [new], existing: [old], managedPrefixes: ["[ACME]"])
 
@@ -394,8 +394,8 @@ import Testing
     }
 
     private static func testPlansNoChangesWhenExpectedStateAlreadyExists() throws {
-        let existing = eventSnapshot(title: "[ACME] Client Planning")
-        let expected = projectedEvent(
+        let existing = calendarEvent(title: "[ACME] Client Planning")
+        let expected = calendarEventProjection(
             destinationCalendar: existing.calendar, title: existing.title, start: existing.start, end: existing.end,
             isAllDay: existing.isAllDay)
 
@@ -514,7 +514,7 @@ import Testing
 
     private static func testRejectsAmbiguousCalendarSelectorDuringReconciliation() async throws {
         let fixtures = applicationFixtures()
-        let duplicateHub = CalendarSnapshot(
+        let duplicateHub = RelayCalendar(
             id: "hub-duplicate", title: fixtures.hubCalendar.title, sourceTitle: fixtures.hubCalendar.sourceTitle,
             isWritable: true)
         let store = FakeCalendarStore(calendars: [fixtures.hubCalendar, duplicateHub, fixtures.workCalendar])
@@ -542,7 +542,7 @@ import Testing
 
     private static func testApplyCreatesAndDeletesPlannedChanges() async throws {
         let fixtures = applicationFixtures()
-        let staleHubProjection = eventSnapshot(
+        let staleHubProjection = calendarEvent(
             id: "hub-stale-1", calendar: fixtures.hubReference, title: "[ACME] Old Planning")
         let store = FakeCalendarStore(
             calendars: [fixtures.hubCalendar, fixtures.workCalendar],
@@ -557,12 +557,14 @@ import Testing
         try expect(plan.deletes == [staleHubProjection], "Apply should return planned delete")
         try expect(
             await store.createdEvents() == [fixtures.expectedHubProjection], "Apply should create planned projections")
-        try expect(await store.deletedEvents() == [staleHubProjection], "Apply should delete stale managed projections")
+        try expect(
+            await store.deletedEvents() == [staleHubProjection.identity],
+            "Apply should delete stale managed projections by identity")
     }
 
     private static func testDoesNotReprojectManagedWorkProjectionsToHub() async throws {
         let fixtures = applicationFixtures()
-        let managedWorkProjection = eventSnapshot(
+        let managedWorkProjection = calendarEvent(
             id: "work-projection-1", calendar: fixtures.workReference, title: "[ME] Dentist",
             start: Date(timeIntervalSince1970: 13_000), end: Date(timeIntervalSince1970: 14_000))
         let store = FakeCalendarStore(
@@ -583,14 +585,14 @@ import Testing
 
     private static func testProjectsWorkSourceToOtherWorkCalendarsInSamePlan() async throws {
         let now = Date(timeIntervalSince1970: 10_000)
-        let hubCalendar = CalendarSnapshot(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: true)
-        let acmeCalendar = CalendarSnapshot(id: "acme-1", title: "ACME Work", sourceTitle: "Google", isWritable: true)
-        let betaCalendar = CalendarSnapshot(id: "beta-1", title: "BETA Work", sourceTitle: "Google", isWritable: true)
-        let acmeReference = CalendarReference(
+        let hubCalendar = RelayCalendar(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: true)
+        let acmeCalendar = RelayCalendar(id: "acme-1", title: "ACME Work", sourceTitle: "Google", isWritable: true)
+        let betaCalendar = RelayCalendar(id: "beta-1", title: "BETA Work", sourceTitle: "Google", isWritable: true)
+        let acmeReference = CalendarIdentity(
             id: acmeCalendar.id, title: acmeCalendar.title, sourceTitle: acmeCalendar.sourceTitle)
-        let betaReference = CalendarReference(
+        let betaReference = CalendarIdentity(
             id: betaCalendar.id, title: betaCalendar.title, sourceTitle: betaCalendar.sourceTitle)
-        let sourceEvent = eventSnapshot(
+        let sourceEvent = calendarEvent(
             id: "acme-source-1", calendar: acmeReference, title: "Client Planning",
             start: Date(timeIntervalSince1970: 11_000), end: Date(timeIntervalSince1970: 12_000))
         let settings = CalendarRelaySettings(
@@ -620,17 +622,17 @@ import Testing
 
     private static func testDoesNotDoublePrefixRelayedWorkBlockers() async throws {
         let now = Date(timeIntervalSince1970: 10_000)
-        let hubCalendar = CalendarSnapshot(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: true)
-        let acmeCalendar = CalendarSnapshot(id: "acme-1", title: "ACME Work", sourceTitle: "Google", isWritable: true)
-        let betaCalendar = CalendarSnapshot(id: "beta-1", title: "BETA Work", sourceTitle: "Google", isWritable: true)
-        let acmeReference = CalendarReference(
+        let hubCalendar = RelayCalendar(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: true)
+        let acmeCalendar = RelayCalendar(id: "acme-1", title: "ACME Work", sourceTitle: "Google", isWritable: true)
+        let betaCalendar = RelayCalendar(id: "beta-1", title: "BETA Work", sourceTitle: "Google", isWritable: true)
+        let acmeReference = CalendarIdentity(
             id: acmeCalendar.id, title: acmeCalendar.title, sourceTitle: acmeCalendar.sourceTitle)
-        let betaReference = CalendarReference(
+        let betaReference = CalendarIdentity(
             id: betaCalendar.id, title: betaCalendar.title, sourceTitle: betaCalendar.sourceTitle)
-        let sourceEvent = eventSnapshot(
+        let sourceEvent = calendarEvent(
             id: "acme-source-1", calendar: acmeReference, title: "Client Planning",
             start: Date(timeIntervalSince1970: 11_000), end: Date(timeIntervalSince1970: 12_000))
-        let relayedWorkBlocker = eventSnapshot(
+        let relayedWorkBlocker = calendarEvent(
             id: "beta-relayed-1", calendar: betaReference, title: "[ACME] Client Planning", start: sourceEvent.start,
             end: sourceEvent.end)
         let settings = CalendarRelaySettings(
@@ -665,7 +667,7 @@ import Testing
 
     private static func testDeletesUnknownPrefixedWorkBlockersWhenAbsentFromHub() async throws {
         let fixtures = applicationFixtures()
-        let remoteWorkProjection = eventSnapshot(
+        let remoteWorkProjection = calendarEvent(
             id: "remote-work-projection-1", calendar: fixtures.workReference, title: "[REMOTE] Partner Planning",
             start: Date(timeIntervalSince1970: 13_000), end: Date(timeIntervalSince1970: 14_000))
         let store = FakeCalendarStore(
@@ -686,7 +688,7 @@ import Testing
 
     private static func testPreservesUnknownPrefixedHubEvents() async throws {
         let fixtures = applicationFixtures()
-        let remoteHubProjection = eventSnapshot(
+        let remoteHubProjection = calendarEvent(
             id: "remote-hub-projection-1", calendar: fixtures.hubReference, title: "[REMOTE] Partner Planning",
             start: Date(timeIntervalSince1970: 13_000), end: Date(timeIntervalSince1970: 14_000))
         let store = FakeCalendarStore(
@@ -721,12 +723,12 @@ import Testing
     }
 
     private static func testFormatsPlannedCreatesAndDeletes() throws {
-        let create = projectedEvent(
-            destinationCalendar: CalendarReference(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
+        let create = calendarEventProjection(
+            destinationCalendar: CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
             title: "[ACME] Client Planning", start: Date(timeIntervalSince1970: 1_000),
             end: Date(timeIntervalSince1970: 2_000))
-        let delete = eventSnapshot(
-            id: "stale-1", calendar: CalendarReference(id: "acme-1", title: "ACME Work", sourceTitle: "Google"),
+        let delete = calendarEvent(
+            id: "stale-1", calendar: CalendarIdentity(id: "acme-1", title: "ACME Work", sourceTitle: "Google"),
             title: "[ME] Dentist", start: Date(timeIntervalSince1970: 3_000), end: Date(timeIntervalSince1970: 4_000))
 
         let output = ReconciliationPlanFormatter.format(ReconciliationPlan(creates: [create], deletes: [delete]))
@@ -747,15 +749,15 @@ import Testing
 
     private static func testReconciliationPlanOutputAvoidsDebugDumps() throws {
         let output = ReconciliationPlanFormatter.format(
-            ReconciliationPlan(creates: [projectedEvent(title: "[ACME] Client Planning")], deletes: []))
+            ReconciliationPlan(creates: [calendarEventProjection(title: "[ACME] Client Planning")], deletes: []))
 
-        try expect(!output.contains("ProjectedEvent("), "Output should not expose Swift debug dumps")
-        try expect(!output.contains("CalendarReference("), "Output should not expose Swift type internals")
+        try expect(!output.contains("CalendarEventProjection("), "Output should not expose Swift debug dumps")
+        try expect(!output.contains("CalendarIdentity("), "Output should not expose Swift type internals")
     }
 
     private static func testExplainReportsIncludedAndExcludedEvents() async throws {
         let fixtures = applicationFixtures()
-        let excludedWorkEvent = eventSnapshot(
+        let excludedWorkEvent = calendarEvent(
             id: "acme-excluded-1", calendar: fixtures.workReference, title: "AI QA Learning path sync",
             start: Date(timeIntervalSince1970: 15_000), end: Date(timeIntervalSince1970: 16_000), availability: .free,
             status: .confirmed)
@@ -782,12 +784,12 @@ import Testing
     private static func testFormatsEventExplanations() throws {
         let output = EventExplanationFormatter.format([
             EventExplanation(
-                calendar: CalendarReference(id: "acme-1", title: "ACME Work", sourceTitle: "Google"),
+                calendar: CalendarIdentity(id: "acme-1", title: "ACME Work", sourceTitle: "Google"),
                 title: "Client Planning", start: Date(timeIntervalSince1970: 1_000),
                 end: Date(timeIntervalSince1970: 2_000), isAllDay: false, availability: .busy, status: .confirmed,
                 reason: .included),
             EventExplanation(
-                calendar: CalendarReference(id: "acme-1", title: "ACME Work", sourceTitle: "Google"),
+                calendar: CalendarIdentity(id: "acme-1", title: "ACME Work", sourceTitle: "Google"),
                 title: "AI QA Learning path sync", start: Date(timeIntervalSince1970: 3_000),
                 end: Date(timeIntervalSince1970: 4_000), isAllDay: false, availability: .free, status: .confirmed,
                 reason: .unsupportedAvailability(.free))
@@ -814,8 +816,8 @@ import Testing
 
     private static func testFormatsCalendarList() throws {
         let output = CalendarListFormatter.format([
-            CalendarSnapshot(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: true),
-            CalendarSnapshot(id: "readonly-1", title: "Shared Holidays", sourceTitle: "Subscribed", isWritable: false)
+            RelayCalendar(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: true),
+            RelayCalendar(id: "readonly-1", title: "Shared Holidays", sourceTitle: "Subscribed", isWritable: false)
         ])
 
         try expect(output.contains("Calendars (2)"), "Calendar output should summarize count")
@@ -823,7 +825,7 @@ import Testing
         try expect(output.contains("id: hub-1"), "Calendar output should include IDs for troubleshooting")
         try expect(output.contains("writable"), "Calendar output should show writable state")
         try expect(output.contains("read-only"), "Calendar output should show read-only state")
-        try expect(!output.contains("CalendarSnapshot("), "Calendar output should not expose Swift debug dumps")
+        try expect(!output.contains("RelayCalendar("), "Calendar output should not expose Swift debug dumps")
     }
 
     private static func validSettings(
@@ -840,25 +842,25 @@ import Testing
             workCalendars: workCalendars)
     }
 
-    private static func eventSnapshot(
+    private static func calendarEvent(
         id: String = "event-1",
-        calendar: CalendarReference = CalendarReference(id: "calendar-1", title: "ACME Work", sourceTitle: "Google"),
+        calendar: CalendarIdentity = CalendarIdentity(id: "calendar-1", title: "ACME Work", sourceTitle: "Google"),
         title: String = "Client Planning", start: Date = Date(timeIntervalSince1970: 1_000),
         end: Date = Date(timeIntervalSince1970: 2_000), isAllDay: Bool = false, availability: EventAvailability = .busy,
         status: EventStatus = .confirmed
-    ) -> EventSnapshot {
-        EventSnapshot(
+    ) -> CalendarEvent {
+        CalendarEvent(
             id: id, calendar: calendar, title: title, start: start, end: end, isAllDay: isAllDay,
             availability: availability, status: status)
     }
 
-    private static func projectedEvent(
-        destinationCalendar: CalendarReference = CalendarReference(
+    private static func calendarEventProjection(
+        destinationCalendar: CalendarIdentity = CalendarIdentity(
             id: "calendar-1", title: "ACME Work", sourceTitle: "Google"), title: String,
         start: Date = Date(timeIntervalSince1970: 1_000), end: Date = Date(timeIntervalSince1970: 2_000),
         isAllDay: Bool = false
-    ) -> ProjectedEvent {
-        ProjectedEvent(
+    ) -> CalendarEventProjection {
+        CalendarEventProjection(
             destinationCalendar: destinationCalendar, title: title, start: start, end: end, isAllDay: isAllDay)
     }
 
@@ -884,7 +886,7 @@ import Testing
             settings: WorkCalendarSettings(
                 name: name, prefix: prefix,
                 calendar: CalendarSelector(sourceTitle: "Google", calendarTitle: calendarTitle)),
-            calendar: CalendarReference(id: calendarID, title: calendarTitle, sourceTitle: "Google"))
+            calendar: CalendarIdentity(id: calendarID, title: calendarTitle, sourceTitle: "Google"))
     }
 
     private static func canonicalSettingsYAML(syncWindowDays: Int?) -> String {
@@ -906,18 +908,18 @@ import Testing
 
     private static func applicationFixtures(hubIsWritable: Bool = true) -> ApplicationFixtures {
         let now = Date(timeIntervalSince1970: 10_000)
-        let hubCalendar = CalendarSnapshot(
+        let hubCalendar = RelayCalendar(
             id: "hub-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: hubIsWritable)
-        let workCalendar = CalendarSnapshot(id: "acme-1", title: "ACME Work", sourceTitle: "Google", isWritable: true)
-        let hubReference = CalendarReference(
+        let workCalendar = RelayCalendar(id: "acme-1", title: "ACME Work", sourceTitle: "Google", isWritable: true)
+        let hubReference = CalendarIdentity(
             id: hubCalendar.id, title: hubCalendar.title, sourceTitle: hubCalendar.sourceTitle)
-        let workReference = CalendarReference(
+        let workReference = CalendarIdentity(
             id: workCalendar.id, title: workCalendar.title, sourceTitle: workCalendar.sourceTitle)
-        let workEvent = eventSnapshot(
+        let workEvent = calendarEvent(
             id: "acme-source-1", calendar: workReference, title: "Client Planning",
             start: Date(timeIntervalSince1970: 11_000), end: Date(timeIntervalSince1970: 12_000))
         let settings = validSettings()
-        let expectedHubProjection = ProjectedEvent(
+        let expectedHubProjection = CalendarEventProjection(
             destinationCalendar: hubReference, title: "[ACME] Client Planning", start: workEvent.start,
             end: workEvent.end, isAllDay: workEvent.isAllDay)
 
@@ -957,38 +959,38 @@ import Testing
 private struct ApplicationFixtures {
     let now: Date
     let settings: CalendarRelaySettings
-    let hubCalendar: CalendarSnapshot
-    let hubReference: CalendarReference
-    let workCalendar: CalendarSnapshot
-    let workReference: CalendarReference
-    let workEvent: EventSnapshot
-    let expectedHubProjection: ProjectedEvent
+    let hubCalendar: RelayCalendar
+    let hubReference: CalendarIdentity
+    let workCalendar: RelayCalendar
+    let workReference: CalendarIdentity
+    let workEvent: CalendarEvent
+    let expectedHubProjection: CalendarEventProjection
 }
 
 private actor FakeCalendarStore: CalendarStorePort {
-    private let calendars: [CalendarSnapshot]
-    private let eventsByCalendarID: [String: [EventSnapshot]]
-    private var recordedCreates: [ProjectedEvent] = []
-    private var recordedDeletes: [EventSnapshot] = []
+    private let calendars: [RelayCalendar]
+    private let eventsByCalendarID: [String: [CalendarEvent]]
+    private var recordedCreates: [CalendarEventProjection] = []
+    private var recordedDeletes: [CalendarEventIdentity] = []
 
-    init(calendars: [CalendarSnapshot], eventsByCalendarID: [String: [EventSnapshot]] = [:]) {
+    init(calendars: [RelayCalendar], eventsByCalendarID: [String: [CalendarEvent]] = [:]) {
         self.calendars = calendars
         self.eventsByCalendarID = eventsByCalendarID
     }
 
-    func listCalendars() async throws -> [CalendarSnapshot] { calendars }
+    func listCalendars() async throws -> [RelayCalendar] { calendars }
 
-    func events(in calendar: CalendarReference, from start: Date, to end: Date) async throws -> [EventSnapshot] {
+    func events(in calendar: CalendarIdentity, from start: Date, to end: Date) async throws -> [CalendarEvent] {
         eventsByCalendarID[calendar.id, default: []]
     }
 
-    func createEvent(_ event: ProjectedEvent) async throws { recordedCreates.append(event) }
+    func createEvent(_ event: CalendarEventProjection) async throws { recordedCreates.append(event) }
 
-    func deleteEvent(_ event: EventSnapshot) async throws { recordedDeletes.append(event) }
+    func deleteEvent(_ event: CalendarEventIdentity) async throws { recordedDeletes.append(event) }
 
-    func createdEvents() -> [ProjectedEvent] { recordedCreates }
+    func createdEvents() -> [CalendarEventProjection] { recordedCreates }
 
-    func deletedEvents() -> [EventSnapshot] { recordedDeletes }
+    func deletedEvents() -> [CalendarEventIdentity] { recordedDeletes }
 }
 
 private struct ContractTestFailure: Error, CustomStringConvertible {
