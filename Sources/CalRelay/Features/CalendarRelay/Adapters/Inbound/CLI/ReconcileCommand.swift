@@ -2,24 +2,6 @@ import ArgumentParser
 import CalRelayKit
 import Foundation
 
-@main @available(macOS 10.15, macCatalyst 13, iOS 13, tvOS 13, watchOS 6, *)
-struct CalRelayCommand: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(
-        commandName: "calrelay", abstract: "Relay Apple Calendar availability blockers across configured calendars.",
-        discussion: "Calendar listing and reconciliation commands use EventKit-backed Apple Calendar access.",
-        subcommands: [CalendarsCommand.self, ReconcileCommand.self])
-}
-
-struct CalendarsCommand: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(
-        commandName: "calendars", abstract: "List visible calendars and their source/title selectors.")
-
-    func run() async throws {
-        let calendars = try await EventKitCalendarStore().listCalendars()
-        print(CalendarListFormatter.format(calendars))
-    }
-}
-
 struct ReconcileCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "reconcile", abstract: "Load configuration and plan calendar relay changes.",
