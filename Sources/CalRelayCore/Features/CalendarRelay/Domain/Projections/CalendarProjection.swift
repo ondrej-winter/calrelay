@@ -1,5 +1,27 @@
 import Foundation
 
+public struct WorkCalendarProjectionTarget: Equatable, Sendable {
+    public let settings: WorkCalendarSettings
+    public let calendar: CalendarIdentity
+
+    public init(settings: WorkCalendarSettings, calendar: CalendarIdentity) {
+        self.settings = settings
+        self.calendar = calendar
+    }
+}
+
+public enum WorkToHubProjector {
+    public static func project(
+        events: [CalendarEvent], from workCalendar: WorkCalendarSettings, to hubCalendar: CalendarIdentity
+    ) -> [CalendarEventProjection] {
+        events.filter(EventInclusionPolicy.includes).map { event in
+            CalendarEventProjection(
+                destinationCalendar: hubCalendar, title: "\(workCalendar.prefix) \(event.title)", start: event.start,
+                end: event.end, isAllDay: event.isAllDay)
+        }
+    }
+}
+
 public enum HubToWorkProjector {
     public static func project(
         hubEvents: [CalendarEvent], to workCalendars: [WorkCalendarProjectionTarget], personalPrefix: String

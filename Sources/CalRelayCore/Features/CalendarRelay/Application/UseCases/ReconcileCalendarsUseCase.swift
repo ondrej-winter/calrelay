@@ -56,11 +56,12 @@ public struct ReconcileCalendarsUseCase: Sendable {
 
     private func plan(settings: CalendarRelaySettings, now: Date) async throws -> PlannedRun {
         let context = try await loadRunContext(settings: settings, now: now)
+        let titlePolicy = ManagedEventTitlePolicy(managedPrefixes: context.managedPrefixes)
 
         let expectedHubEvents = context.workCalendars.flatMap { workCalendar in
             WorkToHubProjector.project(
                 events: context.workEvents(for: workCalendar).filter { event in
-                    !isRelayedWorkBlocker(event, managedPrefixes: context.managedPrefixes)
+                    !titlePolicy.isRelayedWorkBlocker(event)
                 }, from: workCalendar.settings, to: context.hubCalendar.reference)
         }
 
@@ -77,7 +78,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
         let hubPlan = ReconciliationPlanner.plan(
             expected: expectedHubEvents, existing: context.hubEvents, managedPrefixes: context.managedPrefixes)
         let workPlan = ReconciliationPlanner.plan(expected: expectedWorkEvents, existing: context.allWorkEvents) {
-            event in isRelayedWorkBlocker(event, managedPrefixes: context.managedPrefixes)
+            event in titlePolicy.isRelayedWorkBlocker(event)
         }
         let reconciliationPlan = ReconciliationPlan(
             creates: hubPlan.creates + workPlan.creates, deletes: hubPlan.deletes + workPlan.deletes)
@@ -129,16 +130,6 @@ public struct ReconcileCalendarsUseCase: Sendable {
         CandidateEventExplanation(event: event, inclusion: EventInclusionPolicy.evaluate(event))
     }
 
-    private func isRelayedWorkBlocker(_ event: CalendarEvent, managedPrefixes: Set<String>) -> Bool {
-        hasBracketedPrefix(event.title) || isManagedProjection(event, managedPrefixes: managedPrefixes)
-    }
-
-    private func hasBracketedPrefix(_ title: String) -> Bool { title.hasPrefix("[") && title.contains("]") }
-
-    private func isManagedProjection(_ event: CalendarEvent, managedPrefixes: Set<String>) -> Bool {
-        managedPrefixes.contains { prefix in event.title.hasPrefix(prefix) }
-    }
-
     private func validate(_ settings: CalendarRelaySettings) throws {
         do { try SettingsValidator.validate(settings) } catch let error as SettingsValidationError {
             throw ReconcileCalendarsError.invalidSettings(error.description)
@@ -168,38 +159,5 @@ public struct ReconcileCalendarsUseCase: Sendable {
         guard calendarsByID[calendar.id]?.isWritable == true else {
             throw ReconcileCalendarsError.calendarReadOnly(calendar)
         }
-    }
-}
-
-private struct PlannedRun {
-    let plan: ReconciliationPlan
-    let calendarsByID: [String: RelayCalendar]
-}
-
-private struct ReconciliationRunContext {
-    let hubCalendar: ResolvedCalendar
-    let workCalendars: [WorkCalendarResolution]
-    let managedPrefixes: Set<String>
-    let hubEvents: [CalendarEvent]
-    let workEventsByCalendarID: [String: [CalendarEvent]]
-    let calendarsByID: [String: RelayCalendar]
-
-    var allWorkEvents: [CalendarEvent] { workEventsByCalendarID.values.flatMap { $0 } }
-
-    func workEvents(for workCalendar: WorkCalendarResolution) -> [CalendarEvent] {
-        workEventsByCalendarID[workCalendar.calendar.snapshot.id, default: []]
-    }
-}
-
-private struct WorkCalendarResolution {
-    let settings: WorkCalendarSettings
-    let calendar: ResolvedCalendar
-}
-
-private struct ResolvedCalendar {
-    let snapshot: RelayCalendar
-
-    var reference: CalendarIdentity {
-        CalendarIdentity(id: snapshot.id, title: snapshot.title, sourceTitle: snapshot.sourceTitle)
     }
 }
