@@ -4,94 +4,35 @@ CalRelay is a local macOS Swift CLI and app that uses Apple Calendar/EventKit-vi
 
 The current implementation source of truth is the [CalRelay EventKit MVP spec](docs/specs/calrelay-eventkit-mvp-spec.md), derived from the original idea in [`docs/ideas/calrelay-eventkit-mvp.md`](docs/ideas/calrelay-eventkit-mvp.md).
 
-Implementation work is broken down in the [CalRelay EventKit MVP implementation plan](docs/plans/calrelay-eventkit-mvp-implementation-plan.md).
-
-## Requirements
-
-- macOS 26+
-- Swift 6.2+
-- `make` for the canonical local development commands
-- `swift-format` for formatting checks
-- SwiftLint for lint checks
-- Full Calendar access for `CalRelay.app` when prompted by macOS
-- Writable Apple Calendar/EventKit calendars for any calendar that CalRelay should mutate
-
-## Build and test
+## Quick start
 
 Use the `Makefile` as the canonical local tooling entrypoint:
 
 ```sh
-make help
 make check
 make app
-```
-
-`make check` runs linting, a SwiftPM build, the deterministic SwiftPM executable test runner, and a CLI help smoke check. The underlying commands remain ordinary SwiftPM commands and can still be run directly when debugging a specific step:
-
-```sh
-make format-check
-make format
-make lint
-make build
-make test
 swift run calrelay --help
 ```
 
-`make format-check` and `make format` use the repository `swift-format` configuration. The formatter is available as a separate target so a future formatting-only change can adopt it without mixing mechanical formatting churn into feature work.
-
-`make test` is the local deterministic test gate. It runs `swift run CalRelayKitTests` and does not require real EventKit access, real calendars, `CalRelay.app`, Swift Testing, XCTest, or a separately selected full Xcode toolchain.
-
-The package manifest (`Package.swift`) is the source of truth for products, targets, and dependencies. Keep `Package.resolved` committed with intentional dependency resolution updates.
-
-## Repository layout
-
-- `Sources/CalRelayKit/`: standalone shared `CalendarRelay` library target. It owns calendar relay business logic, application use cases, DTOs, ports, settings validation, projection, reconciliation planning, YAML configuration loading, reusable command handlers/formatters, and EventKit outbound adapters used by thin wrappers.
-- `Sources/CalRelayCLI/`: executable `calrelay` CLI wrapper. It owns ArgumentParser command declarations, command-line options, terminal printing, and composition by delegating reusable behavior to `CalRelayKit`.
-- `Sources/CalRelayApp/`: Dock-visible SwiftUI app control panel and UI-only menu bar surface used for macOS Calendar permission and EventKit capability checks.
-- `Tests/CalRelayKitTests/`: consolidated deterministic executable test runner for shared library, CLI-support, and contract behavior; it uses fakes and does not require real EventKit access.
-- `docs/manual-validation.md`: app-backed EventKit validation recipe for local writable test calendars.
-
-`CalRelayKit` is the intended integration point for command-line, macOS, and future UI wrappers. Keep wrapper targets focused on UI, lifecycle, option parsing, and presentation-shell concerns; put reusable calendar relay behavior and related infrastructure behind kit APIs.
-
-## Usage
-
-### App
-
-Build and open the app bundle:
+Build and open the app bundle when you need macOS Calendar permission and EventKit visibility checks:
 
 ```sh
-make app
 open .build/CalRelay.app
 ```
 
-The app uses bundle identifier `dev.owinter.CalRelay` and owns its own macOS Calendar permission prompt. Use the main control panel's **List Calendars** button to request Calendar access and confirm visible calendars.
-
-The app remains a normal Dock-visible macOS app. It includes an optional UI-only menu bar item, enabled by default, with **Open CalRelay** and **Quit** actions. The menu bar item can be shown or hidden from the app control panel. It does not run sync, schedule background work, or listen for Calendar changes; the CLI remains the current reconciliation interface. See the [app lifecycle spec](docs/specs/calrelay-app-lifecycle-spec.md) for the staged lifecycle direction.
-
-### CLI
-
-List visible EventKit calendars, their source titles, local calendar IDs, and writable status:
+Everyday CLI reconciliation reads `~/.config/calrelay/config.yaml` by default and is dry-run unless `--apply` is passed:
 
 ```sh
 swift run calrelay calendars
-```
-
-Run reconciliation in dry-run mode. By default, this reads `~/.config/calrelay/config.yaml`, reads the configured calendars, and prints planned creates/deletes without mutating Apple Calendar:
-
-```sh
 swift run calrelay reconcile
 ```
 
-Use `--config <path>` for tests, experiments, or temporary alternate configurations:
+## Documentation
 
-```sh
-swift run calrelay reconcile --config ./calrelay.yml
-```
+- [Development workflow](docs/development.md): local requirements, build/test commands, formatting, linting, and package notes.
+- [Repository layout](docs/repository-layout.md): source targets, test organization, and the `CalRelayKit` integration boundary.
+- [Configuration](docs/configuration.md): YAML file location, schema, selector semantics, CLI reconciliation commands, and safety notes.
+- [Manual validation](docs/manual-validation.md): app-backed EventKit validation with harmless local test calendars.
+- [App lifecycle spec](docs/specs/calrelay-app-lifecycle-spec.md): current app lifecycle behavior and staged direction.
+- [EventKit MVP spec](docs/specs/calrelay-eventkit-mvp-spec.md): canonical product and behavior specification.
 
-Apply the planned reconciliation. Mutation only happens when `--apply` is passed:
-
-```sh
-swift run calrelay reconcile --apply
-```
-
-See [`docs/configuration.md`](docs/configuration.md) for the YAML schema, selector semantics, and safety notes. Use `CalRelay.app` for EventKit permission checks; see [`docs/manual-validation.md`](docs/manual-validation.md) for the app-backed validation recipe.
