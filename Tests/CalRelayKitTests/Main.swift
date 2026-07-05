@@ -9,12 +9,20 @@ struct CalRelayKitTestRunner {
             try ConfigurationFileSelectionTests.runAll()
         }
 
-        if filters.isEmpty || filters.contains("CalendarRelayCommandHandlerTests") {
-            try await CalendarRelayCommandHandlerTests.runAll()
+        if filters.isEmpty || filters.contains("CalendarListCommandHandlerTests") {
+            try await CalendarListCommandHandlerTests.runAll()
+        }
+
+        if filters.isEmpty || filters.contains("ReconcileCommandHandlerTests") {
+            try await ReconcileCommandHandlerTests.runAll()
         }
 
         if filters.isEmpty || filters.contains("CalRelayContractTests") {
             try await CalRelayContractTests.runAll()
+        }
+
+        if filters.isEmpty || filters.contains("CalRelayCLISmokeTests") {
+            try CalRelayCLISmokeTests.runAll()
         }
 
         print("CalRelayKitTests passed")

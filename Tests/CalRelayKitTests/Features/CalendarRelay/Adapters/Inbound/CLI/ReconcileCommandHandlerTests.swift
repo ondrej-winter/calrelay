@@ -1,19 +1,11 @@
 import CalRelayKit
 import Foundation
 
-enum CalendarRelayCommandHandlerTests {
+enum ReconcileCommandHandlerTests {
     static func runAll() async throws {
-        try await testCalendarListHandlerFormatsCalendarsFromInjectedStore()
         try await testReconcileHandlerFormatsDryRunPlanFromInjectedStoreAndConfig()
+        try await testReconcileHandlerFormatsApplyPlanFromInjectedStoreAndConfig()
         try await testReconcileHandlerFormatsExplanationFromInjectedStoreAndConfig()
-    }
-
-    private static func testCalendarListHandlerFormatsCalendarsFromInjectedStore() async throws {
-        let store = CommandHandlerCalendarStore(calendars: [hubCalendar()])
-        let output = try await CalendarListCommandHandler(calendarStore: store).run()
-
-        try expect(output.contains("Calendars (1)"), "Calendar list handler should format calendar count")
-        try expect(output.contains("iCloud / Personal Work"), "Calendar list handler should format calendar selector")
     }
 
     private static func testReconcileHandlerFormatsDryRunPlanFromInjectedStoreAndConfig() async throws {
@@ -31,6 +23,22 @@ enum CalendarRelayCommandHandlerTests {
         try expect(output.contains("[ACME] Client Planning"), "Dry-run output should include planned projection title")
         try expect((await store.createdEvents()).isEmpty, "Dry-run handler should not create events")
         try expect((await store.deletedEvents()).isEmpty, "Dry-run handler should not delete events")
+    }
+
+    private static func testReconcileHandlerFormatsApplyPlanFromInjectedStoreAndConfig() async throws {
+        let fixture = reconciliationFixture()
+        let configURL = try writeTemporaryConfigFile()
+        let store = CommandHandlerCalendarStore(
+            calendars: [fixture.hubCalendar, fixture.workCalendar],
+            eventsByCalendarID: [fixture.workCalendar.id: [fixture.workEvent]])
+        let handler = ReconcileCommandHandler(calendarStore: store, now: { fixture.now })
+
+        let output = try await handler.run(config: configURL.path, apply: true, explain: false)
+
+        try expect(output.contains("Apply mode. Planned calendar mutations were performed."), "Apply output should include mode message")
+        try expect(output.contains("Creates (1)"), "Apply output should include planned create count")
+        try expect(await store.createdEvents().count == 1, "Apply handler should create planned events")
+        try expect((await store.deletedEvents()).isEmpty, "Apply handler should not delete events in this fixture")
     }
 
     private static func testReconcileHandlerFormatsExplanationFromInjectedStoreAndConfig() async throws {
@@ -51,7 +59,7 @@ enum CalendarRelayCommandHandlerTests {
 
     private static func reconciliationFixture() -> CommandHandlerFixture {
         let now = Date(timeIntervalSince1970: 10_000)
-        let hubCalendar = Self.hubCalendar()
+        let hubCalendar = RelayCalendar(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: true)
         let workCalendar = RelayCalendar(id: "acme-1", title: "ACME Work", sourceTitle: "Google", isWritable: true)
         let workReference = CalendarIdentity(
             id: workCalendar.id, title: workCalendar.title, sourceTitle: workCalendar.sourceTitle)
@@ -61,10 +69,6 @@ enum CalendarRelayCommandHandlerTests {
             availability: .busy, status: .confirmed)
 
         return CommandHandlerFixture(now: now, hubCalendar: hubCalendar, workCalendar: workCalendar, workEvent: workEvent)
-    }
-
-    private static func hubCalendar() -> RelayCalendar {
-        RelayCalendar(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: true)
     }
 
     private static func writeTemporaryConfigFile() throws -> URL {
@@ -101,30 +105,4 @@ private struct CommandHandlerFixture {
     let hubCalendar: RelayCalendar
     let workCalendar: RelayCalendar
     let workEvent: CalendarEvent
-}
-
-private actor CommandHandlerCalendarStore: CalendarStorePort {
-    private let calendars: [RelayCalendar]
-    private let eventsByCalendarID: [String: [CalendarEvent]]
-    private var recordedCreates: [CalendarEventProjection] = []
-    private var recordedDeletes: [CalendarEventIdentity] = []
-
-    init(calendars: [RelayCalendar], eventsByCalendarID: [String: [CalendarEvent]] = [:]) {
-        self.calendars = calendars
-        self.eventsByCalendarID = eventsByCalendarID
-    }
-
-    func listCalendars() async throws -> [RelayCalendar] { calendars }
-
-    func events(in calendar: CalendarIdentity, from start: Date, to end: Date) async throws -> [CalendarEvent] {
-        eventsByCalendarID[calendar.id, default: []]
-    }
-
-    func createEvent(_ event: CalendarEventProjection) async throws { recordedCreates.append(event) }
-
-    func deleteEvent(_ event: CalendarEventIdentity) async throws { recordedDeletes.append(event) }
-
-    func createdEvents() -> [CalendarEventProjection] { recordedCreates }
-
-    func deletedEvents() -> [CalendarEventIdentity] { recordedDeletes }
 }
