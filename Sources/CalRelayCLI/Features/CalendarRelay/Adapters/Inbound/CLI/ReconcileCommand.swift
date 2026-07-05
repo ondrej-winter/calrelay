@@ -1,6 +1,5 @@
 import ArgumentParser
 import CalRelayKit
-import Foundation
 
 struct ReconcileCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
@@ -17,26 +16,6 @@ struct ReconcileCommand: AsyncParsableCommand {
     var explain = false
 
     func run() async throws {
-        let selectedFile = try ConfigurationFileSelection.select(overridePath: config)
-        let yaml = try String(contentsOfFile: selectedFile.path, encoding: .utf8)
-        let settings = try YAMLCalendarRelaySettingsLoader.load(yaml)
-        let useCase = ReconcileCalendarsUseCase(calendarStore: EventKitCalendarStore())
-
-        let now = Date()
-
-        if explain {
-            let explanation = try await useCase.explain(settings: settings, now: now)
-            print(EventExplanationFormatter.format(explanation))
-            return
-        }
-
-        let plan =
-            try await
-            (apply ? useCase.apply(settings: settings, now: now) : useCase.dryRun(settings: settings, now: now))
-        print(
-            apply
-                ? "Apply mode. Planned calendar mutations were performed."
-                : "Dry-run mode. No calendar mutations were performed.")
-        print(ReconciliationPlanFormatter.format(plan))
+        print(try await ReconcileCommandHandler().run(config: config, apply: apply, explain: explain))
     }
 }

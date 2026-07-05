@@ -45,11 +45,13 @@ The package manifest (`Package.swift`) is the source of truth for products, targ
 
 ## Repository layout
 
-- `Sources/CalRelayKit/`: shared `CalendarRelay` library target containing pure domain/application logic, DTOs, ports, settings validation, projection, reconciliation planning, YAML configuration loading, CLI output formatting, and EventKit outbound adapters.
-- `Sources/CalRelayCLI/`: executable `calrelay` CLI command parsing and composition.
+- `Sources/CalRelayKit/`: standalone shared `CalendarRelay` library target. It owns calendar relay business logic, application use cases, DTOs, ports, settings validation, projection, reconciliation planning, YAML configuration loading, reusable command handlers/formatters, and EventKit outbound adapters used by thin wrappers.
+- `Sources/CalRelayCLI/`: executable `calrelay` CLI wrapper. It owns ArgumentParser command declarations, command-line options, terminal printing, and composition by delegating reusable behavior to `CalRelayKit`.
 - `Sources/CalRelayApp/`: Dock-visible SwiftUI app control panel and UI-only menu bar surface used for macOS Calendar permission and EventKit capability checks.
 - `Tests/CalRelayKitTests/`: consolidated deterministic executable test runner for shared library, CLI-support, and contract behavior; it uses fakes and does not require real EventKit access.
 - `docs/manual-validation.md`: app-backed EventKit validation recipe for local writable test calendars.
+
+`CalRelayKit` is the intended integration point for command-line, macOS, and future UI wrappers. Keep wrapper targets focused on UI, lifecycle, option parsing, and presentation-shell concerns; put reusable calendar relay behavior and related infrastructure behind kit APIs.
 
 ## Usage
 
