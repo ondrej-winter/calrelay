@@ -84,7 +84,7 @@ Sources/CalRelayKit/Features/CalendarRelay/Adapters/Inbound/CLI/ConfigurationFil
 
 Update `Package.swift` so:
 
-- executable target `CalRelay` depends on the consolidated `CalRelayKit` target;
+- executable target `CalRelayCLI` depends on the consolidated `CalRelayKit` target;
 - focused test target `CalRelayCLITests` depends on `CalRelayKit`;
 - `CalRelayKit` domain/application code remains free of filesystem path-resolution policy.
 
