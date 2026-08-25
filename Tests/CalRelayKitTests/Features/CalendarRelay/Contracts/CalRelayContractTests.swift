@@ -50,6 +50,7 @@ enum CalRelayContractTests {
         try Self.testMapsCurrentUserDeclinedParticipantStatusToDeclined()
         try Self.testMapsAcceptedParticipantStatusFromOverallEventStatus()
         try await Self.testDryRunPlansChangesWithoutMutatingCalendarStore()
+        try await Self.testReconciliationLoadsTwoDaysInThePast()
         try await Self.testRejectsMissingCalendarSelectorDuringReconciliation()
         try await Self.testRejectsAmbiguousCalendarSelectorDuringReconciliation()
         try await Self.testApplyRejectsReadOnlyDestinationBeforeMutation()
@@ -546,6 +547,23 @@ enum CalRelayContractTests {
         try expect(deletedEvents.isEmpty, "Dry-run should not delete events")
     }
 
+    private static func testReconciliationLoadsTwoDaysInThePast() async throws {
+        let fixtures = applicationFixtures()
+        let store = FakeCalendarStore(calendars: [fixtures.hubCalendar, fixtures.workCalendar])
+        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+
+        _ = try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now)
+
+        let requests = await store.eventRequests()
+        let expectedStart = fixtures.now.addingTimeInterval(-2 * 24 * 60 * 60)
+        let expectedEnd = fixtures.now.addingTimeInterval(Double(fixtures.settings.syncWindowDays) * 24 * 60 * 60)
+
+        try expect(requests.count == 2, "Reconciliation should load events for the hub and work calendars")
+        try expect(
+            requests.allSatisfy { $0.start == expectedStart && $0.end == expectedEnd },
+            "Reconciliation should load two days in the past while preserving the configured future window")
+    }
+
     private static func testRejectsMissingCalendarSelectorDuringReconciliation() async throws {
         let fixtures = applicationFixtures()
         let store = FakeCalendarStore(calendars: [fixtures.workCalendar])
@@ -1020,6 +1038,7 @@ private actor FakeCalendarStore: CalendarStorePort {
     private let eventsByCalendarID: [String: [CalendarEvent]]
     private var recordedCreates: [CalendarEventProjection] = []
     private var recordedDeletes: [CalendarEventIdentity] = []
+    private var recordedEventRequests: [(start: Date, end: Date)] = []
 
     init(calendars: [RelayCalendar], eventsByCalendarID: [String: [CalendarEvent]] = [:]) {
         self.calendars = calendars
@@ -1029,7 +1048,8 @@ private actor FakeCalendarStore: CalendarStorePort {
     func listCalendars() async throws -> [RelayCalendar] { calendars }
 
     func events(in calendar: CalendarIdentity, from start: Date, to end: Date) async throws -> [CalendarEvent] {
-        eventsByCalendarID[calendar.id, default: []]
+        recordedEventRequests.append((start: start, end: end))
+        return eventsByCalendarID[calendar.id, default: []]
     }
 
     func createEvent(_ event: CalendarEventProjection) async throws { recordedCreates.append(event) }
@@ -1039,6 +1059,8 @@ private actor FakeCalendarStore: CalendarStorePort {
     func createdEvents() -> [CalendarEventProjection] { recordedCreates }
 
     func deletedEvents() -> [CalendarEventIdentity] { recordedDeletes }
+
+    func eventRequests() -> [(start: Date, end: Date)] { recordedEventRequests }
 }
 
 private struct ContractTestFailure: Error, CustomStringConvertible {

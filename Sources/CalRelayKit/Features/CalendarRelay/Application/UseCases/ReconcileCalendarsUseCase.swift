@@ -99,17 +99,18 @@ public struct ReconcileCalendarsUseCase: Sendable {
                 settings: workCalendar, calendar: try resolve(workCalendar.calendar, from: calendars))
         }
 
+        let syncWindowStart = now.addingTimeInterval(-2 * 24 * 60 * 60)
         let syncWindowEnd = now.addingTimeInterval(Double(settings.syncWindowDays) * 24 * 60 * 60)
         let managedPrefixes = Set(settings.workCalendars.map(\.prefix) + [settings.personalPrefix])
 
-        let hubEvents = try await calendarStore.events(in: hubCalendar.reference, from: now, to: syncWindowEnd)
+        let hubEvents = try await calendarStore.events(in: hubCalendar.reference, from: syncWindowStart, to: syncWindowEnd)
         try Task.checkCancellation()
 
         var workEventsByCalendarID: [String: [CalendarEvent]] = [:]
         for workCalendar in workCalendars {
             try Task.checkCancellation()
             workEventsByCalendarID[workCalendar.calendar.snapshot.id] = try await calendarStore.events(
-                in: workCalendar.calendar.reference, from: now, to: syncWindowEnd)
+                in: workCalendar.calendar.reference, from: syncWindowStart, to: syncWindowEnd)
         }
 
         return ReconciliationRunContext(
