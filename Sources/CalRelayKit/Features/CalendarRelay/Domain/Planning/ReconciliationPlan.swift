@@ -11,23 +11,39 @@ public struct ReconciliationPlan: Equatable, Sendable {
 }
 
 public enum ReconciliationPlanner {
-    public static func plan(expected: [CalendarEventProjection], existing: [CalendarEvent], managedPrefixes: Set<String>)
-        -> ReconciliationPlan
-    { plan(expected: expected, existing: existing) { event in isManaged(event, by: managedPrefixes) } }
+    public static func plan(
+        expected: [CalendarEventProjection], existing: [CalendarEvent], managedPrefixes: Set<String>
+    ) -> ReconciliationPlan {
+        plan(expected: expected, existing: existing) { event in isManaged(event, by: managedPrefixes) }
+    }
 
     public static func plan(
         expected: [CalendarEventProjection], existing: [CalendarEvent], shouldDeleteStaleEvent: (CalendarEvent) -> Bool
     ) -> ReconciliationPlan {
+        let uniqueExpected = uniqueProjections(from: expected)
         let existingKeys = Set(existing.map(VisibleEventKey.init(event:)))
-        let expectedKeys = Set(expected.map(visibleKey(for:)))
+        let expectedKeys = Set(uniqueExpected.map(visibleKey(for:)))
 
-        let creates = expected.filter { projection in !existingKeys.contains(visibleKey(for: projection)) }
+        let creates = uniqueExpected.filter { projection in !existingKeys.contains(visibleKey(for: projection)) }
 
+        var retainedKeys = Set<VisibleEventKey>()
         let deletes = existing.filter { event in
-            !expectedKeys.contains(VisibleEventKey(event: event)) && shouldDeleteStaleEvent(event)
+            let key = VisibleEventKey(event: event)
+
+            guard expectedKeys.contains(key) else { return shouldDeleteStaleEvent(event) }
+
+            guard retainedKeys.insert(key).inserted else { return shouldDeleteStaleEvent(event) }
+
+            return false
         }
 
         return ReconciliationPlan(creates: creates, deletes: deletes)
+    }
+
+    private static func uniqueProjections(from projections: [CalendarEventProjection]) -> [CalendarEventProjection] {
+        var seenKeys = Set<VisibleEventKey>()
+
+        return projections.filter { projection in seenKeys.insert(visibleKey(for: projection)).inserted }
     }
 
     private static func visibleKey(for projection: CalendarEventProjection) -> VisibleEventKey {

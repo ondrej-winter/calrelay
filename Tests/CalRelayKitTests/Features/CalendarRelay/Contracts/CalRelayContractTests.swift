@@ -1,5 +1,5 @@
-import Foundation
 import CalRelayKit
+import Foundation
 
 enum CalRelayContractTests {
     static func runAll() async throws {
@@ -34,8 +34,11 @@ enum CalRelayContractTests {
         try Self.testProjectsUnprefixedHubEventToAllWorkCalendarsWithPersonalPrefix()
         try Self.testProjectsRemotePrefixedHubEventToLocalWorkCalendars()
         try Self.testPlansCreateForMissingExpectedProjection()
+        try Self.testPlansOneCreateForDuplicateExpectedProjection()
         try Self.testPlansDeleteForStaleManagedProjection()
+        try Self.testDeletesSurplusManagedProjectionForExpectedKey()
         try Self.testNeverDeletesUnprefixedEvents()
+        try Self.testPreservesDuplicateUnprefixedEventsForExpectedKey()
         try Self.testPreservesUnknownPrefixedEvents()
         try Self.testPlansRenameAsDeleteOldAndCreateNew()
         try Self.testPlansNoChangesWhenExpectedStateAlreadyExists()
@@ -80,13 +83,14 @@ enum CalRelayContractTests {
     private static func testRejectsEmptyHubSelectorFields() throws {
         try expectValidationError(
             .emptyHubCalendarSourceTitle,
-            for: validSettings(hubCalendar: HubCalendarSettings(
-                calendar: CalendarSelector(sourceTitle: "", calendarTitle: "Personal Work"))))
+            for: validSettings(
+                hubCalendar: HubCalendarSettings(
+                    calendar: CalendarSelector(sourceTitle: "", calendarTitle: "Personal Work"))))
 
         try expectValidationError(
             .emptyHubCalendarTitle,
-            for: validSettings(hubCalendar: HubCalendarSettings(
-                calendar: CalendarSelector(sourceTitle: "iCloud", calendarTitle: ""))))
+            for: validSettings(
+                hubCalendar: HubCalendarSettings(calendar: CalendarSelector(sourceTitle: "iCloud", calendarTitle: ""))))
     }
 
     private static func testRejectsEmptyWorkCalendarSelectorFields() throws {
@@ -357,6 +361,15 @@ enum CalRelayContractTests {
         try expect(plan.deletes.isEmpty, "Missing expected projection should not create deletes")
     }
 
+    private static func testPlansOneCreateForDuplicateExpectedProjection() throws {
+        let expected = calendarEventProjection(title: "[ACME] Client Planning")
+
+        let plan = ReconciliationPlanner.plan(expected: [expected, expected], existing: [], managedPrefixes: ["[ACME]"])
+
+        try expect(plan.creates == [expected], "Duplicate expected projections should result in one create")
+        try expect(plan.deletes.isEmpty, "Duplicate expected projections should not create deletes")
+    }
+
     private static func testPlansDeleteForStaleManagedProjection() throws {
         let stale = calendarEvent(title: "[ACME] Old Planning")
 
@@ -366,12 +379,44 @@ enum CalRelayContractTests {
         try expect(plan.deletes == [stale], "Stale managed projection should be planned as delete")
     }
 
+    private static func testDeletesSurplusManagedProjectionForExpectedKey() throws {
+        let existing = calendarEvent(id: "managed-1", title: "[ACME] Client Planning")
+        let duplicate = calendarEvent(
+            id: "managed-2", calendar: existing.calendar, title: existing.title, start: existing.start,
+            end: existing.end, isAllDay: existing.isAllDay)
+        let expected = calendarEventProjection(
+            destinationCalendar: existing.calendar, title: existing.title, start: existing.start, end: existing.end,
+            isAllDay: existing.isAllDay)
+
+        let plan = ReconciliationPlanner.plan(
+            expected: [expected], existing: [existing, duplicate], managedPrefixes: ["[ACME]"])
+
+        try expect(plan.creates.isEmpty, "An existing expected projection should not be created again")
+        try expect(plan.deletes == [duplicate], "Surplus managed projections should be removed")
+    }
+
     private static func testNeverDeletesUnprefixedEvents() throws {
         let original = calendarEvent(title: "Client Planning")
 
         let plan = ReconciliationPlanner.plan(expected: [], existing: [original], managedPrefixes: ["[ACME]"])
 
         try expect(plan.deletes.isEmpty, "Unprefixed events should never be deleted")
+    }
+
+    private static func testPreservesDuplicateUnprefixedEventsForExpectedKey() throws {
+        let existing = calendarEvent(id: "manual-1", title: "Client Planning")
+        let duplicate = calendarEvent(
+            id: "manual-2", calendar: existing.calendar, title: existing.title, start: existing.start,
+            end: existing.end, isAllDay: existing.isAllDay)
+        let expected = calendarEventProjection(
+            destinationCalendar: existing.calendar, title: existing.title, start: existing.start, end: existing.end,
+            isAllDay: existing.isAllDay)
+
+        let plan = ReconciliationPlanner.plan(
+            expected: [expected], existing: [existing, duplicate], managedPrefixes: ["[ACME]"])
+
+        try expect(plan.creates.isEmpty, "An existing expected projection should not be created again")
+        try expect(plan.deletes.isEmpty, "Duplicate unprefixed events should remain protected from deletion")
     }
 
     private static func testPreservesUnknownPrefixedEvents() throws {
