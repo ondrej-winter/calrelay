@@ -2,7 +2,7 @@
 name: planning-and-task-breakdown
 description: Breaks work into ordered tasks. Use when you have a spec or clear requirements and need to break work into implementable tasks. Use when a task feels too large to start, when you need to estimate scope, or when parallel work is possible.
 metadata:
-  version: "1.1.6"
+  version: "1.3.1"
   dependencies:
     tools: []
     skills:
@@ -43,6 +43,11 @@ Produce a written implementation plan that includes:
 - dependencies, checkpoints, and sequencing constraints
 - likely files or components touched, using portable placeholders when needed
 - risks, assumptions, and open questions that affect safe implementation
+- explicit instructions to keep the plan current during implementation by
+  updating checkboxes, status, scope changes, and newly discovered work
+
+By default, create the plan at `docs/plans/<kebab-case-name>-plan.md`, where
+`<kebab-case-name>` is a short name derived from the feature, project, or task.
 
 ## Steps
 
@@ -71,7 +76,8 @@ Foundational data or state model
   - Supporting setup, migration, or seed data
 ```
 
-Implementation order follows the dependency graph bottom-up: build foundations first.
+Implementation order follows dependencies from foundations outward: build each
+prerequisite before the work that depends on it.
 
 ### Step 3: Slice vertically
 
@@ -124,7 +130,7 @@ Each task follows this structure:
 - `<module_path>`
 - `<test_path>`
 
-**Estimated scope:** [Small: 1-2 files | Medium: 3-5 files | Large: 5+ files]
+**Estimated scope:** [XS: 1 file | Small: 2 files | Medium: 3-5 files | Large: 6-8 files | XL: 9+ files]
 ```
 
 ### Step 5: Order and checkpoint
@@ -152,10 +158,10 @@ Add explicit checkpoints:
 | Size   | Files | Scope                                      | Example                                          |
 | ------ | ----- | ------------------------------------------ | ------------------------------------------------ |
 | **XS** | 1     | Single function or config change           | Add a validation rule                            |
-| **S**  | 1-2   | One component, interface, or workflow step | Add a new command handler or interface operation |
+| **S**  | 2     | One component, interface, or workflow step | Add a new command handler or interface operation |
 | **M**  | 3-5   | One feature slice                          | User registration flow                           |
-| **L**  | 5-8   | Multi-component feature                    | Search with filtering and pagination             |
-| **XL** | 8+    | **Too large — break it down further**      | Break into smaller tasks                         |
+| **L**  | 6-8   | Multi-component feature                    | Search with filtering and pagination             |
+| **XL** | 9+    | **Too large - break it down further**      | Break into smaller tasks                         |
 
 If a task is L or larger, it should be broken into smaller tasks. An agent performs best on S and M tasks.
 
@@ -168,6 +174,16 @@ If a task is L or larger, it should be broken into smaller tasks. An agent perfo
 
 ## Plan Document Template
 
+Write the plan to `docs/plans/<kebab-case-name>-plan.md` by default unless the
+user or repository conventions specify another location.
+
+Treat the plan as a living document during implementation. Update task and
+checkpoint checkboxes as work is completed, and keep unfinished or unverified
+items unchecked. Record brief status notes, blockers, deviations, changed
+sequencing, and newly discovered work when they affect the remaining plan. Make
+these updates after each completed task or meaningful plan change without
+waiting for the user to ask for progress updates.
+
 ```markdown
 # Implementation Plan: [Feature/Project Name]
 
@@ -179,6 +195,21 @@ If a task is L or larger, it should be broken into smaller tasks. An agent perfo
 
 - [Key decision 1 and rationale]
 - [Key decision 2 and rationale]
+
+## Progress Tracking
+
+Treat this plan as a living document throughout implementation. After each
+completed task or meaningful change:
+
+- check off completed tasks, acceptance criteria, verification items, and
+  checkpoints
+- leave unfinished or unverified items unchecked
+- add newly discovered work and update sequencing when scope or dependencies
+  change
+- note blockers, deviations, and decisions that affect the remaining work
+
+Keep this section and the task list current without waiting for the user to ask
+for progress updates.
 
 ## Task List
 
@@ -268,5 +299,6 @@ Before starting implementation, confirm:
 - [ ] Task dependencies are identified and ordered correctly
 - [ ] No task touches more than ~5 files
 - [ ] Checkpoints exist between major phases
+- [ ] The plan says how and when its checkboxes and status will be updated during implementation
 - [ ] Required reviews or approvals are identified before implementation starts
 - [ ] Open questions and assumptions are captured or marked not applicable

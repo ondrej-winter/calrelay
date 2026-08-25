@@ -1,15 +1,23 @@
 ---
 name: add-observability
-description: Add logs, metrics, traces, profiling, or operational notes for meaningful workflows without unsupported performance claims.
+description: Add logs, metrics, traces, profiling, or operational notes when a workflow needs better runtime visibility or measurable evidence without unsupported performance claims.
 metadata:
-  version: "1.1.2"
+  version: "1.1.4"
   dependencies:
     tools: []
     skills:
-      - debugging-and-error-recovery
-      - performance-optimization
-      - shipping-and-launch
-      - update-project-docs
+      - name: debugging-and-error-recovery
+        purpose: Reproduce, localize, and fix active failures before adding observability around them.
+        required: false
+      - name: performance-optimization
+        purpose: Diagnose and optimize known or suspected performance bottlenecks after measurement signals exist.
+        required: false
+      - name: shipping-and-launch
+        purpose: Include observability in rollout, monitoring, and rollback-readiness planning.
+        required: false
+      - name: update-project-docs
+        purpose: Document operational signals, dashboards, alerts, or troubleshooting notes affected by observability changes.
+        required: false
 ---
 
 # Add Observability
@@ -97,8 +105,14 @@ Choose signals that fit the project conventions.
   supported.
 - Add traces or spans around external I/O and cross-service boundaries where
   supported.
+- Use profiles for representative investigations of CPU, memory, allocation, or
+  contention costs rather than as permanent request-level instrumentation.
 - Propagate request, correlation, job, or tenant identifiers when available and
   safe.
+
+Prefer the smallest set of signals that answers the stated question. Avoid
+recording the same event redundantly unless each signal supports a distinct
+operational use.
 
 Do not log or emit secrets, credentials, personal data, or highly variable labels
 that would create high cardinality.
@@ -125,9 +139,10 @@ Use `update-project-docs` for durable documentation updates.
 
 ### 7. Validate the signal
 
-Exercise the instrumented workflow when practical and confirm the expected logs,
-metrics, traces, or profile outputs are emitted. Check that labels and fields are
-stable, low-cardinality, and free of sensitive data.
+Exercise representative success and failure paths when practical. Confirm the
+expected logs, metrics, traces, or profile outputs are emitted, and check that
+signals are not missing, duplicated, or emitted at an unexpected volume. Check
+that labels and fields are stable, low-cardinality, and free of sensitive data.
 
 ## Output checklist
 

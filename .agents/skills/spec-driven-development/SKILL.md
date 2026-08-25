@@ -2,14 +2,22 @@
 name: spec-driven-development
 description: Creates a specification before implementation. Use when starting a project, feature, integration, workflow, migration, or significant change with unclear or incomplete requirements.
 metadata:
-  version: "1.2.1"
+  version: "1.3.0"
   dependencies:
     tools: []
     skills:
-      - planning-and-task-breakdown
-      - review-implementation-plan
-      - interview-me
-      - idea-refine
+      - name: planning-and-task-breakdown
+        purpose: Break confirmed requirements into ordered, verifiable implementation tasks.
+        required: false
+      - name: review-implementation-plan
+        purpose: Review implementation plans derived from a specification before coding begins.
+        required: false
+      - name: interview-me
+        purpose: Clarify unclear user intent before writing a specification.
+        required: false
+      - name: idea-refine
+        purpose: Refine rough concepts into a clearer direction before defining requirements.
+        required: false
 ---
 
 # Spec-Driven Development
@@ -68,6 +76,12 @@ IMPLEMENT: execute tasks and keep the spec current when decisions change.
 
 Start by surfacing assumptions. Do not silently fill requirement gaps.
 
+Create or update the spec in `docs/specs/<name>-spec.md` by default, where
+`<name>` is a short kebab-case project, feature, workflow, integration,
+migration, or change name. Create `docs/specs/` if it does not exist. Use a
+different location only when the project already has a clear spec convention or
+the user asks for one.
+
 ```text
 ASSUMPTIONS
 1. The primary user is <user_or_actor>.
@@ -86,17 +100,18 @@ Cover these areas at the appropriate level of detail:
 1. Objective: what is being built, who it is for, and why it matters.
 2. Current context: relevant existing behavior, files, workflows, constraints, and
    dependencies.
-3. Desired behavior: user-visible behavior, interfaces, data changes,
+3. Assumptions: unconfirmed beliefs that affect requirements or implementation.
+4. Desired behavior: user-visible behavior, interfaces, data changes,
    operational behavior, or workflow changes.
-4. Commands and validation: exact build, test, lint, documentation, migration, or
+5. Commands and validation: exact build, test, lint, documentation, migration, or
    manual verification commands where known.
-5. Project structure: where implementation, tests, docs, and configuration belong.
-6. Style and conventions: naming, formatting, error handling, logging, API,
+6. Project structure: where implementation, tests, docs, and configuration belong.
+7. Style and conventions: naming, formatting, error handling, logging, API,
    accessibility, security, or platform conventions that matter for the change.
-7. Testing strategy: which test levels or checks prove the behavior works.
-8. Boundaries: what to always do, ask before doing, and never do.
-9. Success criteria: specific, testable conditions for completion.
-10. Open questions: unresolved decisions that need user input.
+8. Testing strategy: which test levels or checks prove the behavior works.
+9. Boundaries: what to always do, ask before doing, and never do.
+10. Success criteria: specific, testable conditions for completion.
+11. Open questions: unresolved decisions that need user input.
 
 ### Spec template
 
@@ -111,6 +126,10 @@ Cover these areas at the appropriate level of detail:
 
 <Existing behavior, constraints, files, systems, and dependencies.>
 
+## Assumptions
+
+- <Assumption that must be confirmed or tested.>
+
 ## Desired behavior
 
 <Functional, operational, data, interface, or workflow requirements.>
@@ -124,6 +143,7 @@ Cover these areas at the appropriate level of detail:
 
 ## Project structure
 
+- Spec: `docs/specs/<name>-spec.md`
 - `<source_location>`: <implementation responsibility>
 - `<test_location>`: <test responsibility>
 - `<docs_location>`: <documentation responsibility>
@@ -242,7 +262,8 @@ truth.
 Before implementation begins, confirm:
 
 - [ ] assumptions and open questions are visible
+- [ ] blocking questions are resolved
 - [ ] the spec defines objective, desired behavior, constraints, and boundaries
 - [ ] success criteria are specific and testable
 - [ ] validation commands or manual checks are recorded where known
-- [ ] the user has reviewed or accepted the spec and plan
+- [ ] the user has accepted the spec, plan, and task list

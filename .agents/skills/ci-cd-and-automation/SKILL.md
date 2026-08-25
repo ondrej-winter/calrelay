@@ -2,7 +2,7 @@
 name: ci-cd-and-automation
 description: Design, review, or improve CI/CD and automation workflows for quality gates, deployment safety, rollback readiness, secrets handling, and feedback loops across any technology stack.
 metadata:
-  version: "1.3.1"
+  version: "1.5.0"
   dependencies:
     tools: []
     skills: []
@@ -84,6 +84,13 @@ Common gates include:
 
 Order fast deterministic checks before slower or environment-heavy checks.
 
+For Python type-checking gates, use the project's configured `ty` command when
+present. If the target project has not selected a type checker and the workflow
+must introduce one, prefer `ty` rather than `mypy`. Run it through the project's
+declared dependency and command mechanism so local and CI execution use the same
+version; do not assume a globally installed executable. Treat replacement of an
+established checker as an explicit migration rather than incidental CI cleanup.
+
 ### 3. Keep provider configuration portable
 
 Use the project’s CI provider conventions, but keep the design independent of a
@@ -151,11 +158,13 @@ Configuration templates may be committed, but real secrets must not be.
 For deployment workflows, define:
 
 - artifact or version being deployed
+- how the same immutable artifact is promoted between environments
 - target environment and approval requirements
 - migration steps and ordering
 - smoke checks or health checks after deployment
 - monitoring window and success criteria
 - rollback or roll-forward procedure
+- concurrency rules that prevent overlapping deployments from corrupting state
 - ownership when deployment fails
 
 For risky or incomplete functionality, consider feature flags, staged rollout,
@@ -176,7 +185,8 @@ Examples include:
 - stale preview cleanup
 
 For each automation, define what it changes, who reviews the result, and how to
-recover if the automation behaves incorrectly.
+recover if the automation behaves incorrectly. Test mutating automation with a
+dry-run mode, disposable environment, or tightly bounded scope when practical.
 
 ### 8. Optimize without weakening the gate
 
@@ -207,6 +217,7 @@ Confirm:
 - secrets are not exposed
 - artifacts and logs are available when needed
 - rollback or recovery path is documented and tested where practical
+- mutating automation has been exercised safely before it can affect production
 - local reproduction instructions exist for likely failures
 - any gate that cannot be run before handoff is documented with the reason,
   risk, owner, and follow-up condition
