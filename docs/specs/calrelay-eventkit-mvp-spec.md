@@ -1,5 +1,19 @@
 # Spec: CalRelay EventKit MVP
 
+## Specification record
+
+- **Status:** Accepted.
+- **Revision:** 2 — template-alignment audit on September 14, 2026; no product requirements changed.
+- **Canonical artifact:** `docs/specs/calrelay-eventkit-mvp-spec.md`.
+- **Source of truth:** This specification supersedes the exploratory note at `docs/ideas/calrelay-eventkit-mvp.md` for MVP requirements.
+- **Acceptance basis:** Repository history identifies this file as the canonical product definition and records subsequent implementation and requirement updates. An individual approver and acceptance date were not recorded.
+- **Next authorized step:** Maintain this specification when MVP behavior changes; derive or update implementation plans only for accepted changes.
+
+## Revision history
+
+- **Revision 2 — September 14, 2026:** Aligned the document structure with the specification template. Preserved the existing accepted requirements, boundaries, and unresolved decisions.
+- **Revision 1 — June 30, 2026:** Initial canonical MVP specification, subsequently refined through repository changes.
+
 ## Objective
 
 Build a local macOS Swift CLI that uses EventKit-visible Apple Calendar calendars to prevent double-booking across configured work/client calendars for a configurable sync window, defaulting to the next 60 days.
@@ -15,9 +29,9 @@ The MVP is for a single user who wants one personal Apple Calendar work calendar
 - Apple Calendar/EventKit is the integration surface: if a client calendar is visible and writable in Apple Calendar, CalRelay can participate.
 - The MVP targets macOS 26+.
 
-## Desired behavior
+## Required outcomes
 
-### Core workflow
+### REQ-01 — Core workflow
 
 - Request calendar permission at the platform boundary.
 - List available calendars, sources/accounts, and writable/read-only status.
@@ -32,7 +46,7 @@ The MVP is for a single user who wants one personal Apple Calendar work calendar
 - Perform apply-mode reconciliation only when explicitly requested with `--apply` after configuration validation succeeds.
 - Repeat safely: running reconciliation twice after a successful apply should produce no second-run changes.
 
-### Reconciliation model
+### REQ-02 — Visible-set reconciliation model
 
 - Use visible set reconciliation rather than provider IDs, hidden metadata, notes metadata, or a local identity mapping store.
 - Treat generated events as disposable projections.
@@ -57,7 +71,7 @@ The MVP is for a single user who wants one personal Apple Calendar work calendar
 
 - Timezone normalization may be added after EventKit behavior is tested.
 
-### Source event inclusion defaults
+### REQ-03 — Source-event inclusion defaults
 
 For the first MVP:
 
@@ -70,7 +84,7 @@ For the first MVP:
 - Treat each exposed recurring occurrence as an ordinary visible event snapshot for reconciliation.
 - Do not preserve or reproduce original recurrence-rule configuration.
 
-### Managed-event safety convention
+### REQ-04 — Managed-event safety convention
 
 - Every event CalRelay is allowed to delete must be visibly marked with a configured prefix.
 - Prefixes are both human-readable source markers and CalRelay ownership markers.
@@ -81,7 +95,7 @@ For the first MVP:
 - CalRelay must mutate only the hub calendar and locally configured writable work/client calendars for the current run.
 - Manual edits to prefixed generated events may be overwritten or deleted by reconciliation.
 
-### Multi-computer topology
+### REQ-05 — Multi-computer topology
 
 CalRelay may run on multiple computers where each machine can see the shared hub calendar plus only a subset of work/client calendars. For example:
 
@@ -95,7 +109,7 @@ Each machine is responsible only for its locally configured work calendars and p
 
 Remote prefixed hub events can still act as blockers for local work calendars. For example, if Laptop A is configured only with ACME but sees `[BETA] Sales Call` in the hub, it may project `[BETA] Sales Call` into ACME to prevent double-booking, but it must not delete the `[BETA]` hub event.
 
-### Routing rules
+### REQ-06 — Routing rules
 
 Given this conceptual configuration:
 
@@ -147,7 +161,7 @@ Personal Work: [BETA] Sales Call
 
 Unknown prefixed events in the hub are preserved by default unless a future configuration explicitly opts into managing that prefix. Unknown prefixed events in work calendars are treated as relayed blockers and removed when absent from the expected hub-derived blocker set.
 
-### Initial configuration shape
+### REQ-07 — Initial configuration shape
 
 The initial configuration format is YAML. The implementation uses `Yams` rather than hand-rolling a parser.
 
@@ -219,7 +233,9 @@ Initial commands once the SwiftPM package exists:
 - Do not introduce direct provider APIs, OAuth, hidden source identifiers, notes metadata, or local identity mapping in the MVP.
 - Do not log secrets, full raw user calendar contents, full file paths, or unnecessary private user data.
 
-## Testing strategy
+## Verification approach
+
+The following validation establishes conformance for the requirements above.
 
 Unit-test set reconciliation for:
 
@@ -242,55 +258,51 @@ Unit-test set reconciliation for:
 
 Use fakes for calendar repository/EventKit ports in domain and application tests. Reserve real EventKit checks for `CalRelay.app`-backed capability runs or explicit integration checks, because they depend on local Apple Calendar state, permissions, and writable calendars.
 
-## Boundaries
+## Binding constraints and execution boundaries
 
-- Always: statically validate required selectors, prefix uniqueness, personal-prefix conflicts, and sync-window values before reconciliation.
-- Always: resolve selectors against visible EventKit calendars and validate apply-mode writability before mutation.
-- Always: fail safely when calendar permissions are unavailable, denied, revoked, or a target calendar is read-only.
-- Always: mutate only calendars configured for the current run.
-- Always: map EventKit framework types into application DTOs at the adapter boundary.
-- Always: keep SwiftUI/AppKit/menu-bar/background-agent work out of the MVP unless explicitly approved later.
-- Ask first: adding persistent stores, hidden source IDs, provider APIs, OAuth, UI/menu-bar app, background agent behavior, launch agents, or synchronization daemons.
-- Ask first: changing the source event inclusion defaults from hard-coded MVP behavior to user configuration.
-- Never: mutate or delete original unprefixed work/client calendar events.
-- Never: pass EventKit types into domain or application APIs.
-- Never: rely on live external provider APIs in default tests.
+These constraints are mandatory for work governed by this specification.
 
-## Success criteria
+- **CON-01:** Statically validate required selectors, prefix uniqueness, personal-prefix conflicts, and sync-window values before reconciliation.
+- **CON-02:** Resolve selectors against visible EventKit calendars and validate apply-mode writability before mutation.
+- **CON-03:** Fail safely when Calendar permission is unavailable, denied, revoked, or a target calendar is read-only.
+- **CON-04:** Mutate only calendars configured for the current run and map EventKit types into application DTOs at the adapter boundary.
+- **CON-05:** Keep SwiftUI/AppKit/menu-bar/background-agent work out of the MVP unless explicitly approved later.
+- **CON-06:** Adding persistent stores, hidden source IDs, provider APIs, OAuth, UI/menu-bar app, background-agent behavior, launch agents, or synchronization daemons requires an explicit decision.
+- **CON-07:** Changing hard-coded MVP source-event inclusion defaults to user configuration requires an explicit decision.
+- **CON-08:** Never mutate or delete original unprefixed work/client events, pass EventKit types into domain/application APIs, or rely on live external provider APIs in default tests.
 
-- This spec is accepted and implementation tasks are traceable to it.
-- A SwiftPM CLI can list calendars, sources/accounts, and writable status.
-- Given representative configured calendars, dry-run mode shows expected creates/deletes without mutation.
-- Apply mode can reconcile generated prefixed projections.
-- Running reconciliation twice after apply produces no second-run changes.
-- Renaming a source event deletes the old projection and creates the new projection.
-- CalRelay never deletes unprefixed original work/client events.
-- CalRelay preserves unknown prefixed events by default in multi-computer setups.
-- CalRelay can project remote prefixed hub blockers into locally configured work calendars.
-- A representative double-booking scenario is prevented across at least two configured work calendars over the next 60 days.
-- Unit tests cover the core reconciliation rules without real EventKit access.
+## Acceptance checks
 
-## Open questions
+- **AC-01 (REQ-01):** A SwiftPM CLI lists calendars, sources/accounts, and writable status; dry-run shows expected creates/deletes without mutation; apply runs only when explicitly requested.
+- **AC-02 (REQ-01, REQ-02):** A second reconciliation after successful apply produces no changes, and renaming a source event deletes the old projection and creates the new projection.
+- **AC-03 (REQ-03):** Representative events demonstrate the documented inclusion defaults, including occurrence-by-occurrence projection of visible recurring instances within the sync window.
+- **AC-04 (REQ-04, CON-08):** CalRelay never deletes unprefixed original work/client events.
+- **AC-05 (REQ-05, REQ-06):** In a representative multi-computer topology, unknown prefixed hub events are preserved while remote prefixed hub blockers can be projected into locally configured work calendars.
+- **AC-06 (REQ-06):** A representative scenario prevents double-booking across at least two configured work calendars over the next 60 days.
+- **AC-07 (REQ-07, CON-01, CON-02, CON-03):** Invalid configuration, unavailable Calendar permission, and read-only mutation targets fail before unsafe mutation.
+- **AC-08 (REQ-02, CON-04, CON-08):** Deterministic unit tests cover core reconciliation rules without real EventKit access or EventKit types in domain/application APIs.
 
-- Are source/title selectors stable enough across the user's Apple Calendar accounts, or will a fallback ID selector be needed later?
-- Should all-day, declined, and cancelled event handling remain hard-coded for MVP or become configurable from day one?
-- Should tentative timed events become configurable after real-world testing?
-- Which exact `Yams` and `swift-argument-parser` versions should be pinned after the SwiftPM package is created?
-- Can EventKit reliably expose recurring occurrences as ordinary visible event snapshots inside the sync window?
-- Is the 60-day default sync window sufficient, or should the first implementation require explicit configuration?
+## Unresolved decisions
 
-## Explicitly out of scope
+- **OPEN-01:** Are source/title selectors stable enough across the user's Apple Calendar accounts, or will a fallback ID selector be needed later?
+- **OPEN-02:** Should all-day, declined, and cancelled event handling remain hard-coded for MVP or become configurable from day one?
+- **OPEN-03:** Should tentative timed events become configurable after real-world testing?
+- **OPEN-04:** Can EventKit reliably expose recurring occurrences as ordinary visible event snapshots inside the sync window?
+- **OPEN-05:** Is the 60-day default sync window sufficient, or should the first implementation require explicit configuration?
 
-- Direct Google Calendar API.
-- Direct Microsoft Graph API.
-- OAuth, app registrations, tenant approvals, or provider-specific sync tokens.
-- Hidden source IDs.
-- Notes metadata.
-- Local identity mapping store.
-- Privacy sanitization beyond conservative field copying and safe diagnostics.
-- Mutation of original unprefixed client/work events.
-- Full semantic two-way editing of arbitrary original events.
-- Mobile app.
-- Team or multi-user product features.
-- Perfect recurring-event support before the EventKit capability spike proves viability.
-- UI/menu-bar app before the CLI/capability spike proves EventKit writability and sync safety.
+## Explicit exclusions
+
+- **EXC-01:** Direct Google Calendar API, Microsoft Graph API, OAuth, app registrations, tenant approvals, and provider-specific sync tokens.
+- **EXC-02:** Hidden source IDs, notes metadata, and a local identity mapping store.
+- **EXC-03:** Privacy sanitization beyond conservative field copying and safe diagnostics.
+- **EXC-04:** Mutation of original unprefixed client/work events and full semantic two-way editing of arbitrary original events.
+- **EXC-05:** Mobile-app, team, and multi-user product features.
+- **EXC-06:** Perfect recurring-event support and a UI/menu-bar app before the CLI/capability spike proves EventKit writability and sync safety.
+
+## Traceability
+
+- **REQ-01–REQ-02:** AC-01, AC-02, AC-08.
+- **REQ-03:** AC-03.
+- **REQ-04:** AC-04.
+- **REQ-05–REQ-06:** AC-05, AC-06.
+- **REQ-07:** AC-07.

@@ -1,5 +1,19 @@
 # Spec: CalRelay Default Configuration Path
 
+## Specification record
+
+- **Status:** Accepted.
+- **Revision:** 2 — template-alignment audit on September 14, 2026; no configuration-path behavior changed.
+- **Canonical artifact:** `docs/specs/calrelay-default-configuration-path-spec.md`.
+- **Source of truth:** This document is the canonical default-path contract for the CLI and future app configuration-status UI.
+- **Acceptance basis:** Repository history records the accepted path decision and its corresponding implementation. An individual approver and acceptance date were not recorded.
+- **Next authorized step:** Maintain this specification with any future configuration-discovery, profile, environment-override, or app-selected-path decision.
+
+## Revision history
+
+- **Revision 2 — September 14, 2026:** Aligned the document structure with the specification template. Preserved the accepted default-path decision and constraints.
+- **Revision 1 — July 2, 2026:** Initial default-configuration-path specification.
+
 ## Objective
 
 Define one canonical user configuration file for CalRelay so the CLI and future app UI share the same default answer to "where is the real config?"
@@ -12,6 +26,17 @@ The canonical configuration file is:
 
 This improves everyday local use by allowing `calrelay reconcile` to work without passing a configuration path, while preserving `--config <path>` as an explicit override for tests, experiments, and temporary alternate configurations.
 
+## Scope
+
+**In scope:** default-path resolution when the CLI receives no `--config` value, continued explicit-path override behavior, missing-file diagnostics, documentation, and the future app first configuration-status milestone.
+
+**Explicit exclusions:** environment-variable overrides, profile support, discovery of multiple paths, remembered alternate app paths, and automatic creation or migration of user configuration files.
+
+## Assumptions
+
+- The current user home directory is available to adapter/bootstrap code for resolving `~`.
+- A single-profile file is sufficient until a separately accepted product decision changes that model.
+
 ## Current context
 
 - The CLI currently requires `calrelay reconcile --config <path>`.
@@ -21,9 +46,9 @@ This improves everyday local use by allowing `calrelay reconcile` to work withou
 - The app lifecycle spec says future manual sync actions require visible configuration validity before exposing sync controls.
 - Configuration source mechanics must remain outside domain/application core.
 
-## Desired behavior
+## Required outcomes
 
-### Canonical config location
+### REQ-01 — Canonical configuration location
 
 - CalRelay has one canonical user configuration file for now: `~/.config/calrelay/config.yaml`.
 - The CLI and future app configuration/status UI should use this same path as their default.
@@ -31,7 +56,7 @@ This improves everyday local use by allowing `calrelay reconcile` to work withou
 - Documentation and user-facing messages may use the friendly `~/.config/calrelay/config.yaml` form.
 - Error details may include the resolved absolute path when that improves clarity.
 
-### CLI behavior
+### REQ-02 — CLI behavior
 
 - `calrelay reconcile` should load `~/.config/calrelay/config.yaml` by default.
 - `calrelay reconcile --config <path>` should continue to load the explicitly provided file.
@@ -49,7 +74,7 @@ Override usage:
 swift run calrelay reconcile --config ./calrelay.yml
 ```
 
-### Missing-file behavior
+### REQ-03 — Missing-file behavior
 
 If the selected configuration file does not exist, CalRelay should fail before parsing or EventKit access with an actionable user-facing error.
 
@@ -68,13 +93,13 @@ Create one there or pass --config <path>.
 See docs/configuration.md for an example.
 ```
 
-### Future app behavior
+### REQ-04 — Future app behavior
 
 - The app should use the same default configuration path for its first configuration-status milestone.
 - The app should be able to show whether the canonical config exists and whether it validates.
 - A later app UI may add "Choose Config..." and remember a selected file, but that is not part of this spec.
 
-## Commands and validation
+## Verification approach
 
 - Build: `swift build`
 - Test: `swift test`, or `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` if the active Command Line Tools Swift Testing issue appears.
@@ -99,36 +124,37 @@ See docs/configuration.md for an example.
 - Do not create, modify, migrate, or overwrite user configuration files automatically in this change.
 - Keep the configuration model single-profile for now.
 
-## Testing strategy
+## Verification approach and test strategy
 
 - Prefer focused tests for pure path helper behavior if a small seam is introduced.
 - Preserve existing deterministic reconciliation contract tests.
 - Use CLI help and missing-file manual checks for command behavior if no clean command test seam exists.
 - Do not require real EventKit access to validate missing-file/default-path behavior.
 
-## Boundaries
+## Binding constraints and execution boundaries
 
-- Always: keep `--config <path>` override support.
-- Always: default to `~/.config/calrelay/config.yaml` when no override is provided.
-- Always: fail before EventKit access when the selected config file is missing.
-- Always: keep default path resolution out of `CalRelayKit` domain/application code.
-- Ask first: before adding environment variable overrides such as `CALRELAY_CONFIG`.
-- Ask first: before adding profile support or multiple config discovery paths.
-- Ask first: before adding a "Choose Config..." UI or remembered alternate app config path.
-- Ask first: before writing a config file automatically.
-- Never: silently create a default config file.
-- Never: search arbitrary directories for config files.
-- Never: make live EventKit access part of default-path validation tests.
+These constraints are mandatory for work governed by this specification.
 
-## Success criteria
+- **CON-01:** Keep `--config <path>` override support, default to `~/.config/calrelay/config.yaml` with no override, and fail before EventKit access when the selected file is missing.
+- **CON-02:** Keep default-path resolution out of `CalRelayKit` domain/application code.
+- **CON-03:** Adding environment-variable overrides, profiles, multiple discovery paths, a "Choose Config..." UI, a remembered alternate app path, or automatic file writing requires an explicit decision.
+- **CON-04:** Never silently create a default configuration file, search arbitrary directories for configuration files, or make live EventKit access part of default-path validation tests.
 
-- `swift run calrelay reconcile` attempts to load `~/.config/calrelay/config.yaml`.
-- `swift run calrelay reconcile --config <path>` continues to work as an explicit override.
-- Missing config errors are clear and tell the user where to create the file or how to pass an override.
-- README and configuration docs show default-path usage.
-- Build and deterministic tests pass.
-- No domain/application API depends on filesystem path resolution.
+## Acceptance checks
 
-## Open questions
+- **AC-01 (REQ-01, REQ-02, CON-01):** `swift run calrelay reconcile` attempts to load `~/.config/calrelay/config.yaml`, while `swift run calrelay reconcile --config <path>` uses the explicit override.
+- **AC-02 (REQ-03, CON-01):** A missing selected configuration file fails before EventKit access with an actionable message that names the default location, the override option, and `docs/configuration.md`.
+- **AC-03 (REQ-01, REQ-02):** README and configuration documentation show default-path and override usage.
+- **AC-04 (REQ-04):** The app’s first configuration-status milestone uses the same default path and can show whether the canonical file exists and validates.
+- **AC-05 (CON-02, CON-04):** Build and deterministic tests pass without a domain/application API depending on filesystem path resolution or requiring live EventKit access for this behavior.
 
-- None blocking. The accepted default path is `~/.config/calrelay/config.yaml`.
+## Unresolved decisions
+
+- None.
+
+## Traceability
+
+- **REQ-01:** AC-01, AC-03.
+- **REQ-02:** AC-01, AC-03.
+- **REQ-03:** AC-02.
+- **REQ-04:** AC-04.
