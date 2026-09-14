@@ -21,6 +21,6 @@ This page describes the main source and test areas in the repository. The root `
 
 - `docs/configuration.md`: YAML schema, selector semantics, CLI reconciliation commands, and safety notes.
 - `docs/manual-validation.md`: app-backed EventKit validation recipe for local writable test calendars.
-- `docs/specs/`: product and behavior specifications.
+- `docs/specs/`: feature-owned product and behavior specifications. Start with `docs/specs/README.md` for the canonical index and legacy-spec migration map.
 - `docs/ideas/`: original ideas and exploratory notes.
 - `docs/plans/`: implementation plans.
