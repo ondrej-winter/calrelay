@@ -21,6 +21,11 @@ The product CLI shell is intentionally feature-neutral. It owns parser mechanics
 and process-facing concerns. Feature slices own the command meanings and
 translation into application behavior. Bootstrap owns concrete dependency wiring.
 
+Treat the CLI shell API as a deliberately curated extension surface. Feature
+adapters may depend on its public command contracts and shared rendering helpers
+when documented, but not on parser construction, registry implementations,
+runtime helpers, or bootstrap modules.
+
 ## Typical package layout
 
 ```text
@@ -77,7 +82,9 @@ configure(parser) -> decode(feature_namespace) -> run(decoded_command, context)
 
 - `configure` adds command-specific arguments to a parser supplied by the shell.
 - `decode` converts parsed external values into immutable adapter-local command
-  objects or application DTOs.
+  objects. When CLI-derived composition settings are needed, it may return an
+  immutable wrapper containing both the use-case command and adapter-local
+  composition options.
 - `run` calls the feature's application boundary and maps results to CLI output
   and exit codes.
 
@@ -141,6 +148,22 @@ class UsageError(Exception):
 Use project-specific global options and command fields. Avoid copying fields that
 are not part of the target product's CLI contract.
 
+Use keyword-only frozen command definitions and frozen parsed command values.
+Normalize `append`, `nargs`, and other mutable `argparse` results to tuples or
+frozensets before they leave decoding. This prevents a runner or deferred
+composition factory from observing parser-owned mutable state.
+
+## Mandatory version option
+
+Every product CLI built with this pattern **must** provide a root `--version`
+option. It must print the executable name and installed distribution version to
+stdout, exit with status 0, and work without a selected subcommand. Source the
+value from canonical package metadata, such as `importlib.metadata.version`, so
+release tooling and CLI output cannot drift through duplicated literals.
+
+For `argparse`, prefer its built-in `version` action on the root parser. Cover the
+shell behavior and each installed process entrypoint with tests.
+
 ## Namespace isolation
 
 The shell should reserve parser destinations for shell-owned concerns such as the
@@ -156,7 +179,9 @@ Why this matters:
 
 When using `argparse`, reserved destination validation may require localized
 access to parser internals. Keep that access inside the shell registry and cover
-it with tests.
+it with tests. Validate both newly added parser actions and explicit defaults,
+including feature-owned nested subparsers, so `set_defaults()` cannot override
+shell state.
 
 ## Error and exit-code matrix
 
@@ -165,6 +190,7 @@ Define the target project's exact matrix. A common shape is:
 | Case | Owner | Behavior |
 | --- | --- | --- |
 | Help requested | Shell/parser | Write help to stdout and return 0 |
+| Version requested | Shell/parser | Write installed distribution version to stdout and return 0 without requiring a subcommand |
 | Invalid CLI syntax | Shell/parser | Write usage diagnostic to stderr and return 2 |
 | Invalid decoded user value | Feature decoder plus shell | Raise usage error and route through parser usage path |
 | Invalid registration | Shell/bootstrap | Raise registration error; process boundary writes stderr and returns configuration error code |
@@ -174,6 +200,11 @@ Define the target project's exact matrix. A common shape is:
 Keep programmer/configuration failures distinct from invalid user input. This
 makes tests clearer and prevents bootstrap mistakes from looking like normal
 usage errors.
+
+In an `argparse` implementation, narrow the `SystemExit` conversion boundary to
+parser construction, parsing, and decoder-driven usage handling. Execute the
+selected runner only after parsing succeeds, so runner-owned exits and unexpected
+failures retain their documented caller semantics.
 
 ## Composition-root pattern
 
@@ -195,6 +226,11 @@ bootstrap.cli.features.<feature_name>
 Lazy construction avoids creating expensive clients, loading credentials, or
 opening resources for commands that were not selected.
 
+For package applications, expose one bootstrap `main(argv: Sequence[str] | None)
+-> int` through the console-script entry and make `__main__.py` call that same
+function. This keeps installed-script and `python -m <app_name>` behavior in
+lockstep.
+
 ## Architecture enforcement examples
 
 When the project uses import-linter or a similar tool, consider contracts such
@@ -215,6 +251,7 @@ and the approved modules in project documentation or an ADR.
 Useful tests include:
 
 - root help uses stdout and exits successfully
+- root `--version` reports canonical installed package metadata on stdout and exits successfully without a subcommand
 - missing subcommand and invalid flags use stderr and return the usage exit code
 - global flags are accepted only where documented
 - duplicate command names fail registration
@@ -227,6 +264,8 @@ Useful tests include:
 - runner receives explicit streams and immutable global options
 - bootstrap can inject fake application ports or workflow runners
 - default dependencies are created lazily only for the selected command
+- console-script and module entrypoints have equivalent offline help and version
+  behavior when both are supported
 - process entrypoint returns integer codes and does not leak parser `SystemExit`
 - architecture checks enforce the documented dependency surface
 
