@@ -14,7 +14,7 @@ This directory contains the accepted, capability-owned product and behavior cont
 
 Together, these documents define the current EventKit MVP. The original idea remains at [`../ideas/calrelay-eventkit-mvp.md`](../ideas/calrelay-eventkit-mvp.md).
 
-## Migration from umbrella specifications
+## Historical specification migrations
 
 | Former specification | Replacement canonical specifications |
 | --- | --- |
@@ -22,7 +22,7 @@ Together, these documents define the current EventKit MVP. The original idea rem
 | `calrelay-default-configuration-path-spec.md` | `configuration-spec.md` and `cli-spec.md` |
 | `calrelay-app-lifecycle-spec.md` | `macos-app-spec.md` |
 
-The former EventKit MVP and app-lifecycle paths remain as compatibility stubs for repository history and inbound links. Former specifications are no longer authoritative for new behavior changes.
+The former specification files have been removed. Use the listed canonical specifications for current requirements and behavior changes.
 
 ## Cross-slice rules
 
