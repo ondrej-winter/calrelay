@@ -1,4 +1,4 @@
-.PHONY: help resolve build test lint format format-check check app clean sync-rules require-swift-format require-swiftlint
+.PHONY: help resolve build test lint format format-check check app clean require-swift-format require-swiftlint
 
 SWIFT_FORMAT ?= $(shell command -v swift-format 2>/dev/null || xcrun --find swift-format 2>/dev/null || printf '%s' swift-format)
 SWIFTLINT ?= $(shell command -v swiftlint 2>/dev/null || test ! -x /opt/homebrew/bin/swiftlint || printf '%s' /opt/homebrew/bin/swiftlint || printf '%s' swiftlint)
@@ -18,7 +18,6 @@ help:
 	@printf '  %-14s %s\n' 'check' 'Run the local quality gate'
 	@printf '  %-14s %s\n' 'app' 'Build the local CalRelay.app bundle'
 	@printf '  %-14s %s\n' 'clean' 'Remove SwiftPM build products'
-	@printf '  %-14s %s\n' 'sync-rules' 'Sync shared agent and .clinerules assets from the configured upstream'
 
 resolve:
 	swift package resolve
@@ -46,9 +45,6 @@ app:
 
 clean:
 	swift package clean
-
-sync-rules:
-	bash scripts/sync-clinerules.sh
 
 require-swift-format:
 	@command -v "$(SWIFT_FORMAT)" >/dev/null 2>&1 || { \

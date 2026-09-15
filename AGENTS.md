@@ -72,7 +72,7 @@ constraints here take precedence over generic defaults in reusable skills.
 - `docs/configuration.md`, `docs/development.md`,
   `docs/repository-layout.md`, and `docs/manual-validation.md`: user and
   maintainer references.
-- `scripts/`: app-bundle base and synchronization scripts.
+- `scripts/`: app-bundle build scripts.
 
 ## Architecture
 
@@ -260,8 +260,6 @@ failures clearly.
   unstaged.
 - Do not run `swift package resolve`, `make resolve`, or other network-backed
   dependency updates unless the task requires a dependency change.
-- Do not run `make sync-rules` without an explicit request. It may add a
-  Git remote, fetch from the network, and replace `.agents/` and `.clinerules/`.
 - Do not pipe remote downloads directly into a shell or interpreter.
 - Treat paths, refs, branch names, and interpolated search text as untrusted;
   quote or validate them and never use `eval`-style command construction.
@@ -274,14 +272,5 @@ Task-specific procedures live under `.agents/skills/`. Before starting a task,
 identify and follow the most specific matching `SKILL.md`. This file
 remains the authority when a generic procedure conflicts with CalRelay.
 
-- Use `.agents/skills/using-agent-skills/SKILL.md` and
-  `.agents/skills/using-agnostic-software-development-skills/SKILL.md` for
+- Use `.agents/skills/using-agnostic-software-development-skills/SKILL.md` for
   skill discovery.
-- The current `ritebook.toml` and `ritebook.lock` sync agnostic and Python
-  skills. Python-specific procedures are not default Swift guidance; use
-  them only when a task actually involves Python.
-- Treat `.agents/` and `.clinerules/` as synchronized assets. Before editing
-  them, inspect `ritebook.toml`, `ritebook.lock`, and
-  `scripts/sync-clinerules.sh` to identify the upstream source. Update the
-  source of truth and resynchronize, or obtain explicit approval for a local
-  exception. Preserve unrelated local skill or rule changes.
