@@ -9,6 +9,7 @@ This page is the canonical local development reference for requirements, build c
 - `make` for the canonical local development commands
 - `swift-format` for formatting checks
 - SwiftLint for lint checks
+- `uvx` for the Fabrica-assisted commit workflow
 - Full Calendar access for `CalRelay.app` when prompted by macOS
 - Writable Apple Calendar/EventKit calendars for any calendar that CalRelay should mutate
 
@@ -20,6 +21,7 @@ Use the `Makefile` as the canonical local tooling entrypoint:
 make help
 make check
 make app
+make commit
 ```
 
 `make check` runs linting, a SwiftPM build, the deterministic SwiftPM executable test runner, and a CLI help smoke check. The underlying commands remain ordinary SwiftPM commands and can still be run directly when debugging a specific step:
@@ -38,6 +40,8 @@ swift run calrelay --help
 `make test` is the local deterministic test gate. It runs `swift run CalRelayKitTests` and does not require real EventKit access, real calendars, `CalRelay.app`, Swift Testing, XCTest, or a separately selected full Xcode toolchain.
 
 The package manifest (`Package.swift`) is the source of truth for products, targets, and dependencies. Keep `Package.resolved` committed with intentional dependency resolution updates.
+
+Run `make commit` to create a Conventional Commit with Fabrica using the repository skill root and configured model. Review the staged changes before invoking it because the command starts a Git commit workflow.
 
 ## App bundle
 

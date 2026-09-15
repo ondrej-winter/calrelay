@@ -1,4 +1,4 @@
-.PHONY: help resolve build test lint format format-check check app clean require-swift-format require-swiftlint
+.PHONY: help resolve build test lint format format-check check app commit clean require-swift-format require-swiftlint
 
 SWIFT_FORMAT ?= $(shell command -v swift-format 2>/dev/null || xcrun --find swift-format 2>/dev/null || printf '%s' swift-format)
 SWIFTLINT ?= $(shell command -v swiftlint 2>/dev/null || test ! -x /opt/homebrew/bin/swiftlint || printf '%s' /opt/homebrew/bin/swiftlint || printf '%s' swiftlint)
@@ -17,6 +17,7 @@ help:
 	@printf '  %-14s %s\n' 'lint' 'Run SwiftLint'
 	@printf '  %-14s %s\n' 'check' 'Run the local quality gate'
 	@printf '  %-14s %s\n' 'app' 'Build the local CalRelay.app bundle'
+	@printf '  %-14s %s\n' 'commit' 'Create a Conventional Commit with Fabrica'
 	@printf '  %-14s %s\n' 'clean' 'Remove SwiftPM build products'
 
 resolve:
@@ -42,6 +43,13 @@ check: lint build test
 
 app:
 	zsh scripts/build-calrelay-app.sh
+
+commit:
+	uvx fabrica commit \
+		--skill conventional-commits \
+		--skill-root .agents/skills \
+		--model gpt-5.6-luna \
+		--reasoning-effort low
 
 clean:
 	swift package clean

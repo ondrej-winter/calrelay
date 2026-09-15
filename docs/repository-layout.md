@@ -13,9 +13,6 @@ This page describes the main source and test areas in the repository. The root `
 ## Tests
 
 - `Tests/CalRelayKitTests/`: consolidated deterministic executable test runner for shared library, CLI-support, and contract behavior; it uses fakes and does not require real EventKit access.
-- `Tests/CalRelayCLITests/`: CLI-focused test area.
-- `Tests/CalRelayContractTests/`: contract-focused test area.
-- `Tests/CalRelayTests/`: unit test area organized by feature ownership.
 
 ## Documentation
 

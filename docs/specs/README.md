@@ -29,4 +29,4 @@ The former paths remain as compatibility stubs for repository history and inboun
 - Calendar permission, EventKit types, calendar IDs, stores, and mutation mechanics remain at adapter or app/bootstrap boundaries.
 - Domain and application APIs remain deterministic and independent of EventKit, filesystem-path resolution, UI frameworks, and live external provider APIs.
 - A capability that crosses slices must reference the owning specification instead of duplicating the other slice's normative requirement.
-- Automatic or closed-app operation requires the explicit approval and ADR gate in [`macos-app-spec.md`](macos-app-spec.md).
+- Automation requires the relevant explicit decision in [`macos-app-spec.md`](macos-app-spec.md); closed-app operation additionally requires an ADR.
