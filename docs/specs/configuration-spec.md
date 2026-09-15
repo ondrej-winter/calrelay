@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 2 — accepted on September 15, 2026 after the calendar-access contract review; configured selector-resolution readiness and config-check selection behavior changed.
+- **Revision:** 3 — accepted on September 15, 2026 after the CLI Revision 2 stress test; `syncWindowDays` was clarified as a forward horizon and its omitted default changed to 100 days.
 - **Canonical artifact:** `docs/specs/configuration-spec.md`.
 - **Scope:** YAML settings, selector contract, canonical configuration discovery, validation, and app configuration status.
 
@@ -12,8 +12,10 @@
 ### CONFIG-01 — Settings model
 
 - Use YAML, parsed with `Yams`, as the initial configuration format.
-- Settings define a hub calendar, one or more locally available work/client calendars, a unique prefix per work calendar, a personal-origin prefix, and a sync window.
-- Calendar selection uses source/title selectors. EventKit IDs are displayed by calendar discovery but are not configuration keys or automatic selector fallbacks.
+- Settings define a hub calendar, one or more locally available work/client calendars, a unique prefix per work calendar, a personal-origin prefix, and a positive-integer `syncWindowDays` forward horizon.
+- `syncWindowDays` counts future local dates after the reference date as defined in [`projection-and-safety-spec.md`](projection-and-safety-spec.md). When omitted, it defaults to `100`.
+- The fixed two-local-date lookback is not configurable and is not included in `syncWindowDays`.
+- Calendar selection uses source/title selectors. EventKit IDs may be displayed by successful calendar discovery and successful explicit reconciliation explanation, but they are not configuration keys or automatic selector fallbacks.
 - Pass validated settings into application use cases as explicit DTOs.
 
 ### CONFIG-02 — Canonical location and override
@@ -38,8 +40,10 @@
 
 ## Compatibility and breaking changes
 
-- Revision 2 makes runtime selector resolution fail closed: every configured role must resolve exactly once, and every role must resolve to a distinct physical EventKit calendar.
-- EventKit IDs remain visible troubleshooting data but cannot silently repair an ambiguous or missing source/title selector.
+- Revision 3 changes the omitted `syncWindowDays` default from `60` to `100` and clarifies that the value is a forward-date horizon rather than the total effective window length.
+- Explicit positive `syncWindowDays` values preserve their configured forward horizon.
+- The fixed two-date lookback is owned by [`projection-and-safety-spec.md`](projection-and-safety-spec.md) and does not add a new configuration field.
+- EventKit IDs remain visible troubleshooting data on the approved successful CLI surfaces but cannot silently repair an ambiguous or missing source/title selector.
 
 ## Constraints
 
@@ -55,7 +59,8 @@
 - **CONFIG-AC-03:** README and `docs/configuration.md` document the default and override behavior.
 - **CONFIG-AC-04:** Build and deterministic tests pass without domain/application APIs depending on filesystem-path resolution or live EventKit access.
 - **CONFIG-AC-05:** Runtime readiness rejects zero-match, multi-match, and duplicate-physical-calendar role resolution without using EventKit IDs as fallback selectors.
+- **CONFIG-AC-06:** Omitting `syncWindowDays` produces a forward horizon of `100`; explicit positive values are preserved; zero and negative values are rejected.
 
 ## Open decision
 
-- Are source/title selectors stable enough across the user's accounts, or will a future explicit EventKit-ID selector be needed? Revision 2 prohibits automatic ID fallback.
+- Are source/title selectors stable enough across the user's accounts, or will a future explicit EventKit-ID selector be needed? Automatic ID fallback remains prohibited.

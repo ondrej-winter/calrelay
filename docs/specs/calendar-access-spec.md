@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 2 — accepted on September 15, 2026 after an explicit calendar-access contract review; permission ownership, discovery, configured readiness, and runtime failure behavior changed.
+- **Revision:** 3 — accepted on September 15, 2026 after the CLI Revision 2 stress test; explanation readiness and narrow successful-output EventKit-ID disclosure changed.
 - **Canonical artifact:** `docs/specs/calendar-access-spec.md`.
 - **Scope:** Calendar permission, discovery, configured-topology access preflight, writability, runtime access failures, and EventKit boundary behavior.
 
@@ -24,22 +24,23 @@
 
 - `calrelay calendars` is a configuration-independent inventory command. It requires pre-existing full Calendar access and never prompts.
 - Discovery lists every EventKit-visible calendar with its source/account, title, EventKit calendar ID, and writable/read-only status.
+- Successful inventory discovery includes the empty inventory: zero visible calendars does not by itself make discovery fail.
 - Discovery success means only that the current inventory was listed. It does not imply that a configuration is valid or ready for reconciliation.
 - `CalRelay.app` provides an equivalent all-calendar inventory for setup and recovery and clearly distinguishes inventory from configured readiness.
-- EventKit calendar IDs are displayed discovery data and troubleshooting identifiers, but they are not canonical configuration keys.
+- EventKit calendar IDs displayed by successful CLI discovery are troubleshooting identifiers, not canonical configuration keys. The app inventory does not display EventKit IDs.
 
 ### ACCESS-03 — Configured-topology readiness preflight
 
-- `calrelay config check`, reconciliation dry-run, and reconciliation apply use the same non-mutating configured-topology access preflight after the selected configuration passes file and structural validation.
+- `calrelay config check`, reconciliation dry-run, reconciliation apply, and reconciliation explanation use the same non-mutating configured-topology access preflight after the selected configuration passes file and structural validation.
 - Full Calendar authorization is required before configured readiness can succeed.
 - For every configured hub or work-calendar role, preflight must establish all of the following:
   - its source/title selector resolves to exactly one currently visible EventKit calendar;
   - its resolved EventKit calendar ID is distinct from every other configured role;
-  - reading its events over the configured sync window succeeds;
+  - reading its events over the effective reconciliation window defined in [`projection-and-safety-spec.md`](projection-and-safety-spec.md) succeeds;
   - EventKit currently reports the calendar as writable.
 - Preflight must not create, update, or delete an event as a capability probe.
 - Preflight collects and reports every safely determinable failure across the configured topology. Missing matches, ambiguous matches, role collisions, read failures, and read-only calendars are readiness failures.
-- Any readiness failure prevents `calrelay config check`, dry-run, or apply from reporting success. Apply must complete the entire preflight before its first mutation, and any preflight failure prevents all mutations for that run.
+- Any readiness failure prevents config check, dry-run, apply, or explanation from reporting success. Explanation requires the same writability checks even though it never mutates. Apply must complete the entire preflight before its first mutation, and any preflight failure prevents all mutations for that run.
 - A successful preflight reports current readiness; it is not a guarantee that authorization or remote calendar availability will remain unchanged during later mutation.
 
 ### ACCESS-04 — Failure after mutation begins
@@ -51,7 +52,11 @@
 ### ACCESS-05 — Privacy-safe access diagnostics
 
 - Interactive access, readiness, and partial-application diagnostics may identify a configured role, its source/title selector, and a failure or action category.
-- Interactive access and readiness diagnostics omit event titles and EventKit calendar IDs by default. The explicit discovery command and app inventory are the exception and display calendar IDs as required by `ACCESS-02`.
+- Failure, readiness, and partial-application diagnostics omit event titles, EventKit event IDs, and EventKit calendar IDs.
+- EventKit IDs may appear in user-facing output only for:
+  1. successful `calrelay calendars` inventory, which displays calendar IDs as required by `ACCESS-02`; and
+  2. successful, explicitly requested `calrelay reconcile --explain` output, which may display event and calendar IDs with the human-readable event details and reasons required by [`cli-spec.md`](cli-spec.md).
+- Other successful CLI output and app inventory omit EventKit IDs.
 - Persistent logs contain counts and categories only. They do not contain calendar names, source/title selectors, EventKit IDs, event titles, or event details.
 
 ### ACCESS-06 — EventKit boundary
@@ -62,25 +67,26 @@
 
 ## Compatibility and breaking changes
 
-- Revision 2 intentionally makes access checks fail closed. Implementations that prompt from CLI or reconciliation, permit write-only access, perform partial-topology preflight, or mutate after a preflight failure do not conform.
-- Dry-run now requires the same full configured-topology access readiness as apply.
-- Existing implementations may require changes before the accepted permission, readiness, diagnostics, and partial-application contracts are satisfied.
+- Revision 3 adds reconciliation explanation to the commands that require complete configured-topology readiness, including current writability of every configured role.
+- Revision 3 narrows user-facing EventKit-ID disclosure to successful CLI inventory and successful, explicitly requested CLI explanation. IDs remain prohibited from failures, readiness diagnostics, partial-application diagnostics, other successful output, app inventory, and persistent logs.
+- Existing explanation implementations that read only part of the topology, skip writability checks, or disclose IDs on failure do not conform.
 
 ## Validation
 
 - `calrelay calendars` lists every visible calendar, source/account, title, EventKit ID, and writability without configuration or mutation.
-- `calrelay config check`, dry-run, and apply demonstrate the shared non-mutating preflight and aggregate failure behavior.
+- `calrelay config check`, dry-run, apply, and explanation demonstrate the shared non-mutating preflight and aggregate failure behavior.
+- Successful inventory and explanation demonstrate their narrow ID-disclosure exceptions; failures and persistent logs demonstrate ID omission.
 - Real EventKit capability checks are explicit local validation through `CalRelay.app` or the CLI; default deterministic tests do not require real EventKit access.
 - Manually validate permission acquisition and recovery with the stable `CalRelay.app` bundle identity.
 
 ## Acceptance checks
 
-- **ACCESS-AC-01:** Authorization-state tests prove that only the explicit app setup/recovery action may request access and that CLI, dry-run, apply, and scheduled reconciliation never prompt.
-- **ACCESS-AC-02:** Discovery lists all visible calendars with source/account, title, ID, and writability without requiring configuration, and its output does not claim configured readiness.
-- **ACCESS-AC-03:** Config check, dry-run, and apply reject missing, ambiguous, colliding, unreadable, or read-only configured calendars.
+- **ACCESS-AC-01:** Authorization-state tests prove that only the explicit app setup/recovery action may request access and that calendar inventory, config check, dry-run, apply, explanation, and scheduled reconciliation never prompt.
+- **ACCESS-AC-02:** Discovery lists all visible calendars with source/account, title, ID, and writability without requiring configuration, treats a successfully discovered empty inventory as success, and does not claim configured readiness.
+- **ACCESS-AC-03:** Config check, dry-run, apply, and explanation reject missing, ambiguous, colliding, unreadable, or read-only configured calendars.
 - **ACCESS-AC-04:** A preflight with multiple safely determinable failures reports all of them and performs no mutation.
 - **ACCESS-AC-05:** A mutation-phase access or EventKit failure stops later mutations and returns a privacy-safe partial-application result without rollback or a success claim.
-- **ACCESS-AC-06:** Interactive and persistent diagnostics obey the disclosure boundaries in `ACCESS-05`.
+- **ACCESS-AC-06:** Successful CLI inventory and successful explicit CLI explanation may disclose the approved IDs, while failures, readiness output, partial-application diagnostics, other successful output, app inventory, and persistent logs omit them as required by `ACCESS-05`.
 - **ACCESS-AC-07:** Deterministic core tests run without EventKit access or EventKit types in domain/application APIs.
 
 ## Constraints
