@@ -4,12 +4,12 @@ This directory contains the accepted, capability-owned product and behavior cont
 
 ## Canonical capability specifications
 
-- [`calendar-access-spec.md`](calendar-access-spec.md): Calendar permission, discovery, writability, and the EventKit boundary.
+- [`calendar-access-spec.md`](calendar-access-spec.md): Calendar permission, discovery, configured readiness, runtime access failures, writability, and the EventKit boundary.
 - [`reconciliation-spec.md`](reconciliation-spec.md): visible-set reconciliation, idempotency, and deterministic core behavior.
 - [`projection-and-safety-spec.md`](projection-and-safety-spec.md): source-event inclusion, projection fields, and deletion ownership rules.
 - [`routing-spec.md`](routing-spec.md): hub/work routing and multi-computer topology.
 - [`configuration-spec.md`](configuration-spec.md): YAML settings, selectors, default-path discovery, and configuration validation.
-- [`cli-spec.md`](cli-spec.md): `calrelay` command behavior, dry-run/apply controls, and CLI-facing diagnostics.
+- [`cli-spec.md`](cli-spec.md): `calrelay` discovery, config check, dry-run/apply controls, and CLI-facing diagnostics.
 - [`macos-app-spec.md`](macos-app-spec.md): the control panel, menu bar, manual sync, scheduling, notifications, and background-operation gates.
 
 Together, these documents define the current EventKit MVP. The original idea remains at [`../ideas/calrelay-eventkit-mvp.md`](../ideas/calrelay-eventkit-mvp.md).
@@ -22,7 +22,7 @@ Together, these documents define the current EventKit MVP. The original idea rem
 | `calrelay-default-configuration-path-spec.md` | `configuration-spec.md` and `cli-spec.md` |
 | `calrelay-app-lifecycle-spec.md` | `macos-app-spec.md` |
 
-The former paths remain as compatibility stubs for repository history and inbound links. They are no longer authoritative for new behavior changes.
+The former EventKit MVP and app-lifecycle paths remain as compatibility stubs for repository history and inbound links. Former specifications are no longer authoritative for new behavior changes.
 
 ## Cross-slice rules
 
