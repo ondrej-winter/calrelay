@@ -25,7 +25,7 @@ hubCalendar:
   sourceTitle: "iCloud"
   calendarTitle: "Personal Work"
 personalPrefix: "[ME]"
-syncWindowDays: 60
+syncWindowDays: 100
 workCalendars:
   - name: "ACME"
     prefix: "[ACME]"
@@ -41,7 +41,7 @@ workCalendars:
 | `hubCalendar.sourceTitle` | String | Yes | None | Calendar account/source title that contains the hub calendar. |
 | `hubCalendar.calendarTitle` | String | Yes | None | Hub calendar title. |
 | `personalPrefix` | String | Yes | None | Prefix used when copying unprefixed hub events into work calendars. |
-| `syncWindowDays` | Integer | No | `60` | Number of days in the reconciliation window. Must be greater than zero. |
+| `syncWindowDays` | Integer | No | `100` | Number of future local dates after the run's reference local date included in the reconciliation window. Must be greater than zero. |
 | `workCalendars[].name` | String | Yes | None | Human-readable configured work calendar name used in validation messages. |
 | `workCalendars[].prefix` | String | Yes | None | Prefix that identifies projections from this work calendar, such as `[ACME]`. Must be unique. |
 | `workCalendars[].calendar.sourceTitle` | String | Yes | None | Calendar account/source title that contains the work calendar. |
@@ -60,6 +60,20 @@ swift run calrelay calendars
 The listing includes EventKit calendar IDs for troubleshooting, but IDs are not the canonical configuration key for the MVP.
 
 ## Commands
+
+Validate the selected configuration and the current readiness of every configured calendar without mutating calendars:
+
+```sh
+swift run calrelay config check
+```
+
+On success, config check reports the selected path and that the complete configured topology is currently ready.
+
+Config check accepts the same explicit configuration override as reconciliation:
+
+```sh
+swift run calrelay config check --config ./calrelay.yml
+```
 
 Dry-run reconciliation is the default and performs no calendar mutations:
 
@@ -81,7 +95,7 @@ swift run calrelay reconcile --apply
 
 Review dry-run output before using `--apply`, especially when introducing new prefixes or changing calendar selectors.
 
-Use `--explain` to diagnose why specific events are or are not being synced. Instead of producing a reconciliation plan, this mode lists every candidate hub and work-calendar event in the sync window with its inclusion/exclusion reason (`included`, `excluded (all-day event)`, `excluded (cancelled)`, `excluded (declined)`, or `excluded (unsupported availability: <value>)`). `--explain` never mutates the calendar store and can be combined with `--config`:
+Use `--explain` for a non-mutating, end-to-end account of the exact reconciliation plan. It reports the effective window, classifies every input event by eligibility, routing/source treatment, and existing-state disposition, then lists every planned create/delete with causal links. Successful explanation output includes EventKit event and calendar IDs so duplicate events and action causes can be correlated. It can be combined with `--config`, but not with `--apply`:
 
 ```sh
 swift run calrelay reconcile --explain
@@ -91,13 +105,15 @@ swift run calrelay reconcile --explain
 
 - At least one work calendar must be configured.
 - Source/title selector fields must not be empty.
-- `syncWindowDays` must be positive.
+- `syncWindowDays` must be positive. It controls the forward horizon and defaults to 100 when omitted.
+- Each run also includes a fixed two-local-date lookback. The effective window uses whole local dates in the system calendar and time zone captured at run start.
+- Existing configurations that omit `syncWindowDays` need no syntax change, but their default forward horizon expands from 60 to 100 future local dates.
 - Work calendar prefixes must be unique.
 - `personalPrefix` must not match any configured work calendar prefix.
 - Configured prefixes identify CalRelay-managed projections during reconciliation. Use dry-run output to review planned deletes before running apply mode.
 - Configuration errors are reported without echoing raw YAML content.
 - CalRelay requires full Calendar access. If macOS denies or restricts access, listing and reconciliation fail safely.
-- Apply mode requires writable target calendars. Read-only calendars are rejected before planned mutations are executed.
+- Config check, dry-run, apply, and explanation require every configured calendar to be readable and writable before reporting success. Read-only calendars are rejected during the shared preflight.
 - CalRelay must never delete unprefixed original work/client events; deletion is limited to stale prefixed projections selected by the conservative reconciliation logic.
 - Work-calendar events whose titles start with a configured CalRelay-managed prefix are treated as existing projections and are not relayed back to the hub. Other bracket-prefixed titles are treated as ordinary source events.
 - Timed events from calendars that do not expose EventKit availability are treated as blocking events for MVP reconciliation, unless they are all-day, declined, or cancelled.

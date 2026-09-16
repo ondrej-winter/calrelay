@@ -31,21 +31,35 @@ The menu bar item is intentionally UI-only. It must not start sync, schedule bac
 ## Basic MVP checks
 
 1. Open `CalRelay.app`, click **List Calendars**, and confirm the hub/work calendars are visible and writable where needed.
-2. Run dry-run and inspect planned creates/deletes:
+2. Check the selected configuration and complete configured-topology readiness:
+
+   ```sh
+   swift run calrelay config check --config calrelay.yml
+   ```
+
+   Confirm success reports the selected path and that the complete configured topology is currently ready.
+
+3. Run dry-run and inspect planned creates/deletes:
 
    ```sh
    swift run calrelay reconcile --config calrelay.yml
    ```
 
-3. Run apply, then run dry-run again and confirm the second run reports no changes:
+4. Run full explanation and confirm it reports the effective window, classifies every input event, and lists the same planned creates/deletes as dry-run with causal EventKit event and calendar IDs:
+
+   ```sh
+   swift run calrelay reconcile --config calrelay.yml --explain
+   ```
+
+5. Run apply, then run dry-run again and confirm the second run reports no changes:
 
    ```sh
    swift run calrelay reconcile --config calrelay.yml --apply
    swift run calrelay reconcile --config calrelay.yml
    ```
 
-4. Rename or move a source event and confirm dry-run shows delete-old plus create-new projection.
-5. Create a representative double-booking scenario across at least two work calendars and confirm blockers are projected through the hub within the sync window.
+6. Rename or move a source event and confirm dry-run shows delete-old plus create-new projection.
+7. Create a representative double-booking scenario across at least two work calendars and confirm blockers are projected through the hub within the effective window.
 
 ## Recurring-event capability check
 
