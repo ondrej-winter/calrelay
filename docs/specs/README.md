@@ -4,13 +4,13 @@ This directory contains the accepted, capability-owned product and behavior cont
 
 ## Canonical capability specifications
 
-- [`calendar-access-spec.md`](calendar-access-spec.md): Calendar permission, discovery, configured readiness, runtime access failures, writability, and the EventKit boundary.
-- [`reconciliation-spec.md`](reconciliation-spec.md): visible-set reconciliation, idempotency, and deterministic core behavior.
-- [`projection-and-safety-spec.md`](projection-and-safety-spec.md): source-event inclusion, projection fields, and deletion ownership rules.
-- [`routing-spec.md`](routing-spec.md): hub/work routing and multi-computer topology.
-- [`configuration-spec.md`](configuration-spec.md): YAML settings, selectors, default-path discovery, and configuration validation.
-- [`cli-spec.md`](cli-spec.md): `calrelay` discovery, config check, dry-run/apply controls, and CLI-facing diagnostics.
-- [`macos-app-spec.md`](macos-app-spec.md): the control panel, menu bar, manual sync, scheduling, notifications, and background-operation gates.
+- [`calendar-access-spec.md`](calendar-access-spec.md): Calendar permission, discovery, ordinary and cleanup preflight, runtime access failures, writability, and the EventKit boundary.
+- [`reconciliation-spec.md`](reconciliation-spec.md): visible-set reconciliation, deterministic cleanup planning, idempotency, and exact explanation.
+- [`projection-and-safety-spec.md`](projection-and-safety-spec.md): source-event inclusion, exact marker recognition, projection fields, and deletion ownership rules.
+- [`routing-spec.md`](routing-spec.md): hub/work marker routing, eventual-convergence migration, and multi-computer topology.
+- [`configuration-spec.md`](configuration-spec.md): strict YAML settings, markers, selectors, path discovery, validation, and migration cleanup coverage.
+- [`cli-spec.md`](cli-spec.md): `calrelay` discovery, config check, ordinary dry-run/apply/explanation, legacy cleanup, and CLI-facing diagnostics.
+- [`macos-app-spec.md`](macos-app-spec.md): the control panel, menu bar, manual sync, scheduling, migration-pending presentation, notifications, and background-operation gates.
 
 Together, these documents define the current EventKit MVP. The original idea remains at [`../ideas/calrelay-eventkit-mvp.md`](../ideas/calrelay-eventkit-mvp.md).
 

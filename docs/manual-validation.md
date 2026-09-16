@@ -60,6 +60,42 @@ The menu bar item is intentionally UI-only. It must not start sync, schedule bac
 
 6. Rename or move a source event and confirm dry-run shows delete-old plus create-new projection.
 7. Create a representative double-booking scenario across at least two work calendars and confirm blockers are projected through the hub within the effective window.
+8. Confirm a title such as `[A] Planning` is recognized only as marker `[A]`, while `[ACME] Planning` is not misclassified as `[A]`.
+9. Confirm an empty or surrounding-whitespace source title is projected with trimmed text or `(Untitled)` and exactly one space after the marker.
+
+## Marker migration cleanup check
+
+Use only harmless, dedicated test calendars. Cleanup is a broad deletion workflow and must not be tested against calendars containing real events.
+
+1. Add a valid unused marker such as `[RETIRED_TEST]` to `legacyMarkers` in the local validation fixture.
+2. Create representative `[RETIRED_TEST] Example` events in the test hub and each configured test work calendar.
+3. Run config check and confirm it completes ordinary topology preflight, reports migration pending, returns nonzero, and does not claim readiness:
+
+   ```sh
+   swift run calrelay config check --config calrelay.yml
+   ```
+
+4. Confirm ordinary reconciliation and explanation fail safely with guidance to run cleanup:
+
+   ```sh
+   swift run calrelay reconcile --config calrelay.yml
+   swift run calrelay reconcile --config calrelay.yml --explain
+   ```
+
+5. Preview the cleanup-only plan and confirm it reports the September 15, 2026 through `D + 365` local-date range, selects only exact `[RETIRED_TEST]` marker matches, plans no creates, and does not expose EventKit IDs:
+
+   ```sh
+   swift run calrelay reconcile --config calrelay.yml --cleanup-legacy
+   ```
+
+6. Apply only after reviewing the plan:
+
+   ```sh
+   swift run calrelay reconcile --config calrelay.yml --cleanup-legacy --apply
+   ```
+
+7. Confirm apply reports success only after a full-range verification snapshot, then run cleanup dry-run again and confirm it reports no local matches without claiming global marker retirement.
+8. Remove `[RETIRED_TEST]` from `legacyMarkers`, run config check, and confirm ordinary readiness can succeed again.
 
 ## Recurring-event capability check
 

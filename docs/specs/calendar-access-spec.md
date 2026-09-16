@@ -3,97 +3,114 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 3 — accepted on September 15, 2026 after the CLI Revision 2 stress test; explanation readiness and narrow successful-output EventKit-ID disclosure changed.
+- **Revision:** 4 — accepted on September 16, 2026 after the Configuration Revision 4 stress test; migration-pending config checks and full-range legacy-cleanup preflight were defined.
 - **Canonical artifact:** `docs/specs/calendar-access-spec.md`.
-- **Scope:** Calendar permission, discovery, configured-topology access preflight, writability, runtime access failures, and EventKit boundary behavior.
+- **Scope:** Calendar permission, discovery, ordinary and cleanup configured-topology preflight, writability, runtime access failures, and EventKit boundary behavior.
 
 ## Required outcomes
 
 ### ACCESS-01 — Permission ownership and authorization states
 
-- Only full read/write Calendar authorization qualifies for calendar discovery or reconciliation readiness. Write-only access is insufficient.
+- Only full read/write Calendar authorization qualifies for calendar discovery, ordinary reconciliation readiness, or legacy cleanup. Write-only access is insufficient.
 - Only a clearly labeled setup or recovery action in `CalRelay.app` may request full Calendar access and trigger the macOS permission prompt.
 - The app permission action behaves according to the current authorization state:
   - when access is not determined, request full access;
   - when access is denied, write-only, or was later revoked, provide System Settings recovery guidance without requesting again;
   - when access is restricted, explain that the restriction must be resolved outside CalRelay;
   - when full access exists, verify and display the state without prompting.
-- CLI commands and manual or scheduled reconciliation never request Calendar access. They inspect the current state and fail with actionable recovery guidance when full access is unavailable.
+- CLI commands and manual, scheduled, or cleanup reconciliation never request Calendar access. They inspect the current state and fail with actionable recovery guidance when full access is unavailable.
 
 ### ACCESS-02 — Calendar discovery
 
 - `calrelay calendars` is a configuration-independent inventory command. It requires pre-existing full Calendar access and never prompts.
 - Discovery lists every EventKit-visible calendar with its source/account, title, EventKit calendar ID, and writable/read-only status.
 - Successful inventory discovery includes the empty inventory: zero visible calendars does not by itself make discovery fail.
-- Discovery success means only that the current inventory was listed. It does not imply that a configuration is valid or ready for reconciliation.
+- Discovery success means only that the current inventory was listed. It does not imply that a configuration is valid or ready for reconciliation or cleanup.
 - `CalRelay.app` provides an equivalent all-calendar inventory for setup and recovery and clearly distinguishes inventory from configured readiness.
 - EventKit calendar IDs displayed by successful CLI discovery are troubleshooting identifiers, not canonical configuration keys. The app inventory does not display EventKit IDs.
 
-### ACCESS-03 — Configured-topology readiness preflight
+### ACCESS-03 — Ordinary configured-topology readiness preflight
 
-- `calrelay config check`, reconciliation dry-run, reconciliation apply, and reconciliation explanation use the same non-mutating configured-topology access preflight after the selected configuration passes file and structural validation.
+- `calrelay config check`, ordinary reconciliation dry-run, ordinary apply, and ordinary explanation use the same non-mutating configured-topology access preflight after the selected configuration passes file and structural validation.
 - Full Calendar authorization is required before configured readiness can succeed.
-- For every configured hub or work-calendar role, preflight must establish all of the following:
+- For every configured hub or work-calendar role, ordinary preflight must establish all of the following:
   - its source/title selector resolves to exactly one currently visible EventKit calendar;
   - its resolved EventKit calendar ID is distinct from every other configured role;
-  - reading its events over the effective reconciliation window defined in [`projection-and-safety-spec.md`](projection-and-safety-spec.md) succeeds;
+  - reading its events over the effective ordinary reconciliation window defined in [`projection-and-safety-spec.md`](projection-and-safety-spec.md) succeeds; and
   - EventKit currently reports the calendar as writable.
 - Preflight must not create, update, or delete an event as a capability probe.
 - Preflight collects and reports every safely determinable failure across the configured topology. Missing matches, ambiguous matches, role collisions, read failures, and read-only calendars are readiness failures.
-- Any readiness failure prevents config check, dry-run, apply, or explanation from reporting success. Explanation requires the same writability checks even though it never mutates. Apply must complete the entire preflight before its first mutation, and any preflight failure prevents all mutations for that run.
-- A successful preflight reports current readiness; it is not a guarantee that authorization or remote calendar availability will remain unchanged during later mutation.
+- Any readiness failure prevents config check, ordinary dry-run, apply, or explanation from reporting success. Explanation requires the same writability checks even though it never mutates. Apply must complete the entire preflight before its first mutation, and any preflight failure prevents all mutations for that run.
+- A migration-pending config check still completes this preflight and aggregates its access failures, but migration pending independently prevents a success or readiness claim as defined in [`configuration-spec.md`](configuration-spec.md).
+- A successful preflight reports current readiness only; it is not a guarantee that authorization or remote calendar availability will remain unchanged during later mutation.
 
-### ACCESS-04 — Failure after mutation begins
+### ACCESS-04 — Legacy-cleanup preflight
 
-- If Calendar access changes or an EventKit mutation fails after successful preflight and mutation has begun, stop the run immediately rather than attempting later planned mutations.
+- `calrelay reconcile --cleanup-legacy`, with or without `--apply`, uses a dedicated non-mutating cleanup preflight after the selected configuration passes file and structural validation and contains at least one legacy marker.
+- Cleanup preflight applies the same full-authorization, exact selector resolution, distinct physical-role, and writability requirements as ordinary preflight.
+- For every configured role, cleanup preflight must successfully read events over the complete cleanup range defined in [`configuration-spec.md`](configuration-spec.md), not merely the ordinary reconciliation window.
+- Cleanup preflight collects and reports every safely determinable failure across the complete configured topology.
+- Cleanup apply must complete the entire cleanup preflight and load the complete cleanup snapshot before its first deletion. Any cleanup-preflight failure prevents every deletion for that run.
+- Cleanup must not create, update, or delete an event as a capability probe and must not clean only a readable subset when another configured role fails.
+- After every planned cleanup deletion succeeds, cleanup apply re-reads every configured role over the complete cleanup range. It reports success only when that verification snapshot contains no exact configured legacy-marker match.
+- A post-mutation verification read failure or remaining match makes the invocation unsuccessful and nonzero. Confirmed deletions remain applied and are reported accurately; no rollback is attempted.
+
+### ACCESS-05 — Failure after mutation begins
+
+- If Calendar access changes or an EventKit mutation fails after successful ordinary or cleanup preflight and mutation has begun, stop the run immediately rather than attempting later planned mutations.
 - Report the run as partially applied with privacy-safe per-role action counts or categories and the failure category. Never report that run as successful.
-- Do not attempt compensating rollback through EventKit. A later reconciliation is the recovery mechanism.
+- Do not attempt compensating rollback through EventKit. A later ordinary reconciliation or repeated cleanup, as applicable, is the recovery mechanism.
 
-### ACCESS-05 — Privacy-safe access diagnostics
+### ACCESS-06 — Privacy-safe access diagnostics
 
-- Interactive access, readiness, and partial-application diagnostics may identify a configured role, its source/title selector, and a failure or action category.
-- Failure, readiness, and partial-application diagnostics omit event titles, EventKit event IDs, and EventKit calendar IDs.
+- Interactive access, readiness, cleanup, and partial-application diagnostics may identify a configured role, its source/title selector, and a failure or action category.
+- Failure, readiness, cleanup, and partial-application diagnostics omit event titles, EventKit event IDs, and EventKit calendar IDs.
 - EventKit IDs may appear in user-facing output only for:
   1. successful `calrelay calendars` inventory, which displays calendar IDs as required by `ACCESS-02`; and
-  2. successful, explicitly requested `calrelay reconcile --explain` output, which may display event and calendar IDs with the human-readable event details and reasons required by [`cli-spec.md`](cli-spec.md).
+  2. successful, explicitly requested ordinary `calrelay reconcile --explain` output, which may display event and calendar IDs with the human-readable event details and reasons required by [`cli-spec.md`](cli-spec.md).
+- Legacy-cleanup output, including successful dry-run and apply output, must not disclose EventKit IDs.
 - Other successful CLI output and app inventory omit EventKit IDs.
-- Persistent logs contain counts and categories only. They do not contain calendar names, source/title selectors, EventKit IDs, event titles, or event details.
+- Persistent logs contain counts and categories only. They do not contain calendar names, source/title selectors, EventKit IDs, event titles, event details, or marker values.
 
-### ACCESS-06 — EventKit boundary
+### ACCESS-07 — EventKit boundary
 
 - EventKit types, calendar IDs, calendar stores, permission APIs, and mutation mechanics remain in adapters or app/bootstrap code.
 - Map EventKit types into application DTOs at the adapter boundary.
-- Mutate only distinct calendars configured for the current run and only after configured-topology preflight succeeds.
+- Mutate only distinct calendars configured for the current run and only after the applicable complete preflight succeeds.
 
 ## Compatibility and breaking changes
 
-- Revision 3 adds reconciliation explanation to the commands that require complete configured-topology readiness, including current writability of every configured role.
-- Revision 3 narrows user-facing EventKit-ID disclosure to successful CLI inventory and successful, explicitly requested CLI explanation. IDs remain prohibited from failures, readiness diagnostics, partial-application diagnostics, other successful output, app inventory, and persistent logs.
-- Existing explanation implementations that read only part of the topology, skip writability checks, or disclose IDs on failure do not conform.
+- Revision 4 preserves the ordinary configured-topology preflight while requiring migration-pending config check to report non-readiness after completing that preflight.
+- Legacy cleanup receives a separate full-range preflight; ordinary-window readiness is insufficient authorization for cleanup mutation.
+- Successful legacy-cleanup output does not receive the EventKit-ID disclosure exception granted to successful inventory and ordinary explanation.
 
 ## Validation
 
 - `calrelay calendars` lists every visible calendar, source/account, title, EventKit ID, and writability without configuration or mutation.
-- `calrelay config check`, dry-run, apply, and explanation demonstrate the shared non-mutating preflight and aggregate failure behavior.
-- Successful inventory and explanation demonstrate their narrow ID-disclosure exceptions; failures and persistent logs demonstrate ID omission.
+- Config check, ordinary dry-run, apply, and explanation demonstrate the shared ordinary preflight and aggregate failure behavior.
+- Legacy cleanup dry-run and apply demonstrate the full-range cleanup preflight and all-or-nothing preflight gate.
+- Successful inventory and ordinary explanation demonstrate their narrow ID-disclosure exceptions; failures, cleanup output, and persistent logs demonstrate ID omission.
 - Real EventKit capability checks are explicit local validation through `CalRelay.app` or the CLI; default deterministic tests do not require real EventKit access.
 - Manually validate permission acquisition and recovery with the stable `CalRelay.app` bundle identity.
 
 ## Acceptance checks
 
-- **ACCESS-AC-01:** Authorization-state tests prove that only the explicit app setup/recovery action may request access and that calendar inventory, config check, dry-run, apply, explanation, and scheduled reconciliation never prompt.
+- **ACCESS-AC-01:** Authorization-state tests prove that only the explicit app setup/recovery action may prompt and that inventory, config check, ordinary reconciliation, cleanup, and scheduling never prompt.
 - **ACCESS-AC-02:** Discovery lists all visible calendars with source/account, title, ID, and writability without requiring configuration, treats a successfully discovered empty inventory as success, and does not claim configured readiness.
-- **ACCESS-AC-03:** Config check, dry-run, apply, and explanation reject missing, ambiguous, colliding, unreadable, or read-only configured calendars.
-- **ACCESS-AC-04:** A preflight with multiple safely determinable failures reports all of them and performs no mutation.
-- **ACCESS-AC-05:** A mutation-phase access or EventKit failure stops later mutations and returns a privacy-safe partial-application result without rollback or a success claim.
-- **ACCESS-AC-06:** Successful CLI inventory and successful explicit CLI explanation may disclose the approved IDs, while failures, readiness output, partial-application diagnostics, other successful output, app inventory, and persistent logs omit them as required by `ACCESS-05`.
-- **ACCESS-AC-07:** Deterministic core tests run without EventKit access or EventKit types in domain/application APIs.
+- **ACCESS-AC-03:** Ordinary preflight rejects missing, ambiguous, colliding, unreadable, or read-only configured calendars.
+- **ACCESS-AC-04:** Migration-pending config check completes ordinary preflight, aggregates access failures, returns nonzero, and does not claim readiness.
+- **ACCESS-AC-05:** Cleanup preflight reads the complete cleanup range for every role and prevents all deletion when any role is missing, ambiguous, colliding, unreadable, or read-only.
+- **ACCESS-AC-06:** A preflight with multiple safely determinable failures reports all of them and performs no mutation.
+- **ACCESS-AC-07:** Cleanup apply performs a complete post-mutation verification read; a read failure or remaining exact legacy-marker match returns nonzero without rollback or a false cleanup-success claim.
+- **ACCESS-AC-08:** A mutation-phase failure returns a privacy-safe partial result, stops later mutations, and performs no rollback.
+- **ACCESS-AC-09:** Successful CLI inventory and ordinary explanation may disclose the approved IDs, while failures, readiness output, cleanup output, partial-application diagnostics, other successful output, app inventory, and persistent logs omit them.
+- **ACCESS-AC-10:** Deterministic core tests run without EventKit access or EventKit types in domain/application APIs.
 
 ## Constraints
 
 - Do not pass EventKit types into domain/application APIs.
 - Do not mutate calendars to test access readiness.
-- Do not support partial-topology reconciliation when any configured role fails preflight.
+- Do not support partial-topology ordinary reconciliation or cleanup when any configured role fails the applicable preflight.
 - Do not use EventKit calendar IDs as an automatic selector fallback.
 - Do not rely on live external provider APIs in default tests.
 - Direct provider APIs, OAuth, app registrations, tenant approvals, and provider-specific sync tokens are excluded.
