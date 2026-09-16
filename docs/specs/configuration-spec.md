@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 6 — accepted on September 16, 2026 after the projection and safety stress-test interview; bounded moving cleanup coverage, global retirement prerequisites, and exact-only historical migration limits were defined without changing the YAML schema.
+- **Revision:** 7 — accepted on September 16, 2026 after the reconciliation stress-test interview; work-calendar declaration order became mutation-relevant, and standing authorization gained policy-version and resolved-topology bindings without changing the YAML schema.
 - **Canonical artifact:** `docs/specs/configuration-spec.md`.
 - **Scope:** YAML settings, marker and selector contracts, canonical configuration discovery, structural validation, migration-pending state, and legacy-marker cleanup coverage.
 
@@ -91,18 +91,23 @@
 - Multi-computer migration uses eventual convergence. A not-yet-migrated computer may recreate retired-marker events after another computer succeeds, and repeated idempotent cleanup is expected until all publishers have migrated.
 - Historical artifacts that do not satisfy the current exact marked-title grammar are outside automatic cleanup and require manual identification and removal. `legacyMarkers` never enable fuzzy, raw-prefix, or heuristic deletion.
 
-### CONFIG-09 — Fresh app loading and ordinary mutation identity
+### CONFIG-09 — Fresh app loading and ordinary authorization identities
 
 - Every app configuration-status refresh and every app ordinary or cleanup run loads and structurally validates the currently selected file afresh. The app never mutates by falling back to a previously valid in-memory configuration after the selected file becomes missing, invalid, or migration pending.
 - An external change to the selected file triggers a prompt app status refresh. File observation is an invalidation signal only; each run still performs its own fresh load and validation.
-- Define the **ordinary mutation identity** as a deterministic semantic identity over all validated settings that can change ordinary reconciliation mutations: the hub selector, personal marker, effective `syncWindowDays`, every work-calendar selector and current marker, and the legacy-marker set.
-- The identity is insensitive to YAML comments, scalar quoting, mapping-key order, and work-calendar declaration order when the validated mutation semantics are unchanged. Work-calendar diagnostic names do not change the identity unless a later product decision makes them mutation-relevant.
-- The app may persist an opaque representation of this identity only to bind ordinary standing authorization and detect invalidating changes. It must not persist raw YAML, selectors, calendar titles, marker values, or another reversible configuration representation for that purpose, and it must not display or log the opaque value.
-- Once the app observes a different ordinary mutation identity after standing authorization, automatic mutation remains suspended until the user reviews a successful dry run for the current identity and renews authorization. Returning the file to an earlier identity does not silently reactivate old authorization.
-- A mutating app run captures the selected file state and ordinary mutation identity used for its reviewed or authorized plan and verifies immediately before its first mutation that the selected file still has the same identity. A missing, invalid, migration-pending, or changed file aborts the run before mutation.
+- Define the **ordinary configuration mutation identity** as a deterministic semantic identity over all validated settings that can change ordinary reconciliation mutations: the hub selector, personal marker, effective `syncWindowDays`, the declaration-ordered sequence of work-calendar selectors and current markers, and the legacy-marker set.
+- Work-calendar declaration order is mutation-relevant because it controls snapshot loading, ordered plan execution, and partial-failure priority as defined by [`calendar-access-spec.md`](calendar-access-spec.md) and [`reconciliation-spec.md`](reconciliation-spec.md). Reordering `workCalendars` changes the identity even when every entry is otherwise unchanged.
+- The configuration identity remains insensitive to YAML comments, scalar quoting, mapping-key order, and other representation-only changes. Work-calendar diagnostic names do not change the identity unless a later product decision makes them mutation-relevant.
+- Define the **reconciliation-policy version** as an explicit product-controlled identity for ordinary mutation semantics. Increment it whenever a product change can alter the ordinary planned executable actions, exact mutation targets, or execution order for the same validated configuration and loaded snapshot. Wording, layout, diagnostics, or explanation-only changes that cannot alter executable actions or order do not require an increment.
+- Define the **resolved-topology identity** as a deterministic identity over the current mapping from every configured role to the unique physical EventKit calendar resolved by preflight. Role order follows the hub then declaration-ordered work-calendar topology. A changed or unprovably continuous EventKit calendar identity changes the topology identity even when source/title selectors remain unchanged.
+- Ordinary standing authorization is bound to the current configuration mutation identity, reconciliation-policy version, and resolved-topology identity. Once the app observes a different value for any binding, automatic mutation remains suspended until the user reviews a successful dry run for all current bindings and renews authorization. Returning to an earlier identity does not silently reactivate old authorization.
+- The app may persist opaque, non-reversible representations of the configuration and topology identities plus the explicit non-sensitive reconciliation-policy version. It must not persist raw YAML, selectors, calendar titles, marker values, raw EventKit calendar IDs, or another reversible configuration or topology representation for that purpose, and it must not display or log the opaque identity values.
+- A mutating app run captures the selected file state and configuration mutation identity used for its reviewed or authorized plan and verifies immediately before its first mutation that the selected file still has that identity. A missing, invalid, migration-pending, or changed file aborts the run before mutation. Automatic mutation additionally requires the current policy version and freshly resolved topology identity to match the standing authorization.
 
 ## Compatibility and breaking changes
 
+- Revision 7 makes `workCalendars` declaration order mutation-relevant and therefore authorization-relevant; reordering entries now requires renewed app standing authorization.
+- Revision 7 binds standing authorization to an explicit reconciliation-policy version and opaque resolved-topology identity. The delete-first Revision 6 reconciliation policy invalidates authorization granted under the prior create-first policy, and unproven physical calendar identity churn requires a new dry run and renewed authorization.
 - Revision 6 replaces the fixed September 15, 2026 cleanup epoch with the moving bounded `D - 2...D + 365` range and explicitly accepts that older legacy projections may remain indefinitely.
 - Revision 6 adds the operator-managed global marker-retirement prerequisite and excludes malformed historical prefix shapes from automatic cleanup without changing the YAML schema.
 - Revision 5 permits explicit app legacy cleanup while preserving the same cleanup-only authorization, range, preflight, verification, and eventual-convergence semantics as the CLI.
@@ -120,7 +125,7 @@
 - Keep filesystem path resolution, environment access, and `FileManager` mechanics out of domain/application code.
 - Do not log raw YAML contents.
 - Do not silently create, migrate, modify, or overwrite user configuration files; do not search arbitrary directories.
-- Do not use raw YAML bytes or a reversible encoding of sensitive configuration values as the persisted ordinary mutation identity.
+- Do not use raw YAML bytes or a reversible encoding of sensitive configuration or EventKit identity values as a persisted authorization identity.
 - Keep a single-profile model. Environment overrides, profiles, multiple remembered app paths, and a “Choose Config...” UI require an explicit decision.
 - Do not add hidden ownership metadata, a global marker registry, an unbounded EventKit scan, or a claim of globally atomic migration without a new explicit decision.
 
@@ -138,9 +143,11 @@
 - **CONFIG-AC-10:** Cleanup apply re-reads the full cleanup range after its planned deletions, succeeds only when that verification snapshot contains no exact legacy-marker match, and makes no global-retirement or historical-coverage claim when another computer can recreate the marker or older matches remain outside the range.
 - **CONFIG-AC-11:** Deterministic tests pass without domain/application APIs depending on filesystem-path resolution or live EventKit access.
 - **CONFIG-AC-12:** App status and every app run load the selected file afresh; missing, invalid, or migration-pending changes suppress mutation without a last-known-valid fallback.
-- **CONFIG-AC-13:** Semantically equivalent YAML produces the same ordinary mutation identity, every mutation-relevant settings change produces a different identity, an observed identity change invalidates standing authorization until renewed, and persisted identity data reveals none of the prohibited configuration values.
-- **CONFIG-AC-14:** A selected-file identity change before the first app mutation aborts without mutation, including when the file later returns to a previously authorized identity.
+- **CONFIG-AC-13:** Representation-only equivalent YAML produces the same configuration mutation identity; every mutation-relevant value or `workCalendars` declaration-order change produces a different identity; an observed change invalidates standing authorization until renewed; and persisted opaque data reveals none of the prohibited configuration values.
+- **CONFIG-AC-14:** A selected-file configuration identity change before the first app mutation aborts without mutation, including when the file later returns to a previously authorized identity.
 - **CONFIG-AC-15:** Migration documentation requires retirement of a tombstoned marker from every active configuration sharing the hub and directs non-exact historical artifacts to manual removal rather than fuzzy cleanup.
+- **CONFIG-AC-16:** Reconciliation-policy tests change the version whenever identical configuration and snapshot inputs can produce different executable actions, exact targets, or order, invalidate prior standing authorization after such a change, and do not change the version for presentation-only revisions.
+- **CONFIG-AC-17:** Resolved-topology tests bind standing authorization to an opaque hub-and-declaration-ordered role mapping, invalidate authorization when any physical EventKit calendar identity changes or cannot prove continuity, and never persist or display raw calendar IDs.
 
 ## Open decision
 

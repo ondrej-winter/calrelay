@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 6 — accepted on September 16, 2026 after the projection and safety stress-test interview; exact recurring-occurrence deletion, sequential-snapshot limits, and transient cleanup-review disclosure were defined.
+- **Revision:** 7 — accepted on September 16, 2026 after the reconciliation stress-test interview; hub-first declaration-ordered reads, physical-calendar action identity, and local ordinary mutation completion were defined.
 - **Canonical artifact:** `docs/specs/calendar-access-spec.md`.
 - **Scope:** Calendar permission, discovery, ordinary and cleanup configured-topology preflight, writability, runtime access failures, and EventKit boundary behavior.
 
@@ -38,6 +38,7 @@
   - its resolved EventKit calendar ID is distinct from every other configured role;
   - reading its events over the effective ordinary reconciliation window defined in [`projection-and-safety-spec.md`](projection-and-safety-spec.md) succeeds; and
   - EventKit currently reports the calendar as writable.
+- Ordinary snapshot reads proceed hub first and then through work calendars in configuration declaration order. Preflight still collects every safely determinable topology failure rather than treating the first read failure as permission to mutate a subset.
 - Preflight must not create, update, or delete an event as a capability probe.
 - Preflight collects and reports every safely determinable failure across the configured topology. Missing matches, ambiguous matches, role collisions, read failures, and read-only calendars are readiness failures.
 - Any readiness failure prevents config check, ordinary dry-run, apply, or explanation from reporting success. Explanation requires the same writability checks even though it never mutates. Apply must complete the entire preflight before its first mutation, and any preflight failure prevents all mutations for that run.
@@ -49,6 +50,7 @@
 - CLI and app legacy-cleanup dry-run and apply use the same dedicated non-mutating cleanup preflight after the selected configuration passes file and structural validation and contains at least one legacy marker.
 - Cleanup preflight applies the same full-authorization, exact selector resolution, distinct physical-role, and writability requirements as ordinary preflight.
 - For every configured role, cleanup preflight must successfully read events over the complete cleanup range defined in [`configuration-spec.md`](configuration-spec.md), not merely the ordinary reconciliation window.
+- Cleanup snapshot reads and the required post-apply verification reads proceed hub first and then through work calendars in configuration declaration order.
 - Cleanup preflight collects and reports every safely determinable failure across the complete configured topology.
 - Cleanup apply must complete the entire cleanup preflight and load the complete cleanup snapshot before its first deletion. Any cleanup-preflight failure prevents every deletion for that run.
 - Cleanup must not create, update, or delete an event as a capability probe and must not clean only a readable subset when another configured role fails.
@@ -61,6 +63,8 @@
 - If Calendar access changes or an EventKit mutation fails after successful ordinary or cleanup preflight and mutation has begun, stop the run immediately rather than attempting later planned mutations.
 - Report the run as partially applied with privacy-safe per-role action counts or categories and the failure category. Never report that run as successful.
 - Do not attempt compensating rollback through EventKit. A later ordinary reconciliation or repeated cleanup, as applicable, is the recovery mechanism.
+- Ordinary apply is successful when every action in its ordered plan receives EventKit mutation confirmation. It performs no post-mutation verification read; an immediately repeated provider read is not required to reflect those confirmed mutations.
+- A ready ordinary run with an empty plan is successful without entering mutation. Cleanup retains the stronger post-mutation verification requirement in `ACCESS-04`.
 
 ### ACCESS-06 — Privacy-safe access diagnostics and cleanup review
 
@@ -80,12 +84,15 @@
 - EventKit types, calendar IDs, calendar stores, permission APIs, and mutation mechanics remain in adapters or app/bootstrap code.
 - Map EventKit types into application DTOs at the adapter boundary.
 - Mutate only distinct calendars configured for the current run and only after the applicable complete preflight succeeds.
-- Configured calendars are read sequentially. The resulting successful reads are the snapshot for that attempt; CalRelay does not claim an atomic cross-calendar EventKit snapshot.
+- Configured calendars are read sequentially, hub first and then through work calendars in configuration declaration order. The resulting successful reads are the snapshot for that attempt; CalRelay does not claim an atomic cross-calendar EventKit snapshot.
 - A deletion boundary DTO must carry enough occurrence identity to resolve the exact planned recurring occurrence without making EventKit IDs visible-set reconciliation keys or ownership markers.
-- Once mutation begins, adapters target the exact planned event or occurrence without reauthorizing deletion from changed visible fields. EventKit identifier churn, an absent occurrence, or ambiguous occurrence resolution causes a mutation failure rather than substitution.
+- Boundary action identity includes the resolved physical destination or source calendar for the current plan. That identity supports exact reviewed-plan comparison and opaque standing-authorization topology binding but never becomes a configuration selector, selector fallback, visible-set key, routing input, or ownership marker.
+- Once mutation begins, adapters target the exact planned event or occurrence without reauthorizing deletion from changed visible fields. EventKit identifier churn, an absent occurrence—including one already removed by another process—or ambiguous occurrence resolution causes a mutation failure rather than substitution or idempotent-success inference.
 
 ## Compatibility and breaking changes
 
+- Revision 7 makes hub-first then declaration-ordered work-calendar reads normative for ordinary snapshots, cleanup snapshots, and cleanup verification. It also permits resolved physical calendar identity in exact executable-action identity and opaque topology authorization without making EventKit IDs selectors or reconciliation keys.
+- Revision 7 defines ordinary success as local confirmation of every ordered mutation, with no post-apply verification read, while preserving cleanup's stronger complete-range no-match verification.
 - Revision 6 requires exact recurring-occurrence resolution, makes sequential non-atomic reads explicit, and permits transient cleanup titles, roles, and time ranges only for successful plan review.
 - Revision 5 adds app ordinary and cleanup surfaces without adding alternate access semantics: app and CLI operations use the same applicable complete-topology preflight and no-subset mutation gates.
 - Persisted app operational status follows the existing privacy boundary for persistent logs and may contain only the explicitly approved timestamps, counts, and categories.
@@ -116,7 +123,9 @@
 - **ACCESS-AC-10:** Deterministic core tests run without EventKit access or EventKit types in domain/application APIs.
 - **ACCESS-AC-11:** Persisted app operational status and app cleanup presentation obey their stricter disclosure contract without weakening the reusable access-diagnostic boundary.
 - **ACCESS-AC-12:** Recurring-event mutation tests delete only the exact planned occurrence and fail without substitution when exact occurrence resolution is missing or ambiguous.
-- **ACCESS-AC-13:** Snapshot-loading tests and documentation make sequential non-atomic reads explicit without adding EventKit-notification restart or double-read requirements.
+- **ACCESS-AC-13:** Snapshot-loading tests read the hub first and work calendars in declaration order for ordinary, cleanup, and cleanup-verification snapshots, while retaining sequential non-atomic semantics without EventKit-notification restart or double-read requirements.
+- **ACCESS-AC-14:** Exact-action identity tests distinguish physical destination calendars and exact delete occurrences for reviewed-plan and topology authorization purposes without using EventKit IDs as selectors, fallbacks, visible-set keys, or ownership markers.
+- **ACCESS-AC-15:** Ordinary success tests require confirmation of every ordered action but no verification read, accept a ready empty plan as success, and keep cleanup success dependent on the complete no-match verification snapshot.
 
 ## Constraints
 

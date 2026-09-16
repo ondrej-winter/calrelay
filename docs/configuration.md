@@ -58,6 +58,8 @@ legacyMarkers: []
 
 No other fields are accepted at the root or inside nested mappings.
 
+The `workCalendars` sequence is ordered configuration, not an unordered set. Snapshot reads visit the hub first and then work calendars in YAML declaration order. Ordinary mutation uses separate delete and create phases; within each phase, hub actions precede work calendars in declaration order. Reordering otherwise identical work entries changes partial-failure priority and app standing-authorization identity.
+
 ## Marker and title semantics
 
 The YAML field names retain `Prefix` for compatibility, but each value is a complete marker, not an arbitrary text prefix.
@@ -158,7 +160,7 @@ Apply only after reviewing the dry-run plan:
 swift run calrelay reconcile --apply
 ```
 
-Use `--explain` for a non-mutating, end-to-end account of the exact ordinary reconciliation plan. It reports the effective window, classifies every input event, and lists every planned action with causal EventKit IDs. It cannot be combined with `--apply` or `--cleanup-legacy`.
+Use `--explain` for a non-mutating, end-to-end account of the exact ordinary reconciliation plan. It reports the effective window, classifies every input event, and lists every planned action in execution order with causal EventKit IDs. It cannot be combined with `--apply` or `--cleanup-legacy`.
 
 ```sh
 swift run calrelay reconcile --explain
@@ -178,7 +180,7 @@ While the normal app is running and healthy, automatic reconciliation uses:
 
 The app treats more than 60 minutes since the latest successful ordinary reconciliation as overdue freshness. Scheduling may be paused after setup, but the paused state remains visibly degraded because CalRelay is no longer maintaining freshness.
 
-Standing authorization is bound to the mutation-relevant validated settings. Changing a configured calendar selector, current or personal marker, `syncWindowDays`, or legacy-marker set suspends automatic mutation until the app presents a successful dry run for the new settings and the user renews authorization. Comments, quoting, key order, and other YAML-only formatting changes do not require reauthorization when validated mutation behavior is unchanged.
+Standing authorization is bound to the mutation-relevant validated settings, the current reconciliation-policy version, and an opaque identity for the physical calendars currently resolved to configured roles. Changing a configured calendar selector, current or personal marker, `syncWindowDays`, legacy-marker set, or `workCalendars` declaration order suspends automatic mutation until the app presents a successful dry run for the new settings and the user renews authorization. A product upgrade that can change planned actions, exact targets, or execution order, and any changed or unprovably continuous EventKit calendar identity, also requires renewed authorization. Comments, quoting, mapping-key order, and other representation-only YAML changes do not require reauthorization.
 
 These requirements are the accepted contract for the next app implementation milestone. CLI behavior and arguments remain unchanged.
 
@@ -220,9 +222,9 @@ swift run calrelay reconcile --cleanup-legacy --apply
 
 Before adding a marker to `legacyMarkers`, retire it from every current work-marker and personal-marker role in every active configuration sharing the hub. CalRelay cannot verify this global prerequisite.
 
-The accepted app milestone also provides an explicit cleanup dry-run and apply surface. App cleanup uses the same bounded plan, complete-topology preflight, exact marker selection, and post-apply verification as the CLI. It presents each selected event's title, configured role, and time or all-day range transiently and requires separate confirmation for the exact fresh cleanup plan; scheduling authorization never authorizes cleanup. EventKit IDs, selectors, calendar titles, and marker values remain hidden, and review details are never persisted or logged.
+The accepted app milestone also provides an explicit cleanup dry-run and apply surface. App cleanup uses the same bounded plan, complete-topology preflight, exact marker selection, and post-apply verification as the CLI. It presents each selected event's title, configured role, and time or all-day range transiently in execution order and requires separate confirmation for the exact fresh ordered cleanup plan; scheduling authorization never authorizes cleanup. EventKit IDs, selectors, calendar titles, and marker values remain hidden, and review details are never persisted or logged.
 
-CLI cleanup dry-run shows the same per-event review details. Direct `--cleanup-legacy --apply` shows its fresh detailed plan and remains non-interactive: `--apply` alone authorizes mutation, and a prior dry-run is recommended but not enforced.
+CLI cleanup dry-run shows the same per-event review details in execution order. Direct `--cleanup-legacy --apply` shows its fresh detailed ordered plan and remains non-interactive: `--apply` alone authorizes mutation, and a prior dry-run is recommended but not enforced.
 
 Cleanup performs no ordinary creates or current-marker reconciliation. With `D` as the captured local date, it searches the configured hub and every locally configured work calendar over local dates `D - 2` through `D + 365`, inclusive, using the same positive-overlap rule as ordinary reconciliation. Every configured role must resolve uniquely, be writable, and be readable over that complete bounded range before deletion begins.
 
@@ -238,14 +240,16 @@ Cleanup accepts only the current exact marker grammar. Historical events using a
 - Each ordinary and cleanup run includes a fixed two-local-date lookback. Whole local dates use the system calendar and time zone captured at run start.
 - Unknown YAML fields, duplicate mapping keys, malformed markers, marker collisions, and exact duplicate selector tuples fail before EventKit access.
 - Configuration errors are reported without echoing raw YAML content.
-- App automation authorization does not preserve or expose raw YAML, selectors, calendar titles, or marker values; mutation-relevant changes require renewed dry-run review and authorization.
+- App automation authorization does not preserve or expose raw YAML, selectors, calendar titles, marker values, or raw EventKit calendar IDs; mutation-relevant settings or declaration-order changes, reconciliation-policy changes, and physical topology changes require renewed dry-run review and authorization.
 - CalRelay requires full Calendar access. CLI commands never prompt; use the setup/recovery surface in `CalRelay.app` when access is unavailable.
 - Ordinary config check, dry-run, apply, and explanation require every configured calendar to be readable over the ordinary window and currently writable.
 - Cleanup requires every configured calendar to be readable over the complete cleanup range and currently writable.
 - CalRelay never deletes an unmarked original work/client event during ordinary reconciliation.
 - Plan-time ownership remains the authority after mutation begins. A marked event edited after planning may still be deleted as the exact planned occurrence.
-- Ordinary apply attempts all creates before any deletes and stops immediately on the first mutation failure without rollback.
-- When two or more managed events satisfy one expected visible key, CalRelay creates one replacement and deletes every existing duplicate rather than choosing one survivor.
+- Ordinary apply executes hub deletes, work-calendar deletes in YAML declaration order, hub creates, and work-calendar creates in declaration order. It stops immediately on the first mutation failure without rollback or later actions.
+- Within one calendar and action phase, CalRelay prioritizes earlier start and end values, timed before all-day events, and exact locale-independent Unicode-scalar title order. Exact occurrence identity breaks only otherwise exact deletion ties.
+- When two or more managed events satisfy one expected visible key, CalRelay deletes every existing duplicate before attempting one replacement create rather than choosing one survivor. Replacement failure may temporarily leave no blocker until a later successful reconciliation.
+- Ordinary apply reports success after every ordered action is confirmed and performs no post-apply verification read. A ready empty plan is also successful. Provider read lag may cause a later fresh run to repeat actions; CalRelay trusts each fresh snapshot and relies on later convergence.
 - Current-marker and legacy projections older than the moving two-date lookback may remain indefinitely.
 
 For app-backed EventKit validation checks, see [`docs/manual-validation.md`](manual-validation.md).
