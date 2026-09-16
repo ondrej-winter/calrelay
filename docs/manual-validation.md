@@ -13,20 +13,37 @@ make app
 open .build/CalRelay.app
 ```
 
-Use the app's **List Calendars** button to trigger the Calendar permission prompt for bundle identifier `dev.owinter.CalRelay` and confirm visible calendars.
+Use the app's explicit Calendar access setup/recovery action to trigger the permission prompt for bundle identifier `dev.owinter.CalRelay`. After full access exists, use the separate all-calendar inventory to confirm visible calendars.
 
-## App lifecycle and menu bar checks
+## Accepted app automation milestone checks
 
-1. Open `.build/CalRelay.app` and confirm CalRelay appears as a normal Dock-visible app.
-2. Confirm the main window describes Calendar permission and visible-calendar checks, without sync, timer, or background reconciliation controls.
-3. Confirm the CalRelay menu bar item is visible by default.
-4. Open the menu bar item and choose **Open CalRelay**. Confirm the main app window opens or focuses.
-5. In the app control panel, turn off **Show CalRelay in the menu bar** and confirm the menu bar item is removed.
-6. Quit and reopen the app, then confirm the hidden menu bar preference persists.
-7. Re-enable **Show CalRelay in the menu bar**, quit, reopen, and confirm the menu bar item returns.
-8. Open the menu bar item and choose **Quit**. Confirm the app exits through the normal app lifecycle.
+This section describes manual acceptance checks for macOS App Specification Revision 4. Until that revision is implemented, record the checks as pending rather than interpreting missing controls as a validation pass.
 
-The menu bar item is intentionally UI-only. It must not start sync, schedule background work, listen for Calendar changes, or mutate calendars.
+1. Open `.build/CalRelay.app` and confirm CalRelay appears as a normal Dock-visible app with no CalRelay menu-bar item.
+2. Confirm the main window distinguishes all-calendar inventory, configuration validity, configured readiness, migration state, standing authorization, scheduling, and latest operation status.
+3. Complete a successful ordinary dry run, review its create/delete summary, and confirm scheduling cannot be enabled until explicit standing authorization is granted.
+4. Enable scheduling and confirm launch-at-login is enabled for the normal app. Confirm the fixed cadence is 15 minutes and is not user configurable.
+5. Log out and in with the app healthy. Confirm CalRelay launches without opening the main window and performs a gated ordinary run.
+6. Repeat login with setup or recovery requiring action. Confirm the main window opens and presents the first dependency-ordered recovery action plus any secondary issues.
+7. Wake the Mac and confirm one prompt gated run occurs regardless of the previous run time.
+8. Trigger timer, wake, and manual actions during an active run. Confirm they do not overlap and coalesce into at most one follow-up run using fresh configuration, preflight, snapshots, and planning.
+9. Cause a transient failure and confirm finite bounded-backoff retry state is visible. Confirm an actionable failure does not enter an aggressive retry loop.
+10. Confirm more than 60 minutes since the latest successful ordinary reconciliation is shown as overdue and generates a user notification when allowed.
+11. Deny user-notification permission and confirm scheduling remains available with persistent in-app degraded state plus a Dock badge or equivalent visible indicator.
+12. Pause scheduling and confirm the warning persists. Confirm launch-at-login remains enabled until changed separately.
+13. Disable launch-at-login while scheduling remains enabled and confirm automation is presented as degraded rather than healthy.
+14. Choose Quit and confirm the app warns that synchronization stops and availability may become stale until the next manual launch or login.
+
+Use only harmless dedicated calendars for steps that can mutate EventKit data.
+
+## Configuration-change and confirmation checks
+
+1. With scheduling authorized, make a YAML-only formatting change that preserves validated mutation semantics. Confirm status refreshes without requiring renewed authorization.
+2. Change a configured selector, current or personal marker, `syncWindowDays`, or legacy-marker set. Confirm automatic mutation stops and a new dry run plus renewed standing authorization is required.
+3. Make the YAML missing, invalid, or migration pending. Confirm the app never continues with the last valid in-memory settings.
+4. Change the selected file after an automatic run loads it but before its first mutation. Confirm the run aborts without mutation and refreshes status.
+5. Start a manual ordinary apply from a reviewed plan, change calendar state before confirmation completes, and confirm a changed fresh plan invalidates the confirmation even when create/delete counts remain equal.
+6. Confirm a large but valid deterministic plan is not blocked solely by a mutation-count threshold.
 
 ## Basic MVP checks
 
@@ -96,6 +113,15 @@ Use only harmless, dedicated test calendars. Cleanup is a broad deletion workflo
 
 7. Confirm apply reports success only after a full-range verification snapshot, then run cleanup dry-run again and confirm it reports no local matches without claiming global marker retirement.
 8. Remove `[RETIRED_TEST]` from `legacyMarkers`, run config check, and confirm ordinary readiness can succeed again.
+
+Repeat the migration with the accepted app cleanup surface:
+
+1. Confirm migration pending blocks **Dry Run Sync**, **Run Sync Now**, and automatic reconciliation but exposes separate cleanup actions.
+2. Run app cleanup dry-run and confirm it reports only the cleanup range and privacy-safe deletion counts, without event titles, details, IDs, selectors, calendar titles, or marker values.
+3. Confirm cleanup apply requires separate confirmation for the exact fresh cleanup plan and is not authorized by scheduled-sync standing authorization.
+4. Change the cleanup snapshot before mutation and confirm a changed fresh plan invalidates the prior confirmation.
+5. Apply only against harmless test calendars and confirm success requires the complete post-mutation verification snapshot.
+6. Confirm the app does not edit YAML; remove the tombstone manually only after the topology's migration is complete.
 
 ## Recurring-event capability check
 

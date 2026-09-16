@@ -4,13 +4,13 @@ CalRelay reads a strict YAML configuration that identifies one hub calendar and 
 
 ## Configuration file location
 
-By default, the CLI reads the canonical user configuration file at:
+By default, the CLI and macOS app read the canonical user configuration file at:
 
 ```text
 ~/.config/calrelay/config.yaml
 ```
 
-For normal use, create the YAML configuration there. CalRelay does not create or rewrite this file automatically and does not search arbitrary directories for configuration files.
+For normal use, create the YAML configuration there. CalRelay does not create or rewrite this file automatically and does not search arbitrary directories for configuration files. The app does not provide a visual configuration editor or remember an alternate configuration path.
 
 Use `--config <path>` for tests, experiments, or temporary alternate configurations:
 
@@ -134,6 +134,24 @@ Use `--explain` for a non-mutating, end-to-end account of the exact ordinary rec
 swift run calrelay reconcile --explain
 ```
 
+## macOS app scheduling contract
+
+The accepted macOS automation milestone uses the same canonical YAML and reusable reconciliation behavior as the CLI. The app reloads and validates the file for every status refresh and every manual or automatic run; it never continues mutating from a last-known-valid copy after the selected file becomes missing, invalid, or migration pending.
+
+Before scheduling can be enabled for the first time, the app requires a successful ordinary dry run, presents its create/delete summary, and obtains explicit standing authorization for automatic ordinary apply runs. Enabling scheduling also enables launch-at-login for the normal Dock-visible app.
+
+While the normal app is running and healthy, automatic reconciliation uses:
+
+- a fixed 15-minute cadence;
+- one prompt run at every app launch and Mac wake; and
+- bounded retries for transient failures.
+
+The app treats more than 60 minutes since the latest successful ordinary reconciliation as overdue freshness. Scheduling may be paused after setup, but the paused state remains visibly degraded because CalRelay is no longer maintaining freshness.
+
+Standing authorization is bound to the mutation-relevant validated settings. Changing a configured calendar selector, current or personal marker, `syncWindowDays`, or legacy-marker set suspends automatic mutation until the app presents a successful dry run for the new settings and the user renews authorization. Comments, quoting, key order, and other YAML-only formatting changes do not require reauthorization when validated mutation behavior is unchanged.
+
+These requirements are the accepted contract for the next app implementation milestone. CLI behavior and arguments remain unchanged.
+
 ## Changing or retiring a marker
 
 Changing or removing a marker can leave old projections in the shared hub and configured work calendars. Do not reuse an old marker for a different origin. Retire markers explicitly with the top-level `legacyMarkers` list.
@@ -156,7 +174,7 @@ While `legacyMarkers` is nonempty, the configuration is migration pending:
 
 - ordinary dry-run, apply, explanation, and scheduled reconciliation are blocked before EventKit access;
 - config check still performs ordinary topology preflight but returns nonzero, reports migration pending, and does not claim readiness;
-- legacy cleanup is the only reconciliation mode that may use the tombstones.
+- only an explicit legacy-cleanup workflow in the CLI or app may use the tombstones.
 
 Preview cleanup first:
 
@@ -170,6 +188,8 @@ After reviewing the deletion-only plan, apply it explicitly:
 swift run calrelay reconcile --cleanup-legacy --apply
 ```
 
+The accepted app milestone also provides an explicit cleanup dry-run and apply surface. App cleanup uses the same full-range plan, complete-topology preflight, exact marker selection, and post-apply verification as the CLI. It presents only privacy-safe range and count summaries and requires a separate confirmation for the exact fresh cleanup plan; scheduling authorization never authorizes cleanup.
+
 Cleanup performs no ordinary creates or current-marker reconciliation. It searches the configured hub and every locally configured work calendar from the start of local date September 15, 2026 through the end of local date `D + 365`, where `D` is the run's captured reference local date. Every configured role must resolve uniquely, be writable, and be readable over that complete range before deletion begins.
 
 After completing its planned deletions, cleanup apply re-reads the entire configured cleanup range and reports success only if that verification snapshot contains no matching legacy marker. Cleanup success remains local and point-in-time: another computer that still publishes `[OLD]` may recreate matching events later. Repeated cleanup is expected until every publisher has migrated. Remove `legacyMarkers` manually only after the required cleanup runs for your topology; CalRelay never edits the YAML automatically.
@@ -182,6 +202,7 @@ After completing its planned deletions, cleanup apply re-reads the entire config
 - Each ordinary run also includes a fixed two-local-date lookback. Whole local dates use the system calendar and time zone captured at run start.
 - Unknown YAML fields, duplicate mapping keys, malformed markers, marker collisions, and exact duplicate selector tuples fail before EventKit access.
 - Configuration errors are reported without echoing raw YAML content.
+- App automation authorization does not preserve or expose raw YAML, selectors, calendar titles, or marker values; mutation-relevant changes require renewed dry-run review and authorization.
 - CalRelay requires full Calendar access. CLI commands never prompt; use the setup/recovery surface in `CalRelay.app` when access is unavailable.
 - Ordinary config check, dry-run, apply, and explanation require every configured calendar to be readable over the ordinary window and currently writable.
 - Cleanup requires every configured calendar to be readable over the complete cleanup range and currently writable.

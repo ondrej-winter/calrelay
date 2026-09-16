@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 3 — accepted on September 16, 2026 after the Configuration Revision 4 stress test; exact marker classifications and a separate deterministic legacy-cleanup plan were added.
+- **Revision:** 4 — accepted on September 16, 2026 after the macOS automation stress test; reviewed-plan freshness and fresh automatic-run planning were defined without changing reconciliation rules.
 - **Canonical artifact:** `docs/specs/reconciliation-spec.md`.
 - **Scope:** Pure visible-set ordinary reconciliation, deterministic cleanup planning, application behavior, and exact ordinary reconciliation explanation.
 
@@ -52,6 +52,15 @@
 - Duplicate legacy-marker entries and collisions with current markers cannot reach cleanup planning because structural validation rejects them.
 - Cleanup-result semantics are local and point-in-time. Plan completion does not prove global retirement and does not prevent another computer from recreating matching events.
 
+### RECON-05 — Reviewed app plans and fresh automatic plans
+
+- A plan presented by the app for manual ordinary apply or legacy-cleanup apply is a reviewed plan, not authority to mutate indefinitely from that old snapshot.
+- Immediately before a reviewed app apply begins mutation, the app loads fresh validated configuration and a fresh applicable calendar snapshot, repeats the complete applicable preflight, and computes a fresh plan with the same deterministic ordinary or cleanup computation.
+- The reviewed and fresh plans match only when they contain exactly the same create and delete actions. Ordinary create identity uses the visible projection fields from `RECON-01`; delete identity includes the exact existing event selected for deletion so that one duplicate occurrence cannot substitute for another.
+- If the fresh plan differs, the app performs no mutation and presents the fresh plan for a new review and confirmation. It does not apply a same-count but semantically different plan under the earlier confirmation.
+- If the plans match, apply executes the fresh loaded plan. Once its first mutation begins, it does not independently rescan, re-plan, or append actions; mutation-time failure behavior remains defined by [`calendar-access-spec.md`](calendar-access-spec.md).
+- Every automatic ordinary attempt, including retry and a coalesced follow-up, independently loads fresh configuration and calendar state and computes one fresh plan. It never resumes or reuses a plan from an earlier attempt or partially applied run.
+
 ## Acceptance checks
 
 - **RECON-AC-01:** A second ordinary reconciliation after successful apply is a no-op.
@@ -63,6 +72,8 @@
 - **RECON-AC-07:** Cleanup planning selects only exact legacy-marker matches and produces deletes only; post-apply verification performs no additional deletion planning and succeeds only on an exact no-match snapshot.
 - **RECON-AC-08:** A representative eventual-convergence scenario demonstrates that later recreation produces a new cleanup delete without invalidating the earlier run's local point-in-time success.
 - **RECON-AC-09:** Deterministic tests cover ordinary planning, explanation, and cleanup without real EventKit access or a second implementation of the rules.
+- **RECON-AC-10:** App ordinary and cleanup confirmation tests recompute from fresh inputs, apply only an exactly matching fresh plan, and require renewed review for changed actions even when aggregate counts are unchanged.
+- **RECON-AC-11:** Automatic retry and coalesced follow-up tests compute fresh plans and never resume an earlier or partially applied mutation plan.
 
 ## Constraints
 
@@ -70,10 +81,12 @@
 - Do not use EventKit IDs as reconciliation keys, selector fallbacks, ownership markers, or substitutes for visible-set equality.
 - Do not derive ordinary explanation actions independently from the shared ordinary plan.
 - Do not combine cleanup and ordinary reconciliation into one plan or mutation run.
+- Do not treat aggregate counts, plan age alone, or a fixed expiration as a substitute for exact reviewed-plan comparison.
 - Do not place reconciliation or cleanup orchestration in SwiftUI views, app delegates, or menu handlers.
 
 ## Compatibility and breaking changes
 
+- Revision 4 adds app reviewed-plan freshness and automatic-attempt freshness without changing ordinary visible-set equality, cleanup selection, or CLI non-interactive apply authorization.
 - Revision 3 replaces starts-with routing classifications with exact parsed-marker classifications.
 - Revision 3 adds a separate deterministic delete-only cleanup plan; it does not alter ordinary visible-set equality.
 - Ordinary explanation remains the only reconciliation output allowed to include EventKit IDs under [`calendar-access-spec.md`](calendar-access-spec.md); cleanup does not add an explanation mode.

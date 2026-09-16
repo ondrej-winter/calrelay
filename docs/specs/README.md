@@ -10,7 +10,7 @@ This directory contains the accepted, capability-owned product and behavior cont
 - [`routing-spec.md`](routing-spec.md): hub/work marker routing, eventual-convergence migration, and multi-computer topology.
 - [`configuration-spec.md`](configuration-spec.md): strict YAML settings, markers, selectors, path discovery, validation, and migration cleanup coverage.
 - [`cli-spec.md`](cli-spec.md): `calrelay` discovery, config check, ordinary dry-run/apply/explanation, legacy cleanup, and CLI-facing diagnostics.
-- [`macos-app-spec.md`](macos-app-spec.md): the control panel, menu bar, manual sync, scheduling, migration-pending presentation, notifications, and background-operation gates.
+- [`macos-app-spec.md`](macos-app-spec.md): the control panel, manual sync and cleanup, standing authorization, launch-at-login, scheduling, freshness, recovery state, user notifications, and closed-app boundary.
 
 Together, these documents define the current EventKit MVP. The original idea remains at [`../ideas/calrelay-eventkit-mvp.md`](../ideas/calrelay-eventkit-mvp.md).
 
@@ -29,4 +29,4 @@ The former specification files have been removed. Use the listed canonical speci
 - Calendar permission, EventKit types, calendar IDs, stores, and mutation mechanics remain at adapter or app/bootstrap boundaries.
 - Domain and application APIs remain deterministic and independent of EventKit, filesystem-path resolution, UI frameworks, and live external provider APIs.
 - A capability that crosses slices must reference the owning specification instead of duplicating the other slice's normative requirement.
-- Automation requires the relevant explicit decision in [`macos-app-spec.md`](macos-app-spec.md); closed-app operation additionally requires an ADR.
+- Automation requires the relevant explicit decision in [`macos-app-spec.md`](macos-app-spec.md). The normal-app launch-at-login decision is recorded in [`../adr/0001-launch-normal-app-at-login-for-scheduled-sync.md`](../adr/0001-launch-normal-app-at-login-for-scheduled-sync.md); closed-app operation requires a later explicit decision and a new ADR.

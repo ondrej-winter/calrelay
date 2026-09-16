@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 4 — accepted on September 16, 2026 after the Configuration Revision 4 stress test; explicit legacy cleanup, migration-pending behavior, and cleanup output semantics were added.
+- **Revision:** 5 — accepted on September 16, 2026 after the macOS automation stress test; CLI cleanup remained stable while explicit app cleanup became a second presentation of the shared cleanup capability.
 - **Canonical artifact:** `docs/specs/cli-spec.md`.
 - **Scope:** `calrelay` command behavior, user-facing output, command validation, and legacy-marker cleanup controls.
 
@@ -26,7 +26,7 @@
 
 ### CLI-02 — Legacy-marker cleanup mode
 
-- `calrelay reconcile --cleanup-legacy` is the only command mode that processes configured `legacyMarkers`.
+- `calrelay reconcile --cleanup-legacy` is the only CLI command mode that processes configured `legacyMarkers`. The app may expose the separate explicit workflow defined in [`macos-app-spec.md`](macos-app-spec.md); it uses the same reusable cleanup behavior and does not alter this command contract.
 - Cleanup is dry-run by default and reports the exact legacy-marker deletions that would be attempted without mutating calendars.
 - `calrelay reconcile --cleanup-legacy --apply` performs those deletions only after configuration validation and the complete cleanup preflight defined in [`calendar-access-spec.md`](calendar-access-spec.md) succeed.
 - Cleanup mode is cleanup-only: it performs no ordinary creates, current-marker stale deletes, routing, or full ordinary explanation.
@@ -73,6 +73,7 @@
 
 ## Compatibility and breaking changes
 
+- Revision 5 does not change CLI arguments, status, output, or mutation authorization. It clarifies that the CLI is no longer the product's only cleanup presentation after app cleanup is added.
 - Revision 4 adds the explicit `--cleanup-legacy` reconciliation mode and makes it mutually exclusive with `--explain`.
 - Nonempty `legacyMarkers` now block ordinary reconciliation and make config check return nonzero after ordinary preflight.
 - Cleanup uses a separate full-range preflight and performs deletions only; it never silently combines migration with ordinary reconciliation.

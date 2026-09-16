@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 3 — accepted on September 16, 2026 after the Configuration Revision 4 stress test; exact marker parsing, title normalization, reserved work-calendar marker semantics, and cleanup tombstone ownership were defined.
+- **Revision:** 4 — accepted on September 16, 2026 after the macOS automation stress test; explicit app cleanup was granted the existing bounded legacy-tombstone authority.
 - **Canonical artifact:** `docs/specs/projection-and-safety-spec.md`.
 - **Scope:** Source-event eligibility, reconciliation and cleanup windows, projection shape, marker ownership, and deletion safety.
 
@@ -48,7 +48,7 @@
 
 ### SAFE-02 — Legacy cleanup ownership
 
-- A configured legacy marker is explicit deletion authorization only for `calrelay reconcile --cleanup-legacy`.
+- A configured legacy marker is explicit deletion authorization only for the dedicated CLI or app legacy-cleanup workflow. It never authorizes ordinary or scheduled reconciliation deletion.
 - Cleanup selects an event only when the title satisfies `PROJECT-03` and the parsed marker exactly equals one configured legacy marker.
 - Cleanup may delete matching events from the configured hub and every locally configured work calendar over the cleanup range defined by [`configuration-spec.md`](configuration-spec.md).
 - Cleanup does not route events, generate projections, infer an origin calendar, or perform ordinary current-marker reconciliation.
@@ -70,7 +70,7 @@
 - **PROJECT-AC-05:** Dry-run, apply, and explanation use one captured effective window for input reads, projection generation, matching, creates, and stale or surplus deletes.
 - **SAFE-AC-01:** Ordinary reconciliation deletes stale local-work-marker hub projections, preserves non-local marked hub events, and never deletes unmarked original work/client events.
 - **SAFE-AC-02:** Representative manually marked work-calendar events demonstrate the documented reserved-namespace deletion risk.
-- **SAFE-AC-03:** Cleanup selects exact legacy-marker matches across the configured hub and work calendars, selects no current-marker or unmarked events, and performs no creates or ordinary reconciliation deletes.
+- **SAFE-AC-03:** CLI and app cleanup select exact legacy-marker matches across the configured hub and work calendars, select no current-marker or unmarked events, and perform no creates or ordinary reconciliation deletes.
 - **SAFE-AC-04:** Defaults remain deterministic and do not require live EventKit access to test.
 
 ## Open decisions
@@ -88,6 +88,7 @@
 
 ## Compatibility and breaking changes
 
+- Revision 4 permits the explicit app cleanup workflow to exercise the existing bounded legacy-marker deletion authority; the selected events and safety boundaries are unchanged.
 - Revision 3 replaces raw starts-with ownership with exact parsed-marker equality and reserves valid leading markers in configured work calendars for managed blocker semantics.
 - Source titles are now trimmed for projection, and empty results use `(Untitled)` rather than creating an empty marked title.
 - Legacy markers add explicit cleanup-only deletion ownership over the bounded migration range; ordinary reconciliation cannot use that authorization.

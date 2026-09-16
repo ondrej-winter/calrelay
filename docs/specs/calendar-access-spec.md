@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 4 — accepted on September 16, 2026 after the Configuration Revision 4 stress test; migration-pending config checks and full-range legacy-cleanup preflight were defined.
+- **Revision:** 5 — accepted on September 16, 2026 after the macOS automation stress test; app ordinary automation and explicit app cleanup were bound to the shared preflights and privacy rules.
 - **Canonical artifact:** `docs/specs/calendar-access-spec.md`.
 - **Scope:** Calendar permission, discovery, ordinary and cleanup configured-topology preflight, writability, runtime access failures, and EventKit boundary behavior.
 
@@ -31,7 +31,7 @@
 
 ### ACCESS-03 — Ordinary configured-topology readiness preflight
 
-- `calrelay config check`, ordinary reconciliation dry-run, ordinary apply, and ordinary explanation use the same non-mutating configured-topology access preflight after the selected configuration passes file and structural validation.
+- `calrelay config check` and every CLI or app ordinary reconciliation dry-run, apply, and explanation use the same non-mutating configured-topology access preflight after the selected configuration passes file and structural validation.
 - Full Calendar authorization is required before configured readiness can succeed.
 - For every configured hub or work-calendar role, ordinary preflight must establish all of the following:
   - its source/title selector resolves to exactly one currently visible EventKit calendar;
@@ -46,7 +46,7 @@
 
 ### ACCESS-04 — Legacy-cleanup preflight
 
-- `calrelay reconcile --cleanup-legacy`, with or without `--apply`, uses a dedicated non-mutating cleanup preflight after the selected configuration passes file and structural validation and contains at least one legacy marker.
+- CLI and app legacy-cleanup dry-run and apply use the same dedicated non-mutating cleanup preflight after the selected configuration passes file and structural validation and contains at least one legacy marker.
 - Cleanup preflight applies the same full-authorization, exact selector resolution, distinct physical-role, and writability requirements as ordinary preflight.
 - For every configured role, cleanup preflight must successfully read events over the complete cleanup range defined in [`configuration-spec.md`](configuration-spec.md), not merely the ordinary reconciliation window.
 - Cleanup preflight collects and reports every safely determinable failure across the complete configured topology.
@@ -63,14 +63,14 @@
 
 ### ACCESS-06 — Privacy-safe access diagnostics
 
-- Interactive access, readiness, cleanup, and partial-application diagnostics may identify a configured role, its source/title selector, and a failure or action category.
+- Interactive access, readiness, cleanup, and partial-application diagnostics may identify a configured role, its source/title selector, and a failure or action category, except where an owning presentation contract such as app cleanup deliberately allows less disclosure.
 - Failure, readiness, cleanup, and partial-application diagnostics omit event titles, EventKit event IDs, and EventKit calendar IDs.
 - EventKit IDs may appear in user-facing output only for:
   1. successful `calrelay calendars` inventory, which displays calendar IDs as required by `ACCESS-02`; and
   2. successful, explicitly requested ordinary `calrelay reconcile --explain` output, which may display event and calendar IDs with the human-readable event details and reasons required by [`cli-spec.md`](cli-spec.md).
 - Legacy-cleanup output, including successful dry-run and apply output, must not disclose EventKit IDs.
 - Other successful CLI output and app inventory omit EventKit IDs.
-- Persistent logs contain counts and categories only. They do not contain calendar names, source/title selectors, EventKit IDs, event titles, event details, or marker values.
+- Persistent logs and persisted app operational status contain only the timestamps, counts, and categories allowed by [`macos-app-spec.md`](macos-app-spec.md). They do not contain calendar names, source/title selectors, EventKit IDs, event titles, event details, marker values, or raw configuration.
 
 ### ACCESS-07 — EventKit boundary
 
@@ -80,6 +80,8 @@
 
 ## Compatibility and breaking changes
 
+- Revision 5 adds app ordinary and cleanup surfaces without adding alternate access semantics: app and CLI operations use the same applicable complete-topology preflight and no-subset mutation gates.
+- Persisted app operational status follows the existing privacy boundary for persistent logs and may contain only the explicitly approved timestamps, counts, and categories.
 - Revision 4 preserves the ordinary configured-topology preflight while requiring migration-pending config check to report non-readiness after completing that preflight.
 - Legacy cleanup receives a separate full-range preflight; ordinary-window readiness is insufficient authorization for cleanup mutation.
 - Successful legacy-cleanup output does not receive the EventKit-ID disclosure exception granted to successful inventory and ordinary explanation.
@@ -88,7 +90,7 @@
 
 - `calrelay calendars` lists every visible calendar, source/account, title, EventKit ID, and writability without configuration or mutation.
 - Config check, ordinary dry-run, apply, and explanation demonstrate the shared ordinary preflight and aggregate failure behavior.
-- Legacy cleanup dry-run and apply demonstrate the full-range cleanup preflight and all-or-nothing preflight gate.
+- CLI and app legacy cleanup dry-run and apply demonstrate the full-range cleanup preflight and all-or-nothing preflight gate.
 - Successful inventory and ordinary explanation demonstrate their narrow ID-disclosure exceptions; failures, cleanup output, and persistent logs demonstrate ID omission.
 - Real EventKit capability checks are explicit local validation through `CalRelay.app` or the CLI; default deterministic tests do not require real EventKit access.
 - Manually validate permission acquisition and recovery with the stable `CalRelay.app` bundle identity.
@@ -97,14 +99,15 @@
 
 - **ACCESS-AC-01:** Authorization-state tests prove that only the explicit app setup/recovery action may prompt and that inventory, config check, ordinary reconciliation, cleanup, and scheduling never prompt.
 - **ACCESS-AC-02:** Discovery lists all visible calendars with source/account, title, ID, and writability without requiring configuration, treats a successfully discovered empty inventory as success, and does not claim configured readiness.
-- **ACCESS-AC-03:** Ordinary preflight rejects missing, ambiguous, colliding, unreadable, or read-only configured calendars.
+- **ACCESS-AC-03:** Every CLI, manual-app, and automatic-app ordinary operation uses the same complete preflight and rejects missing, ambiguous, colliding, unreadable, or read-only configured calendars.
 - **ACCESS-AC-04:** Migration-pending config check completes ordinary preflight, aggregates access failures, returns nonzero, and does not claim readiness.
-- **ACCESS-AC-05:** Cleanup preflight reads the complete cleanup range for every role and prevents all deletion when any role is missing, ambiguous, colliding, unreadable, or read-only.
+- **ACCESS-AC-05:** CLI and app cleanup preflight read the complete cleanup range for every role and prevent all deletion when any role is missing, ambiguous, colliding, unreadable, or read-only.
 - **ACCESS-AC-06:** A preflight with multiple safely determinable failures reports all of them and performs no mutation.
 - **ACCESS-AC-07:** Cleanup apply performs a complete post-mutation verification read; a read failure or remaining exact legacy-marker match returns nonzero without rollback or a false cleanup-success claim.
 - **ACCESS-AC-08:** A mutation-phase failure returns a privacy-safe partial result, stops later mutations, and performs no rollback.
 - **ACCESS-AC-09:** Successful CLI inventory and ordinary explanation may disclose the approved IDs, while failures, readiness output, cleanup output, partial-application diagnostics, other successful output, app inventory, and persistent logs omit them.
 - **ACCESS-AC-10:** Deterministic core tests run without EventKit access or EventKit types in domain/application APIs.
+- **ACCESS-AC-11:** Persisted app operational status and app cleanup presentation obey their stricter disclosure contract without weakening the reusable access-diagnostic boundary.
 
 ## Constraints
 

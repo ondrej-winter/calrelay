@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 4 — accepted on September 16, 2026 after a focused configuration-contract stress test; the YAML schema, marker grammar, path semantics, validation bounds, and legacy-marker migration workflow were made normative.
+- **Revision:** 5 — accepted on September 16, 2026 after the macOS automation stress test; fresh app loading, semantic mutation identity, standing-authorization invalidation, and app cleanup access were defined.
 - **Canonical artifact:** `docs/specs/configuration-spec.md`.
 - **Scope:** YAML settings, marker and selector contracts, canonical configuration discovery, structural validation, migration-pending state, and legacy-marker cleanup coverage.
 
@@ -62,7 +62,7 @@
 - The default-path error identifies the expected location, the `--config <path>` override, and `docs/configuration.md`.
 - YAML parsing and all structural validation in `CONFIG-01` through `CONFIG-03` complete before EventKit access.
 - Configuration failures do not echo or log raw YAML contents.
-- The app can show whether the canonical config exists and structurally validates before exposing manual sync actions.
+- The app shows whether the canonical config exists and structurally validates before exposing reconciliation or cleanup actions.
 
 ### CONFIG-06 — Runtime selector resolution
 
@@ -72,7 +72,7 @@
 ### CONFIG-07 — Migration-pending state
 
 - A structurally valid configuration with one or more `legacyMarkers` is in migration-pending state.
-- Migration-pending state blocks ordinary reconciliation dry-run, apply, explanation, and scheduled reconciliation. These operations fail after structural validation but before EventKit access and direct the operator to `calrelay reconcile --cleanup-legacy`.
+- Migration-pending state blocks ordinary reconciliation dry-run, apply, explanation, and scheduled reconciliation. These operations fail after structural validation but before EventKit access and direct the operator to the explicit legacy-cleanup workflow in the CLI or app.
 - `calrelay config check` still performs the ordinary configured-topology preflight, aggregates safely determinable access failures, reports migration pending, returns nonzero, and must not claim ordinary reconciliation readiness.
 - Ordinary reconciliation resumes only after the operator completes the necessary cleanup and removes all `legacyMarkers` from the configuration.
 - CalRelay must not automatically remove, rewrite, or otherwise modify `legacyMarkers` or any other configuration field.
@@ -80,7 +80,7 @@
 ### CONFIG-08 — Legacy-marker cleanup coverage
 
 - `legacyMarkers` are temporary, cleanup-only deletion tombstones. They do not identify an origin calendar, route events, generate events, or participate in ordinary reconciliation.
-- Cleanup is available only through the explicit CLI mode defined in [`cli-spec.md`](cli-spec.md).
+- Cleanup is available only through the explicit CLI mode defined in [`cli-spec.md`](cli-spec.md) or the explicit app workflow defined in [`macos-app-spec.md`](macos-app-spec.md). Scheduled reconciliation and ordinary standing authorization never invoke cleanup.
 - At cleanup-run start, capture one reference instant and the Mac's current system calendar and time zone and use that context for the entire run.
 - Let `D` be the local date containing that reference instant. The cleanup range is the half-open interval from the start of local date September 15, 2026 through, but not including, the start of local date `D + 366 days`. It therefore includes `D` and the following 365 local dates.
 - Cleanup searches the configured hub and every locally configured work calendar over the complete cleanup range and selects only events whose parsed marker exactly equals a configured legacy marker.
@@ -88,8 +88,20 @@
 - Cleanup success is local and point-in-time. It does not prove global marker retirement, prevent later recreation, or cover calendars not visible to that run.
 - Multi-computer migration uses eventual convergence. A not-yet-migrated computer may recreate retired-marker events after another computer succeeds, and repeated idempotent cleanup is expected until all publishers have migrated.
 
+### CONFIG-09 — Fresh app loading and ordinary mutation identity
+
+- Every app configuration-status refresh and every app ordinary or cleanup run loads and structurally validates the currently selected file afresh. The app never mutates by falling back to a previously valid in-memory configuration after the selected file becomes missing, invalid, or migration pending.
+- An external change to the selected file triggers a prompt app status refresh. File observation is an invalidation signal only; each run still performs its own fresh load and validation.
+- Define the **ordinary mutation identity** as a deterministic semantic identity over all validated settings that can change ordinary reconciliation mutations: the hub selector, personal marker, effective `syncWindowDays`, every work-calendar selector and current marker, and the legacy-marker set.
+- The identity is insensitive to YAML comments, scalar quoting, mapping-key order, and work-calendar declaration order when the validated mutation semantics are unchanged. Work-calendar diagnostic names do not change the identity unless a later product decision makes them mutation-relevant.
+- The app may persist an opaque representation of this identity only to bind ordinary standing authorization and detect invalidating changes. It must not persist raw YAML, selectors, calendar titles, marker values, or another reversible configuration representation for that purpose, and it must not display or log the opaque value.
+- Once the app observes a different ordinary mutation identity after standing authorization, automatic mutation remains suspended until the user reviews a successful dry run for the current identity and renews authorization. Returning the file to an earlier identity does not silently reactivate old authorization.
+- A mutating app run captures the selected file state and ordinary mutation identity used for its reviewed or authorized plan and verifies immediately before its first mutation that the selected file still has the same identity. A missing, invalid, migration-pending, or changed file aborts the run before mutation.
+
 ## Compatibility and breaking changes
 
+- Revision 5 permits explicit app legacy cleanup while preserving the same cleanup-only authorization, range, preflight, verification, and eventual-convergence semantics as the CLI.
+- App automation now reloads configuration for every run and binds standing mutation authorization to semantic configuration identity rather than YAML bytes or a last-known-valid settings value.
 - Revision 4 replaces arbitrary starts-with prefix semantics with the exact marker grammar and case-sensitive identity in `CONFIG-02`. Existing values outside that grammar become invalid.
 - Revision 4 makes the documented YAML keys and nesting normative, rejects unknown fields and duplicate mapping keys, and limits `syncWindowDays` to `1...365`.
 - Exact duplicate selector tuples now fail structurally before EventKit access rather than being deferred to runtime preflight.
@@ -103,6 +115,7 @@
 - Keep filesystem path resolution, environment access, and `FileManager` mechanics out of domain/application code.
 - Do not log raw YAML contents.
 - Do not silently create, migrate, modify, or overwrite user configuration files; do not search arbitrary directories.
+- Do not use raw YAML bytes or a reversible encoding of sensitive configuration values as the persisted ordinary mutation identity.
 - Keep a single-profile model. Environment overrides, profiles, multiple remembered app paths, and a “Choose Config...” UI require an explicit decision.
 - Do not add hidden ownership metadata, a global marker registry, an unbounded EventKit scan, or a claim of globally atomic migration without a new explicit decision.
 
@@ -119,6 +132,9 @@
 - **CONFIG-AC-09:** Cleanup computes the fixed September 15, 2026 through `D + 365` inclusive local-date range from one captured context and exact-matches only configured legacy markers.
 - **CONFIG-AC-10:** Cleanup apply re-reads the full cleanup range after its planned deletions, succeeds only when that verification snapshot contains no exact legacy-marker match, and makes no global-retirement claim when another computer can later recreate the marker.
 - **CONFIG-AC-11:** Deterministic tests pass without domain/application APIs depending on filesystem-path resolution or live EventKit access.
+- **CONFIG-AC-12:** App status and every app run load the selected file afresh; missing, invalid, or migration-pending changes suppress mutation without a last-known-valid fallback.
+- **CONFIG-AC-13:** Semantically equivalent YAML produces the same ordinary mutation identity, every mutation-relevant settings change produces a different identity, an observed identity change invalidates standing authorization until renewed, and persisted identity data reveals none of the prohibited configuration values.
+- **CONFIG-AC-14:** A selected-file identity change before the first app mutation aborts without mutation, including when the file later returns to a previously authorized identity.
 
 ## Open decision
 
