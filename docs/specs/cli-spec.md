@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 5 — accepted on September 16, 2026 after the macOS automation stress test; CLI cleanup remained stable while explicit app cleanup became a second presentation of the shared cleanup capability.
+- **Revision:** 6 — accepted on September 16, 2026 after the projection and safety stress-test interview; bounded cleanup coverage and transient per-event cleanup review were added while non-interactive `--apply` authorization was retained.
 - **Canonical artifact:** `docs/specs/cli-spec.md`.
 - **Scope:** `calrelay` command behavior, user-facing output, command validation, and legacy-marker cleanup controls.
 
@@ -33,7 +33,9 @@
 - Cleanup mode requires at least one configured legacy marker. An empty list fails nonzero with guidance and before EventKit access.
 - `--cleanup-legacy` and `--explain` are mutually exclusive and fail during command validation before configuration selection, file access, or EventKit access.
 - `--cleanup-legacy` may be combined with `--apply` and `--config`.
-- Cleanup dry-run and apply report the product-defined cleanup range, configured roles covered, per-marker or per-role deletion counts, and the local point-in-time scope of the result.
+- Cleanup dry-run reports the product-defined cleanup range, configured roles covered, per-marker or per-role deletion counts, the local point-in-time scope, and one review row for every selected event containing its title, configured role, and start/end or all-day date range.
+- Cleanup apply displays the fresh selected-event review rows before mutation, but `--apply` remains sufficient non-interactive authorization. The CLI recommends a prior dry-run but does not require a plan token, proof of review, or interactive confirmation.
+- Cleanup review omits EventKit event and calendar IDs, source/title selectors, calendar titles, and marker values. Titles and time ranges are transient command output and must not be written to persistent logs.
 - Cleanup apply reports success only after the post-mutation full-range verification required by [`calendar-access-spec.md`](calendar-access-spec.md) finds no matching legacy-marker events. A verification failure or remaining match returns nonzero while retaining accurate confirmations for completed deletions.
 - Cleanup output must not claim global marker retirement. A successful no-change cleanup reports that no matching events were found in the loaded local snapshot; a successful apply reports that none appeared in its post-mutation verification snapshot.
 - After successful cleanup, CalRelay does not edit the configuration; output directs the operator to remove tombstones only when the eventual-convergence migration is complete for their topology.
@@ -73,18 +75,19 @@
 
 ## Compatibility and breaking changes
 
+- Revision 6 changes successful cleanup presentation from aggregate-only output to transient per-event title, configured-role, and time-range review. It retains the existing command arguments and treats `--cleanup-legacy --apply` as sufficient non-interactive mutation authorization.
 - Revision 5 does not change CLI arguments, status, output, or mutation authorization. It clarifies that the CLI is no longer the product's only cleanup presentation after app cleanup is added.
 - Revision 4 adds the explicit `--cleanup-legacy` reconciliation mode and makes it mutually exclusive with `--explain`.
 - Nonempty `legacyMarkers` now block ordinary reconciliation and make config check return nonzero after ordinary preflight.
 - Cleanup uses a separate full-range preflight and performs deletions only; it never silently combines migration with ordinary reconciliation.
-- Successful cleanup output is privacy-safe and does not receive the EventKit-ID disclosure exception granted to successful ordinary explanation.
+- Successful cleanup review receives only the narrow transient detail exception defined by [`calendar-access-spec.md`](calendar-access-spec.md) and does not receive the EventKit-ID disclosure exception granted to successful ordinary explanation.
 - Existing binary status, stdout/stderr routing, ordinary explanation, progressive mutation confirmation, and no-rollback rules remain in force.
 
 ## Validation
 
 - `make check` is the local quality gate.
 - `swift run calrelay --help`, `swift run calrelay calendars --help`, `swift run calrelay config check --help`, and `swift run calrelay reconcile --help` are smoke checks.
-- Explicit local validation includes config check, ordinary dry-run, full explanation, apply, cleanup dry-run, cleanup apply, no-change success, migration-pending gates, idempotency, rename/change, partial-application reporting, and harmless EventKit write checks.
+- Explicit local validation includes config check, ordinary dry-run, full explanation, apply, cleanup dry-run, cleanup apply with transient per-event review, no-change success, migration-pending gates, idempotency, rename/change, partial-application reporting, and harmless EventKit write checks.
 
 ## Acceptance checks
 
@@ -99,4 +102,5 @@
 - **CLI-AC-09:** Ordinary explanation is non-mutating, covers every input and planned action, may disclose IDs only on successful output, and has exactly the same creates and deletes as the shared ordinary dry-run plan for the loaded snapshot.
 - **CLI-AC-10:** A missing or structurally invalid selected configuration fails before EventKit access, and explicit overrides preserve their selected path semantics.
 - **CLI-AC-11:** CLI access failures are non-prompting, actionable, privacy-safe, written to standard error, and return nonzero.
-- **CLI-AC-12:** Cleanup output reports the bounded range and local point-in-time result, omits EventKit IDs, never claims global retirement, and reports apply success only after a no-match verification snapshot.
+- **CLI-AC-12:** Cleanup output reports the moving bounded range and local point-in-time result, shows each selected event's title, configured role, and time range, omits EventKit IDs and other prohibited details, never claims global or historical retirement, and reports apply success only after a no-match verification snapshot.
+- **CLI-AC-13:** Direct cleanup `--apply` displays the fresh detailed plan and proceeds without interactive confirmation or proof of an earlier dry-run.

@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 5 — accepted on September 16, 2026 after the macOS automation stress test; app ordinary automation and explicit app cleanup were bound to the shared preflights and privacy rules.
+- **Revision:** 6 — accepted on September 16, 2026 after the projection and safety stress-test interview; exact recurring-occurrence deletion, sequential-snapshot limits, and transient cleanup-review disclosure were defined.
 - **Canonical artifact:** `docs/specs/calendar-access-spec.md`.
 - **Scope:** Calendar permission, discovery, ordinary and cleanup configured-topology preflight, writability, runtime access failures, and EventKit boundary behavior.
 
@@ -54,6 +54,7 @@
 - Cleanup must not create, update, or delete an event as a capability probe and must not clean only a readable subset when another configured role fails.
 - After every planned cleanup deletion succeeds, cleanup apply re-reads every configured role over the complete cleanup range. It reports success only when that verification snapshot contains no exact configured legacy-marker match.
 - A post-mutation verification read failure or remaining match makes the invocation unsuccessful and nonzero. Confirmed deletions remain applied and are reported accurately; no rollback is attempted.
+- A recurring-event deletion must resolve the exact occurrence selected by the plan. If EventKit cannot resolve that occurrence unambiguously, stop the run without substituting the first occurrence for an identifier, another occurrence, or the whole series.
 
 ### ACCESS-05 — Failure after mutation begins
 
@@ -61,10 +62,12 @@
 - Report the run as partially applied with privacy-safe per-role action counts or categories and the failure category. Never report that run as successful.
 - Do not attempt compensating rollback through EventKit. A later ordinary reconciliation or repeated cleanup, as applicable, is the recovery mechanism.
 
-### ACCESS-06 — Privacy-safe access diagnostics
+### ACCESS-06 — Privacy-safe access diagnostics and cleanup review
 
 - Interactive access, readiness, cleanup, and partial-application diagnostics may identify a configured role, its source/title selector, and a failure or action category, except where an owning presentation contract such as app cleanup deliberately allows less disclosure.
-- Failure, readiness, cleanup, and partial-application diagnostics omit event titles, EventKit event IDs, and EventKit calendar IDs.
+- Failure, readiness, and partial-application diagnostics omit event titles, event details, EventKit event IDs, and EventKit calendar IDs.
+- Successful cleanup dry-run output and the fresh cleanup plan shown immediately before mutation may transiently disclose each selected event's title, configured role, and start/end or all-day date range so the deletion plan is reviewable.
+- Cleanup review never discloses EventKit event IDs, EventKit calendar IDs, source/title selectors, calendar titles, or marker values. Event titles and time ranges shown for review must not be written to persistent logs or persisted app operational state.
 - EventKit IDs may appear in user-facing output only for:
   1. successful `calrelay calendars` inventory, which displays calendar IDs as required by `ACCESS-02`; and
   2. successful, explicitly requested ordinary `calrelay reconcile --explain` output, which may display event and calendar IDs with the human-readable event details and reasons required by [`cli-spec.md`](cli-spec.md).
@@ -77,21 +80,25 @@
 - EventKit types, calendar IDs, calendar stores, permission APIs, and mutation mechanics remain in adapters or app/bootstrap code.
 - Map EventKit types into application DTOs at the adapter boundary.
 - Mutate only distinct calendars configured for the current run and only after the applicable complete preflight succeeds.
+- Configured calendars are read sequentially. The resulting successful reads are the snapshot for that attempt; CalRelay does not claim an atomic cross-calendar EventKit snapshot.
+- A deletion boundary DTO must carry enough occurrence identity to resolve the exact planned recurring occurrence without making EventKit IDs visible-set reconciliation keys or ownership markers.
+- Once mutation begins, adapters target the exact planned event or occurrence without reauthorizing deletion from changed visible fields. EventKit identifier churn, an absent occurrence, or ambiguous occurrence resolution causes a mutation failure rather than substitution.
 
 ## Compatibility and breaking changes
 
+- Revision 6 requires exact recurring-occurrence resolution, makes sequential non-atomic reads explicit, and permits transient cleanup titles, roles, and time ranges only for successful plan review.
 - Revision 5 adds app ordinary and cleanup surfaces without adding alternate access semantics: app and CLI operations use the same applicable complete-topology preflight and no-subset mutation gates.
 - Persisted app operational status follows the existing privacy boundary for persistent logs and may contain only the explicitly approved timestamps, counts, and categories.
 - Revision 4 preserves the ordinary configured-topology preflight while requiring migration-pending config check to report non-readiness after completing that preflight.
 - Legacy cleanup receives a separate full-range preflight; ordinary-window readiness is insufficient authorization for cleanup mutation.
-- Successful legacy-cleanup output does not receive the EventKit-ID disclosure exception granted to successful inventory and ordinary explanation.
+- Successful legacy-cleanup review may show the approved transient event details but does not receive the EventKit-ID disclosure exception granted to successful inventory and ordinary explanation.
 
 ## Validation
 
 - `calrelay calendars` lists every visible calendar, source/account, title, EventKit ID, and writability without configuration or mutation.
 - Config check, ordinary dry-run, apply, and explanation demonstrate the shared ordinary preflight and aggregate failure behavior.
 - CLI and app legacy cleanup dry-run and apply demonstrate the full-range cleanup preflight and all-or-nothing preflight gate.
-- Successful inventory and ordinary explanation demonstrate their narrow ID-disclosure exceptions; failures, cleanup output, and persistent logs demonstrate ID omission.
+- Successful inventory and ordinary explanation demonstrate their narrow ID-disclosure exceptions; cleanup review demonstrates transient title/role/time disclosure with ID omission; failures and persistent logs demonstrate event-detail and ID omission.
 - Real EventKit capability checks are explicit local validation through `CalRelay.app` or the CLI; default deterministic tests do not require real EventKit access.
 - Manually validate permission acquisition and recovery with the stable `CalRelay.app` bundle identity.
 
@@ -105,9 +112,11 @@
 - **ACCESS-AC-06:** A preflight with multiple safely determinable failures reports all of them and performs no mutation.
 - **ACCESS-AC-07:** Cleanup apply performs a complete post-mutation verification read; a read failure or remaining exact legacy-marker match returns nonzero without rollback or a false cleanup-success claim.
 - **ACCESS-AC-08:** A mutation-phase failure returns a privacy-safe partial result, stops later mutations, and performs no rollback.
-- **ACCESS-AC-09:** Successful CLI inventory and ordinary explanation may disclose the approved IDs, while failures, readiness output, cleanup output, partial-application diagnostics, other successful output, app inventory, and persistent logs omit them.
+- **ACCESS-AC-09:** Successful CLI inventory and ordinary explanation may disclose the approved IDs; cleanup review may transiently disclose only title, configured role, and time range; failures, readiness output, partial-application diagnostics, other successful output, app inventory, and persistent logs omit event details and unapproved IDs.
 - **ACCESS-AC-10:** Deterministic core tests run without EventKit access or EventKit types in domain/application APIs.
 - **ACCESS-AC-11:** Persisted app operational status and app cleanup presentation obey their stricter disclosure contract without weakening the reusable access-diagnostic boundary.
+- **ACCESS-AC-12:** Recurring-event mutation tests delete only the exact planned occurrence and fail without substitution when exact occurrence resolution is missing or ambiguous.
+- **ACCESS-AC-13:** Snapshot-loading tests and documentation make sequential non-atomic reads explicit without adding EventKit-notification restart or double-read requirements.
 
 ## Constraints
 

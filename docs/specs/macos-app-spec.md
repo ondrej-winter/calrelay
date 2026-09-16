@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 4 — accepted on September 16, 2026 after the macOS automation stress test; launch-at-login, freshness, standing authorization, retry, configuration-change, in-app cleanup, and recovery-state contracts were defined.
+- **Revision:** 5 — accepted on September 16, 2026 after the projection and safety stress-test interview; detailed transient cleanup review and the app-only scope of trigger serialization were defined.
 - **Acceptance basis:** The product interview approved on September 16, 2026 prioritizes reliably current relayed availability with minimal ongoing user effort for a developer who is comfortable editing YAML.
 - **Canonical artifact:** `docs/specs/macos-app-spec.md`.
 - **Scope:** The Dock-visible control panel, manual ordinary reconciliation, explicit legacy cleanup, scheduled reconciliation while the normal app is running, launch-at-login, operational status, user notifications, and lifecycle boundaries.
@@ -36,9 +36,10 @@
 - **Run Sync Now** is a manual mutation flow. It loads fresh configuration and calendar state, presents the resulting create/delete summary, and requires explicit confirmation for that exact deterministic ordinary plan.
 - Immediately before a confirmed manual mutation begins, the app repeats configuration loading, validation, ordinary preflight, snapshot loading, and planning. If the plan differs from the reviewed plan, it performs no mutation and requires review and confirmation of the new summary.
 - When `legacyMarkers` is nonempty, the app explains that ordinary reconciliation is blocked and exposes a separate legacy-cleanup dry-run and apply workflow using the cleanup range, planning, preflight, verification, and local point-in-time semantics owned by the other capability specifications.
-- Legacy-cleanup apply requires a successful fresh cleanup dry run, a privacy-safe summary of the cleanup range and deletion counts by safe role or category, and explicit confirmation for that exact deterministic cleanup plan.
+- Legacy-cleanup dry run presents the cleanup range, deletion counts, and one transient review row for every selected event containing its title, configured role, and start/end or all-day date range.
+- Legacy-cleanup apply requires a successful fresh cleanup dry run and explicit confirmation for that exact detailed deterministic cleanup plan.
 - Immediately before cleanup deletion begins, the app reloads configuration and calendar state and recomputes the plan. A changed plan invalidates the prior confirmation and requires a new review; an unchanged plan still receives a fresh complete cleanup preflight before its first deletion.
-- App cleanup presentation omits event titles and details, EventKit event and calendar IDs, source/title selectors, calendar titles, and marker values.
+- App cleanup review omits EventKit event and calendar IDs, source/title selectors, calendar titles, and marker values. Event titles, configured roles, and time ranges are displayed only transiently for review and are never persisted or written to logs.
 - Scheduling authorization never authorizes cleanup. The app never combines cleanup with ordinary reconciliation and never removes or rewrites `legacyMarkers`; after verified cleanup, the developer removes tombstones from YAML when migration is complete for their topology.
 
 ### APP-03 — Setup and standing authorization for automatic mutation
@@ -61,6 +62,7 @@
 - Every manual or automatic run reloads and structurally validates the selected configuration before Calendar access. External selected-file changes also trigger a prompt configuration-status refresh.
 - If the selected file changes after a run loads it but before the first mutation, the run aborts without mutation, refreshes status, and follows the configuration-change authorization rules in [`configuration-spec.md`](configuration-spec.md).
 - Ordinary and cleanup runs never overlap. Any automatic or manual triggers received during an active run coalesce into at most one follow-up run that reloads configuration and repeats validation, applicable preflight, snapshot loading, and planning. Coalescing does not broaden any trigger's mutation authorization.
+- This no-overlap rule covers triggers coordinated inside the app process only. The app does not acquire a cross-process lock against CLI apply, and later reconciliation repairs any duplicate or missing projection caused by concurrent processes as defined in [`reconciliation-spec.md`](reconciliation-spec.md).
 - A transient automatic-run failure receives a finite series of bounded-backoff retries. Retry attempts use fresh configuration, preflight, snapshots, and plans; they never resume an old or partially applied plan.
 - Failures requiring user action do not enter an aggressive retry loop. They remain actionable through the primary and secondary state model, while later ordinary lifecycle or timer triggers may re-evaluate the gates.
 - Freshness is overdue when scheduling is enabled and more than 60 minutes have elapsed since the latest successful ordinary reconciliation. Retry and overdue states are distinct and may coexist.
@@ -85,6 +87,8 @@
 
 ## Compatibility and breaking changes
 
+- Revision 5 replaces aggregate-only app cleanup review with transient per-event title, configured-role, and time-range review while preserving exact fresh-plan confirmation and persistence privacy.
+- Revision 5 clarifies that app trigger serialization does not serialize separate CLI processes.
 - Revision 4 replaces configurable timer scheduling with a fixed 15-minute cadence and a 60-minute freshness target.
 - Launch-at-login moves into the first credible automation milestone, while helper-based and closed-app operation remain deferred.
 - Automatic ordinary mutation uses explicit configuration-bound standing authorization; manual ordinary apply and cleanup retain exact-plan confirmation.
@@ -116,9 +120,9 @@
 - **APP-AC-04:** First scheduling enablement requires a successful ordinary dry run and explicit standing authorization bound to the ordinary mutation identity; mutation-relevant changes suspend automation until review and renewal.
 - **APP-AC-05:** Launch-at-login, launch, wake, fixed 15-minute cadence, one-hour overdue detection, bounded retry, pause, login-item degradation, and Quit warning follow `APP-03` through `APP-06`.
 - **APP-AC-06:** Automatic runs never prompt for Calendar access or per-run mutation confirmation, never use a last-known-valid configuration fallback, and perform no mutation when any gate fails.
-- **APP-AC-07:** Trigger-concurrency tests prove no overlap, at most one coalesced fresh follow-up run, and no reuse of stale configuration, preflight, snapshot, or plan data.
+- **APP-AC-07:** Trigger-concurrency tests prove no overlap among app-owned triggers, at most one coalesced fresh follow-up run, and no reuse of stale configuration, preflight, snapshot, or plan data; the app makes no cross-process serialization claim.
 - **APP-AC-08:** Manual ordinary apply recomputes before mutation and invalidates confirmation when the exact plan changes.
-- **APP-AC-09:** Migration pending blocks ordinary manual and automatic reconciliation, while app cleanup uses the complete cleanup preflight, privacy-safe exact-plan review, separate confirmation, post-apply verification, and no automatic YAML editing.
+- **APP-AC-09:** Migration pending blocks ordinary manual and automatic reconciliation, while app cleanup uses the complete cleanup preflight, transient per-event exact-plan review, separate confirmation, post-apply verification, prohibited-detail omission, and no automatic YAML editing.
 - **APP-AC-10:** Persisted operational state contains only the approved timestamps, categories, and counts; human-notification denial leaves scheduling available with persistent in-app and Dock-visible fallback status.
 - **APP-AC-11:** Deterministic-plan size does not independently block automatic apply, and EventKit change notifications do not trigger reconciliation in this milestone.
 - **APP-AC-12:** The menu-bar item and closed-app synchronization remain absent; enabling scheduling enables launch-at-login for the normal app without introducing helper-based execution.

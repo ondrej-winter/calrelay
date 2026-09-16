@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 5 — accepted on September 16, 2026 after the macOS automation stress test; fresh app loading, semantic mutation identity, standing-authorization invalidation, and app cleanup access were defined.
+- **Revision:** 6 — accepted on September 16, 2026 after the projection and safety stress-test interview; bounded moving cleanup coverage, global retirement prerequisites, and exact-only historical migration limits were defined without changing the YAML schema.
 - **Canonical artifact:** `docs/specs/configuration-spec.md`.
 - **Scope:** YAML settings, marker and selector contracts, canonical configuration discovery, structural validation, migration-pending state, and legacy-marker cleanup coverage.
 
@@ -81,12 +81,15 @@
 
 - `legacyMarkers` are temporary, cleanup-only deletion tombstones. They do not identify an origin calendar, route events, generate events, or participate in ordinary reconciliation.
 - Cleanup is available only through the explicit CLI mode defined in [`cli-spec.md`](cli-spec.md) or the explicit app workflow defined in [`macos-app-spec.md`](macos-app-spec.md). Scheduled reconciliation and ordinary standing authorization never invoke cleanup.
+- Before a marker is configured as a legacy tombstone, the operator must retire it from every current work-marker and personal-marker role in every active CalRelay configuration sharing the hub. CalRelay cannot verify that global prerequisite.
 - At cleanup-run start, capture one reference instant and the Mac's current system calendar and time zone and use that context for the entire run.
-- Let `D` be the local date containing that reference instant. The cleanup range is the half-open interval from the start of local date September 15, 2026 through, but not including, the start of local date `D + 366 days`. It therefore includes `D` and the following 365 local dates.
+- Let `D` be the local date containing that reference instant. The cleanup range is the half-open interval from the start of local date `D - 2 days` through, but not including, the start of local date `D + 366 days`. It therefore covers local dates `D - 2` through `D + 365`, inclusive.
+- Cleanup event membership uses the positive-overlap rule defined in [`projection-and-safety-spec.md`](projection-and-safety-spec.md), and selected events retain their complete returned intervals.
 - Cleanup searches the configured hub and every locally configured work calendar over the complete cleanup range and selects only events whose parsed marker exactly equals a configured legacy marker.
 - Cleanup dry-run success is based on the complete loaded cleanup snapshot. Cleanup apply success additionally requires a post-mutation verification read over the complete configured topology and cleanup range and means that verification snapshot contained no matching legacy-marker events.
-- Cleanup success is local and point-in-time. It does not prove global marker retirement, prevent later recreation, or cover calendars not visible to that run.
+- Cleanup success is local and point-in-time. It does not prove global marker retirement, prevent later recreation, cover calendars not visible to that run, or cover events older than the two-date lookback.
 - Multi-computer migration uses eventual convergence. A not-yet-migrated computer may recreate retired-marker events after another computer succeeds, and repeated idempotent cleanup is expected until all publishers have migrated.
+- Historical artifacts that do not satisfy the current exact marked-title grammar are outside automatic cleanup and require manual identification and removal. `legacyMarkers` never enable fuzzy, raw-prefix, or heuristic deletion.
 
 ### CONFIG-09 — Fresh app loading and ordinary mutation identity
 
@@ -100,6 +103,8 @@
 
 ## Compatibility and breaking changes
 
+- Revision 6 replaces the fixed September 15, 2026 cleanup epoch with the moving bounded `D - 2...D + 365` range and explicitly accepts that older legacy projections may remain indefinitely.
+- Revision 6 adds the operator-managed global marker-retirement prerequisite and excludes malformed historical prefix shapes from automatic cleanup without changing the YAML schema.
 - Revision 5 permits explicit app legacy cleanup while preserving the same cleanup-only authorization, range, preflight, verification, and eventual-convergence semantics as the CLI.
 - App automation now reloads configuration for every run and binds standing mutation authorization to semantic configuration identity rather than YAML bytes or a last-known-valid settings value.
 - Revision 4 replaces arbitrary starts-with prefix semantics with the exact marker grammar and case-sensitive identity in `CONFIG-02`. Existing values outside that grammar become invalid.
@@ -129,12 +134,13 @@
 - **CONFIG-AC-06:** A missing selected file fails before parsing or EventKit access with actionable guidance.
 - **CONFIG-AC-07:** Runtime readiness rejects zero-match, multi-match, and duplicate-physical-calendar role resolution without EventKit-ID fallback.
 - **CONFIG-AC-08:** Nonempty `legacyMarkers` blocks ordinary reconciliation and scheduling, while config check completes ordinary access preflight, reports migration pending, returns nonzero, and makes no readiness claim.
-- **CONFIG-AC-09:** Cleanup computes the fixed September 15, 2026 through `D + 365` inclusive local-date range from one captured context and exact-matches only configured legacy markers.
-- **CONFIG-AC-10:** Cleanup apply re-reads the full cleanup range after its planned deletions, succeeds only when that verification snapshot contains no exact legacy-marker match, and makes no global-retirement claim when another computer can later recreate the marker.
+- **CONFIG-AC-09:** Cleanup computes the moving `D - 2` through `D + 365` inclusive local-date range from one captured context, applies positive-overlap membership, and exact-matches only configured legacy markers.
+- **CONFIG-AC-10:** Cleanup apply re-reads the full cleanup range after its planned deletions, succeeds only when that verification snapshot contains no exact legacy-marker match, and makes no global-retirement or historical-coverage claim when another computer can recreate the marker or older matches remain outside the range.
 - **CONFIG-AC-11:** Deterministic tests pass without domain/application APIs depending on filesystem-path resolution or live EventKit access.
 - **CONFIG-AC-12:** App status and every app run load the selected file afresh; missing, invalid, or migration-pending changes suppress mutation without a last-known-valid fallback.
 - **CONFIG-AC-13:** Semantically equivalent YAML produces the same ordinary mutation identity, every mutation-relevant settings change produces a different identity, an observed identity change invalidates standing authorization until renewed, and persisted identity data reveals none of the prohibited configuration values.
 - **CONFIG-AC-14:** A selected-file identity change before the first app mutation aborts without mutation, including when the file later returns to a previously authorized identity.
+- **CONFIG-AC-15:** Migration documentation requires retirement of a tombstoned marker from every active configuration sharing the hub and directs non-exact historical artifacts to manual removal rather than fuzzy cleanup.
 
 ## Open decision
 

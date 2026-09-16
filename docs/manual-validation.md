@@ -17,7 +17,7 @@ Use the app's explicit Calendar access setup/recovery action to trigger the perm
 
 ## Accepted app automation milestone checks
 
-This section describes manual acceptance checks for macOS App Specification Revision 4. Until that revision is implemented, record the checks as pending rather than interpreting missing controls as a validation pass.
+This section describes manual acceptance checks for macOS App Specification Revision 5. Until that revision is implemented, record the checks as pending rather than interpreting missing controls as a validation pass.
 
 1. Open `.build/CalRelay.app` and confirm CalRelay appears as a normal Dock-visible app with no CalRelay menu-bar item.
 2. Confirm the main window distinguishes all-calendar inventory, configuration validity, configured readiness, migration state, standing authorization, scheduling, and latest operation status.
@@ -26,7 +26,7 @@ This section describes manual acceptance checks for macOS App Specification Revi
 5. Log out and in with the app healthy. Confirm CalRelay launches without opening the main window and performs a gated ordinary run.
 6. Repeat login with setup or recovery requiring action. Confirm the main window opens and presents the first dependency-ordered recovery action plus any secondary issues.
 7. Wake the Mac and confirm one prompt gated run occurs regardless of the previous run time.
-8. Trigger timer, wake, and manual actions during an active run. Confirm they do not overlap and coalesce into at most one follow-up run using fresh configuration, preflight, snapshots, and planning.
+8. Trigger timer, wake, and manual actions during an active run. Confirm app-owned triggers do not overlap and coalesce into at most one follow-up run using fresh configuration, preflight, snapshots, and planning. Confirm the app does not claim to serialize a separate CLI apply process.
 9. Cause a transient failure and confirm finite bounded-backoff retry state is visible. Confirm an actionable failure does not enter an aggressive retry loop.
 10. Confirm more than 60 minutes since the latest successful ordinary reconciliation is shown as overdue and generates a user notification when allowed.
 11. Deny user-notification permission and confirm scheduling remains available with persistent in-app degraded state plus a Dock badge or equivalent visible indicator.
@@ -80,11 +80,36 @@ Use only harmless dedicated calendars for steps that can mutate EventKit data.
 8. Confirm a title such as `[A] Planning` is recognized only as marker `[A]`, while `[ACME] Planning` is not misclassified as `[A]`.
 9. Confirm an empty or surrounding-whitespace source title is projected with trimmed text or `(Untitled)` and exactly one space after the marker.
 
+## Projection and safety checks
+
+Use harmless dedicated calendars and representative test events for these checks.
+
+1. Create attendee invitations for the current user with accepted, tentative, declined, pending, and another non-accepted response. Confirm only the accepted invitation is eligible, regardless of whether its availability is busy, free, or tentative.
+2. Confirm another attendee's tentative or declined response does not exclude an event accepted by the current user.
+3. Create events with no current-user attendee record and representative availability values. Confirm busy, not-supported, and unavailable values are included, while free, tentative, and unknown values are skipped.
+4. Repeat representative eligibility cases with all-day events. Confirm eligible events retain EventKit's returned start/end values and all-day flag in every projection.
+5. Create events crossing the effective-window start and end. Confirm any positive-duration overlap is included with the complete original interval, while an event ending exactly at the start or beginning exactly at the end is excluded.
+6. Confirm projected source titles appear unchanged apart from trimming, `(Untitled)` substitution, and marker addition. Use non-sensitive placeholders because titles cross account boundaries.
+7. Inspect generated projections in each provider. Record whether the provider's default availability blocks time; CalRelay does not explicitly set projection availability.
+8. Create a non-cancelled valid marked hub event whose availability is free or tentative. Confirm it still routes as an authoritative blocker. Mark or expose it as cancelled and confirm it is preserved according to ownership but no longer routes.
+9. Create a manually authored event with a current local work marker in the hub and a valid marker in a configured work calendar. Confirm dry-run shows the documented reserved-namespace ownership risk; do not apply against real data.
+10. Create two or more exact managed duplicates for one expected key. Confirm dry-run plans one replacement create plus deletion of every existing duplicate, and confirm apply creates the replacement before beginning duplicate deletion.
+11. Remove or rename a work source while its local hub projection remains visible. Confirm one dry run plans removal of the stale hub projection and its downstream work blockers without relaying the stale hub event for an extra cycle.
+12. Cause a create failure in a harmless fixture or fake-backed manual harness. Confirm apply stops immediately, performs no deletes, reports partial application, and attempts no later mutations.
+13. Edit a marked event after planning but before deletion in a controlled test. Confirm the documented plan-time authorization behavior: apply may still delete the exact planned occurrence without reauthorizing its changed visible fields.
+
+## Multi-computer topology check
+
+1. Inventory every active CalRelay configuration sharing the hub and confirm every current work and personal marker is globally unique.
+2. Confirm no physical work calendar is actively managed by more than one computer and the machines' configured work-calendar sets are disjoint.
+3. Document that CalRelay cannot verify these cross-computer invariants and that violating them can suppress, duplicate, or delete blockers.
+4. If testing concurrent processes on harmless calendars, run app and CLI apply concurrently and confirm neither claims atomic isolation; use a later fresh dry run to observe and repair any temporary duplicate or missing projection.
+
 ## Marker migration cleanup check
 
 Use only harmless, dedicated test calendars. Cleanup is a broad deletion workflow and must not be tested against calendars containing real events.
 
-1. Add a valid unused marker such as `[RETIRED_TEST]` to `legacyMarkers` in the local validation fixture.
+1. Confirm the marker is retired from every current work and personal role in every active configuration sharing the test hub, then add a valid unused marker such as `[RETIRED_TEST]` to `legacyMarkers` in the local validation fixture.
 2. Create representative `[RETIRED_TEST] Example` events in the test hub and each configured test work calendar.
 3. Run config check and confirm it completes ordinary topology preflight, reports migration pending, returns nonzero, and does not claim readiness:
 
@@ -99,33 +124,36 @@ Use only harmless, dedicated test calendars. Cleanup is a broad deletion workflo
    swift run calrelay reconcile --config calrelay.yml --explain
    ```
 
-5. Preview the cleanup-only plan and confirm it reports the September 15, 2026 through `D + 365` local-date range, selects only exact `[RETIRED_TEST]` marker matches, plans no creates, and does not expose EventKit IDs:
+5. Preview the cleanup-only plan and confirm it reports local dates `D - 2` through `D + 365`, uses positive-overlap membership, selects only exact `[RETIRED_TEST]` marker matches, plans no creates, and shows each selected event's title, configured role, and time or all-day range without EventKit IDs, selectors, calendar titles, or marker values:
 
    ```sh
    swift run calrelay reconcile --config calrelay.yml --cleanup-legacy
    ```
 
-6. Apply only after reviewing the plan:
+6. Apply only after reviewing the plan. Confirm direct CLI `--apply` shows the fresh detailed plan and proceeds non-interactively without requiring proof of the earlier dry run:
 
    ```sh
    swift run calrelay reconcile --config calrelay.yml --cleanup-legacy --apply
    ```
 
-7. Confirm apply reports success only after a full-range verification snapshot, then run cleanup dry-run again and confirm it reports no local matches without claiming global marker retirement.
-8. Remove `[RETIRED_TEST]` from `legacyMarkers`, run config check, and confirm ordinary readiness can succeed again.
+7. Confirm apply reports success only after a complete bounded-range verification snapshot, then run cleanup dry-run again and confirm it reports no local matches without claiming global or historical marker retirement.
+8. Create a matching event older than `D - 2` and confirm cleanup makes no claim to cover or remove it.
+9. Create a historical malformed title shape that cannot satisfy the current exact marker grammar and confirm cleanup does not select it; remove it manually from the harmless test calendar.
+10. Remove `[RETIRED_TEST]` from `legacyMarkers`, run config check, and confirm ordinary readiness can succeed again.
 
 Repeat the migration with the accepted app cleanup surface:
 
 1. Confirm migration pending blocks **Dry Run Sync**, **Run Sync Now**, and automatic reconciliation but exposes separate cleanup actions.
-2. Run app cleanup dry-run and confirm it reports only the cleanup range and privacy-safe deletion counts, without event titles, details, IDs, selectors, calendar titles, or marker values.
-3. Confirm cleanup apply requires separate confirmation for the exact fresh cleanup plan and is not authorized by scheduled-sync standing authorization.
+2. Run app cleanup dry-run and confirm it shows the cleanup range, counts, and a transient row for each selected event containing title, configured role, and time or all-day range, while omitting IDs, selectors, calendar titles, and marker values.
+3. Confirm cleanup apply requires separate confirmation for the exact fresh detailed plan and is not authorized by scheduled-sync standing authorization.
 4. Change the cleanup snapshot before mutation and confirm a changed fresh plan invalidates the prior confirmation.
-5. Apply only against harmless test calendars and confirm success requires the complete post-mutation verification snapshot.
-6. Confirm the app does not edit YAML; remove the tombstone manually only after the topology's migration is complete.
+5. Apply only against harmless test calendars and confirm success requires the complete post-mutation bounded-range verification snapshot.
+6. Relaunch the app and inspect persistent status and logs. Confirm cleanup titles, roles, time ranges, IDs, and other event details were not persisted.
+7. Confirm the app does not edit YAML; remove the tombstone manually only after the topology's migration is complete.
 
 ## Recurring-event capability check
 
-Recurring-event behavior depends on how EventKit exposes occurrences for the locally configured calendars. CalRelay does not copy recurrence rules; it reconciles each occurrence that EventKit returns inside the configured sync window as an ordinary visible event snapshot.
+Recurring-event behavior depends on how EventKit exposes occurrences for the locally configured calendars. A successful EventKit snapshot is authoritative only for that run. CalRelay does not copy recurrence rules or independently prove completeness; it reconciles each returned occurrence, including detached edits, as an ordinary visible event snapshot.
 
 To validate recurring-event behavior with harmless test calendars:
 
@@ -144,4 +172,6 @@ To validate recurring-event behavior with harmless test calendars:
    ```
 
 5. Run dry-run again and confirm it reports no changes.
-6. If only the first occurrence appears, no occurrences appear, or EventKit returns a shape that does not converge after apply, treat recurring-event support for that calendar source as unvalidated and keep using one-off timed events for critical blockers until the behavior is investigated.
+6. Edit one occurrence independently and confirm CalRelay projects the detached occurrence using its returned edited fields.
+7. On a harmless recurring marked test event, select one occurrence for ordinary or cleanup deletion and confirm only that exact occurrence is removed. If the exact occurrence cannot be resolved, confirm the run fails without deleting the first occurrence or the whole series.
+8. If only the first occurrence appears, no occurrences appear, or EventKit returns a shape that does not converge after apply, treat recurring-event support for that calendar source as unvalidated and keep using one-off events for critical blockers until the behavior is investigated.

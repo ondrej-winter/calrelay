@@ -70,7 +70,9 @@ A marker must contain one bracketed ASCII identifier:
 
 Valid examples include `[ACME]`, `[client-2]`, and `[MY_WORK]`. Invalid examples include `ACME`, `[]`, `[ACME Team]`, `[ACME!]`, and `[A][B]`.
 
-Marker identity is case-sensitive. `[ACME]` and `[acme]` are different markers. The personal marker, every current work marker, and every legacy marker must be pairwise distinct.
+Marker identity is case-sensitive. `[ACME]` and `[acme]` are different markers. The personal marker, every current work marker, and every legacy marker must be pairwise distinct within one configuration.
+
+When multiple active CalRelay configurations share a hub, every current work marker and personal marker must also be globally unique across those configurations. CalRelay has no global marker registry and cannot verify this operator-managed requirement. A collision can suppress or delete a valid blocker rather than merely produce an ambiguous label.
 
 A title has marker semantics only in this exact shape:
 
@@ -84,9 +86,37 @@ When generating a projection, CalRelay trims surrounding whitespace from the sou
 
 ### Reserved marker namespace
 
-Any valid marked event in the hub acts as a blocker source. A marker owned by a locally configured work calendar is not routed back to that origin calendar; an unknown or remote marker is copied unchanged into every locally configured work calendar.
+Every non-cancelled valid marked event in the hub acts as an authoritative blocker source regardless of its attendee response or availability. A marker owned by a locally configured work calendar is not routed back to that origin calendar; an unknown or remote marker is copied unchanged into every locally configured work calendar. A cancelled valid marked hub event is preserved according to ownership rules but is not routed.
+
+In the hub, every current locally configured work-marker namespace is reserved for CalRelay projections. A manually created title such as `[ACME] Vendor Call` is indistinguishable from a local ACME projection and may be deleted when stale or duplicated.
 
 In configured work calendars, the valid leading-marker namespace is reserved for CalRelay-managed blockers. A manually created title such as `[FOCUS] Deep Work` is indistinguishable from a relayed blocker and may be deleted when no matching marked hub event exists. Use an unmarked title for ordinary source events that CalRelay must preserve.
+
+### Multi-computer topology
+
+Multiple computers may share the hub, but their actively managed physical work calendars must be disjoint. Each physical work calendar has exactly one active CalRelay writer. CalRelay cannot verify this across computers; violating it can create duplicates or cause one writer to delete another writer's projections.
+
+The app prevents overlap among triggers inside its own process, but it does not lock out CLI processes or CalRelay running elsewhere. Concurrent applies and non-atomic sequential calendar reads can temporarily create duplicate, stale, or missing projections. A later fresh reconciliation is the recovery mechanism.
+
+## Projection eligibility, window, and copied data
+
+CalRelay applies one fixed eligibility policy to timed and all-day source events:
+
+- a reliably cancelled event is skipped;
+- when EventKit identifies you as an attendee, only your accepted response is included, and acceptance overrides the event's availability value;
+- your tentative, declined, pending, delegated, unknown, or other non-accepted response skips the event;
+- other attendees' responses and non-cancelled overall event status are ignored; and
+- when EventKit exposes no current-user attendee record, busy, not-supported, and unavailable events are included, while free, tentative, unknown, and future unrecognized availability values are skipped.
+
+This policy is not configurable. A non-cancelled valid marked hub event bypasses source eligibility because it is already the relay's authoritative blocker envelope.
+
+At ordinary-run start, CalRelay captures the Mac's current system calendar and time zone. If `D` is the captured local date, the effective window covers local dates `D - 2` through `D + syncWindowDays`, inclusive. An event is in the window when any positive-duration portion overlaps it. Events touching only the start or end boundary are excluded, and overlapping events keep their complete original interval rather than being clipped.
+
+CalRelay copies EventKit's returned start, end, and all-day values unchanged and relies on EventKit for timed-event display and floating all-day behavior across time zones. It does not set projection availability explicitly; destination-provider defaults determine whether the visible projection is reported as busy.
+
+Projected titles are copied after trimming surrounding whitespace and substituting `(Untitled)` for an empty result. Titles can therefore cross personal and work account boundaries and may be exposed through providers, notifications, sharing, and delegated calendar access.
+
+EventKit's successful recurring-occurrence snapshot is authoritative for that run. CalRelay projects each returned occurrence, including detached edits, independently without reproducing recurrence rules or promising that a provider exposed every theoretical occurrence.
 
 ## Selector semantics
 
@@ -188,18 +218,24 @@ After reviewing the deletion-only plan, apply it explicitly:
 swift run calrelay reconcile --cleanup-legacy --apply
 ```
 
-The accepted app milestone also provides an explicit cleanup dry-run and apply surface. App cleanup uses the same full-range plan, complete-topology preflight, exact marker selection, and post-apply verification as the CLI. It presents only privacy-safe range and count summaries and requires a separate confirmation for the exact fresh cleanup plan; scheduling authorization never authorizes cleanup.
+Before adding a marker to `legacyMarkers`, retire it from every current work-marker and personal-marker role in every active configuration sharing the hub. CalRelay cannot verify this global prerequisite.
 
-Cleanup performs no ordinary creates or current-marker reconciliation. It searches the configured hub and every locally configured work calendar from the start of local date September 15, 2026 through the end of local date `D + 365`, where `D` is the run's captured reference local date. Every configured role must resolve uniquely, be writable, and be readable over that complete range before deletion begins.
+The accepted app milestone also provides an explicit cleanup dry-run and apply surface. App cleanup uses the same bounded plan, complete-topology preflight, exact marker selection, and post-apply verification as the CLI. It presents each selected event's title, configured role, and time or all-day range transiently and requires separate confirmation for the exact fresh cleanup plan; scheduling authorization never authorizes cleanup. EventKit IDs, selectors, calendar titles, and marker values remain hidden, and review details are never persisted or logged.
 
-After completing its planned deletions, cleanup apply re-reads the entire configured cleanup range and reports success only if that verification snapshot contains no matching legacy marker. Cleanup success remains local and point-in-time: another computer that still publishes `[OLD]` may recreate matching events later. Repeated cleanup is expected until every publisher has migrated. Remove `legacyMarkers` manually only after the required cleanup runs for your topology; CalRelay never edits the YAML automatically.
+CLI cleanup dry-run shows the same per-event review details. Direct `--cleanup-legacy --apply` shows its fresh detailed plan and remains non-interactive: `--apply` alone authorizes mutation, and a prior dry-run is recommended but not enforced.
+
+Cleanup performs no ordinary creates or current-marker reconciliation. With `D` as the captured local date, it searches the configured hub and every locally configured work calendar over local dates `D - 2` through `D + 365`, inclusive, using the same positive-overlap rule as ordinary reconciliation. Every configured role must resolve uniquely, be writable, and be readable over that complete bounded range before deletion begins.
+
+After completing its planned deletions, cleanup apply re-reads the entire configured cleanup range and reports success only if that verification snapshot contains no matching legacy marker. Cleanup success remains local and point-in-time: another computer may recreate `[OLD]` later, and matching events older than the two-date lookback may remain indefinitely. Repeated cleanup is expected until every publisher has migrated. Remove `legacyMarkers` manually only after the required cleanup runs for your topology; CalRelay never edits the YAML automatically.
+
+Cleanup accepts only the current exact marker grammar. Historical events using an old arbitrary prefix, malformed separator, empty marked title, or another non-exact shape require manual identification and removal; CalRelay never uses fuzzy or heuristic deletion.
 
 ## Validation and safety notes
 
 - At least one work calendar must be configured.
 - Source/title selector fields and work-calendar names must not be empty.
 - `syncWindowDays` controls the ordinary forward horizon, accepts `1...365`, and defaults to `100` when omitted.
-- Each ordinary run also includes a fixed two-local-date lookback. Whole local dates use the system calendar and time zone captured at run start.
+- Each ordinary and cleanup run includes a fixed two-local-date lookback. Whole local dates use the system calendar and time zone captured at run start.
 - Unknown YAML fields, duplicate mapping keys, malformed markers, marker collisions, and exact duplicate selector tuples fail before EventKit access.
 - Configuration errors are reported without echoing raw YAML content.
 - App automation authorization does not preserve or expose raw YAML, selectors, calendar titles, or marker values; mutation-relevant changes require renewed dry-run review and authorization.
@@ -207,7 +243,9 @@ After completing its planned deletions, cleanup apply re-reads the entire config
 - Ordinary config check, dry-run, apply, and explanation require every configured calendar to be readable over the ordinary window and currently writable.
 - Cleanup requires every configured calendar to be readable over the complete cleanup range and currently writable.
 - CalRelay never deletes an unmarked original work/client event during ordinary reconciliation.
-- Timed events from calendars that do not expose EventKit availability are treated as blocking events unless they are all-day, declined, or cancelled.
-- "Declined" status is evaluated from the current user's own attendee response, not from other attendees.
+- Plan-time ownership remains the authority after mutation begins. A marked event edited after planning may still be deleted as the exact planned occurrence.
+- Ordinary apply attempts all creates before any deletes and stops immediately on the first mutation failure without rollback.
+- When two or more managed events satisfy one expected visible key, CalRelay creates one replacement and deletes every existing duplicate rather than choosing one survivor.
+- Current-marker and legacy projections older than the moving two-date lookback may remain indefinitely.
 
 For app-backed EventKit validation checks, see [`docs/manual-validation.md`](manual-validation.md).
