@@ -169,7 +169,8 @@ enum ReconcileCommandHandlerTests {
             output.contains("verified no matching legacy-marker events"),
             "Cleanup apply should report verified local success")
         try expect(
-            await store.deletedEvents().map(\.id) == ["legacy-1"], "Cleanup apply should delete the planned event")
+            await store.deletedEvents().map(\.id) == [CalendarEventReference(providerIdentifier: "legacy-1")],
+            "Cleanup apply should delete the planned event")
     }
 
     private static func reconciliationFixture() -> CommandHandlerFixture {

@@ -4,7 +4,7 @@
 
 - **Requirements basis:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), revision 7, accepted September 16, 2026.
 - **Status:** Ready.
-- **Implementation progress:** Partial as of September 17, 2026. The reusable access, CLI, cleanup, and app-status slice is implemented and automated gates pass; D-03/D-05-dependent explanation, opaque-reference migration, app run workflows, and manual EventKit validation remain open.
+- **Implementation progress:** Partial as of September 17, 2026. The reusable access, CLI, cleanup, app-status, and opaque-reference slices are implemented and automated gates pass; D-03/D-05-dependent explanation, app run workflows, and manual EventKit validation remain open.
 - **Scope:** Calendar authorization ownership, inventory, ordinary and cleanup preflight, mutation-time access failure, privacy-safe diagnostics, and the EventKit boundary.
 - **Execution approach:** Thin, test-backed slices. Cross-capability behavior remains owned by the accepted configuration, projection/safety, reconciliation, CLI, and macOS app specifications.
 
@@ -45,13 +45,13 @@ Define and validate an application boundary identity that combines the fetched e
 
 **Evidence:** `CalendarEventIdentity` now carries physical calendar, provider event identifier, stable recurring `occurrenceDate`, and the original loaded snapshot range. The EventKit adapter searches that range and requires exactly one candidate matching calendar, ID, and occurrence date before deleting `.thisEvent`. `CalendarAuthorizationTests` covers detached-occurrence and ambiguous-match selection. Real recurring EventKit mutation remains pending for CA-13 manual validation.
 
-### - [ ] CA-02 — Introduce access DTOs and capability-separated ports
+### - [x] CA-02 — Introduce access DTOs and capability-separated ports
 
 Add framework-free authorization states, privacy-safe access failures, an authorization-inspection port, and a separate full-access request port. Add an explicit app setup/recovery use case. Ordinary inventory and reconciliation APIs must not receive the request capability. Continue toward opaque physical-calendar and exact-occurrence references without making provider IDs selectors, visible-set keys, routing inputs, or ownership markers.
 
 **Dependencies:** CA-01 for the final occurrence-reference shape.
 
-**Evidence:** Added framework-free authorization states/errors, separate `CalendarAuthorizationStatusPort` and `CalendarFullAccessRequestPort`, explicit setup and inventory use cases, and access/preflight DTOs. Reusable handlers no longer construct concrete EventKit adapters. The task remains open because existing calendar/event models still expose provider identifier strings rather than fully opaque physical-calendar and exact-occurrence reference types.
+**Evidence:** Added framework-free authorization states/errors, separate `CalendarAuthorizationStatusPort` and `CalendarFullAccessRequestPort`, explicit setup and inventory use cases, and access/preflight DTOs. Reusable handlers no longer construct concrete EventKit adapters. `PhysicalCalendarReference` and `CalendarEventReference` now preserve exact provider identity for topology collision checks, mutation targets, deterministic ordering, and reviewed-action equality while redacting their descriptions. Raw provider identifiers are available only through package-internal EventKit lookup and approved successful CLI inventory formatting paths. Deterministic authorization, preflight, cleanup, mutation, reconciliation, privacy, and CLI suites pass.
 
 ### - [x] CA-03 — Make EventKit store operations non-prompting
 
@@ -165,7 +165,7 @@ Real Calendar mutation is reserved for explicit harmless manual validation.
 ## Progress tracking
 
 - [x] CA-01 — Establish exact recurring-occurrence identity
-- [ ] CA-02 — Introduce access DTOs and capability-separated ports
+- [x] CA-02 — Introduce access DTOs and capability-separated ports
 - [x] CA-03 — Make EventKit store operations non-prompting
 - [x] CA-04 — Deliver configuration-independent inventory
 - [x] CA-05 — Implement shared complete-topology preflight
@@ -180,4 +180,4 @@ Real Calendar mutation is reserved for explicit harmless manual validation.
 
 ## Next action
 
-Perform the explicit harmless EventKit validation in `docs/manual-validation.md`, then derive and execute focused D-03 and D-05 plans for opaque provider references, complete ordinary explanation, reviewed app runs, app cleanup, scheduling, and privacy-safe persisted operational state before closing CA-02, CA-09 through CA-13.
+Perform the explicit harmless EventKit validation in `docs/manual-validation.md`, then derive and execute focused D-03 and D-05 plans for complete ordinary explanation, reviewed app runs, app cleanup, scheduling, and privacy-safe persisted operational state before closing CA-09 through CA-13.

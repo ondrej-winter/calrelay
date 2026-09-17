@@ -136,8 +136,8 @@ public struct ReconcileCalendarsUseCase: Sendable {
 
     private func calendarEvent(for event: CalendarEventProjection, idPrefix: String) -> CalendarEvent {
         CalendarEvent(
-            id:
-                "\(idPrefix)-\(event.destinationCalendar.id)-\(event.title)-\(event.start.timeIntervalSince1970)-\(event.end.timeIntervalSince1970)",
+            id: event.destinationCalendar.id.syntheticEventReference(
+                idPrefix: idPrefix, title: event.title, start: event.start, end: event.end),
             calendar: event.destinationCalendar, title: event.title, start: event.start, end: event.end,
             isAllDay: event.isAllDay, availability: .busy, status: .confirmed)
     }
@@ -207,8 +207,7 @@ private struct ActionSortKey: Comparable {
         end = event.end
         isAllDay = event.isAllDay
         title = event.title
-        let occurrence = event.occurrenceDate?.timeIntervalSinceReferenceDate.description ?? ""
-        tieBreaker = "\(event.id)|\(occurrence)"
+        tieBreaker = event.id.totalOrderKey(occurrenceDate: event.occurrenceDate)
     }
 
     init(projection: CalendarEventProjection) {

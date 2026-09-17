@@ -88,8 +88,11 @@ enum CalendarCleanupAccessTests {
         let plan = try await useCase.dryRun(settings: settings(legacyMarkers: ["[OLD]"]), now: referenceDate())
 
         try expect(
-            plan.deletions.map(\.event.id) == ["hub-old", "work-old-early", "work-old-late"],
-            "Cleanup should select exact markers hub-first and sort within each calendar")
+            plan.deletions.map(\.event.id) == [
+                CalendarEventReference(providerIdentifier: "hub-old"),
+                CalendarEventReference(providerIdentifier: "work-old-early"),
+                CalendarEventReference(providerIdentifier: "work-old-late")
+            ], "Cleanup should select exact markers hub-first and sort within each calendar")
         try expect(
             plan.deletions.map(\.role) == [
                 .hub, .work(name: "ACME", declarationIndex: 0), .work(name: "ACME", declarationIndex: 0)
@@ -111,10 +114,18 @@ enum CalendarCleanupAccessTests {
         let result = try await useCase.apply(settings: settings(legacyMarkers: ["[OLD]"]), now: referenceDate())
 
         try expect(result.confirmedDeletionCount == 2, "Cleanup should confirm every planned deletion")
-        try expect(await store.deletedEventIDs() == ["hub-old", "work-old"], "Cleanup should execute in topology order")
         try expect(
-            await store.eventRequestCalendarIDs() == ["hub", "work", "hub", "work"],
-            "Cleanup apply should perform a complete ordered verification read")
+            await store.deletedEventIDs() == [
+                CalendarEventReference(providerIdentifier: "hub-old"),
+                CalendarEventReference(providerIdentifier: "work-old")
+            ], "Cleanup should execute in topology order")
+        try expect(
+            await store.eventRequestCalendarIDs() == [
+                PhysicalCalendarReference(providerIdentifier: "hub"),
+                PhysicalCalendarReference(providerIdentifier: "work"),
+                PhysicalCalendarReference(providerIdentifier: "hub"),
+                PhysicalCalendarReference(providerIdentifier: "work")
+            ], "Cleanup apply should perform a complete ordered verification read")
     }
 
     private static func testCleanupApplyFailsWhenVerificationFindsRemainingMatchWithoutRollback() async throws {
@@ -133,7 +144,9 @@ enum CalendarCleanupAccessTests {
             try expect(
                 error == .verificationFoundRemainingMatches(count: 1),
                 "Remaining exact matches should fail verification")
-            try expect(await store.deletedEventIDs() == ["hub-old"], "Confirmed deletion should not be rolled back")
+            try expect(
+                await store.deletedEventIDs() == [CalendarEventReference(providerIdentifier: "hub-old")],
+                "Confirmed deletion should not be rolled back")
             return
         }
 
@@ -162,7 +175,8 @@ enum CalendarCleanupAccessTests {
                         role: .hub, selector: CalendarSelector(sourceTitle: "iCloud", calendarTitle: "Hub"))),
                 "Verification should report the failed role")
             try expect(
-                await store.deletedEventIDs() == ["hub-old"], "Verification failure should not roll back deletion")
+                await store.deletedEventIDs() == [CalendarEventReference(providerIdentifier: "hub-old")],
+                "Verification failure should not roll back deletion")
             return
         }
 
@@ -254,18 +268,18 @@ private struct CleanupStoreFailure: Error {}
 
 private actor CleanupCalendarStore: CalendarStorePort {
     private let calendars: [RelayCalendar]
-    private var eventsByCalendarID: [String: [CalendarEvent]]
+    private var eventsByCalendarID: [PhysicalCalendarReference: [CalendarEvent]]
     private let retainDeletedEvents: Bool
     private let failEventRequestNumbers: Set<Int>
     private var listCalls = 0
     private var eventRequestCount = 0
-    private var eventRequestCalendarIDsValue: [String] = []
-    private var deletedIDs: [String] = []
+    private var eventRequestCalendarIDsValue: [PhysicalCalendarReference] = []
+    private var deletedIDs: [CalendarEventReference] = []
     private var creates = 0
 
     init(
-        calendars: [RelayCalendar], eventsByCalendarID: [String: [CalendarEvent]], retainDeletedEvents: Bool = false,
-        failEventRequestNumbers: Set<Int> = []
+        calendars: [RelayCalendar], eventsByCalendarID: [PhysicalCalendarReference: [CalendarEvent]],
+        retainDeletedEvents: Bool = false, failEventRequestNumbers: Set<Int> = []
     ) {
         self.calendars = calendars
         self.eventsByCalendarID = eventsByCalendarID
@@ -295,9 +309,9 @@ private actor CleanupCalendarStore: CalendarStorePort {
 
     func listCalendarsCallCount() -> Int { listCalls }
 
-    func eventRequestCalendarIDs() -> [String] { eventRequestCalendarIDsValue }
+    func eventRequestCalendarIDs() -> [PhysicalCalendarReference] { eventRequestCalendarIDsValue }
 
-    func deletedEventIDs() -> [String] { deletedIDs }
+    func deletedEventIDs() -> [CalendarEventReference] { deletedIDs }
 
     func mutationCount() -> Int { creates + deletedIDs.count }
 }

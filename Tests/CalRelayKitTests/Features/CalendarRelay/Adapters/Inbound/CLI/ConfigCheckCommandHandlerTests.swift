@@ -38,8 +38,10 @@ enum ConfigCheckCommandHandlerTests {
             try expect(
                 await store.listCalendarsCallCount() == 1, "Migration-pending config check should still run preflight")
             try expect(
-                await store.eventRequestCalendarIDs() == ["hub-1", "work-1"],
-                "Config check should read the complete topology")
+                await store.eventRequestCalendarIDs() == [
+                    PhysicalCalendarReference(providerIdentifier: "hub-1"),
+                    PhysicalCalendarReference(providerIdentifier: "work-1")
+                ], "Config check should read the complete topology")
             return
         }
 

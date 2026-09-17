@@ -733,8 +733,10 @@ enum CalRelayContractTests {
         _ = try await reconciliationUseCase(store: store).apply(settings: fixtures.settings, now: fixtures.now)
 
         try expect(
-            await store.mutationAttempts() == ["delete:hub-stale-1", "create:hub-1"],
-            "Ordinary apply should execute hub deletes before hub creates")
+            await store.mutationAttempts() == [
+                .delete(CalendarEventReference(providerIdentifier: "hub-stale-1")),
+                .create(PhysicalCalendarReference(providerIdentifier: "hub-1"))
+            ], "Ordinary apply should execute hub deletes before hub creates")
     }
 
     private static func testApplyStopsAfterFailureWithoutRollback() async throws {
@@ -764,8 +766,10 @@ enum CalRelayContractTests {
                 "Confirmed deletion should remain applied without rollback")
             try expect((await store.createdEvents()).isEmpty, "Failed create should not be confirmed")
             try expect(
-                await store.mutationAttempts() == ["delete:hub-stale-1", "create:hub-1"],
-                "No later action should run after failure")
+                await store.mutationAttempts() == [
+                    .delete(CalendarEventReference(providerIdentifier: "hub-stale-1")),
+                    .create(PhysicalCalendarReference(providerIdentifier: "hub-1"))
+                ], "No later action should run after failure")
             return
         }
 
@@ -1199,15 +1203,16 @@ private struct ApplicationFixtures {
 
 private actor FakeCalendarStore: CalendarStorePort {
     private let calendars: [RelayCalendar]
-    private let eventsByCalendarID: [String: [CalendarEvent]]
+    private let eventsByCalendarID: [PhysicalCalendarReference: [CalendarEvent]]
     private let failMutationNumber: Int?
     private var recordedCreates: [CalendarEventProjection] = []
     private var recordedDeletes: [CalendarEventIdentity] = []
     private var recordedEventRequests: [(start: Date, end: Date)] = []
-    private var recordedMutationAttempts: [String] = []
+    private var recordedMutationAttempts: [FakeMutationAttempt] = []
 
     init(
-        calendars: [RelayCalendar], eventsByCalendarID: [String: [CalendarEvent]] = [:], failMutationNumber: Int? = nil
+        calendars: [RelayCalendar], eventsByCalendarID: [PhysicalCalendarReference: [CalendarEvent]] = [:],
+        failMutationNumber: Int? = nil
     ) {
         self.calendars = calendars
         self.eventsByCalendarID = eventsByCalendarID
@@ -1222,13 +1227,13 @@ private actor FakeCalendarStore: CalendarStorePort {
     }
 
     func createEvent(_ event: CalendarEventProjection) async throws {
-        recordedMutationAttempts.append("create:\(event.destinationCalendar.id)")
+        recordedMutationAttempts.append(.create(event.destinationCalendar.id))
         if failMutationNumber == recordedMutationAttempts.count { throw FakeMutationFailure() }
         recordedCreates.append(event)
     }
 
     func deleteEvent(_ event: CalendarEventIdentity) async throws {
-        recordedMutationAttempts.append("delete:\(event.id)")
+        recordedMutationAttempts.append(.delete(event.id))
         if failMutationNumber == recordedMutationAttempts.count { throw FakeMutationFailure() }
         recordedDeletes.append(event)
     }
@@ -1239,7 +1244,12 @@ private actor FakeCalendarStore: CalendarStorePort {
 
     func eventRequests() -> [(start: Date, end: Date)] { recordedEventRequests }
 
-    func mutationAttempts() -> [String] { recordedMutationAttempts }
+    func mutationAttempts() -> [FakeMutationAttempt] { recordedMutationAttempts }
+}
+
+private enum FakeMutationAttempt: Equatable {
+    case delete(CalendarEventReference)
+    case create(PhysicalCalendarReference)
 }
 
 private struct FakeMutationFailure: Error {}

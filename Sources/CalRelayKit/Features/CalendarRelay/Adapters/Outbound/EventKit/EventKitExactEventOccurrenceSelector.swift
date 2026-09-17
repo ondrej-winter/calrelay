@@ -1,13 +1,13 @@
 import Foundation
 
 public struct EventKitEventOccurrenceCandidate: Equatable, Sendable {
-    public let id: String
-    public let calendarID: String
+    public let id: CalendarEventReference
+    public let calendarID: PhysicalCalendarReference
     public let occurrenceDate: Date?
 
     public init(id: String, calendarID: String, occurrenceDate: Date?) {
-        self.id = id
-        self.calendarID = calendarID
+        self.id = CalendarEventReference(providerIdentifier: id)
+        self.calendarID = PhysicalCalendarReference(providerIdentifier: calendarID)
         self.occurrenceDate = occurrenceDate
     }
 }

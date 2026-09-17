@@ -7,6 +7,7 @@ enum CalendarAuthorizationTests {
         try await testSetupDoesNotRequestForSettledAuthorizationStates()
         try await testInventoryRequiresFullAccessWithoutRequesting()
         try await testInventoryReturnsEmptySuccessfulInventory()
+        try testOpaqueProviderReferencesPreserveIdentityWithoutStringExposure()
         try testExactOccurrenceSelectionUsesOriginalOccurrenceDate()
         try testExactOccurrenceSelectionRejectsAmbiguousCandidates()
     }
@@ -62,6 +63,25 @@ enum CalendarAuthorizationTests {
 
         try expect(calendars.isEmpty, "An empty EventKit inventory should be a successful result")
         try expect(await store.listCalendarsCallCount() == 1, "Full-access inventory should query the store once")
+    }
+
+    private static func testOpaqueProviderReferencesPreserveIdentityWithoutStringExposure() throws {
+        let firstCalendar = PhysicalCalendarReference(providerIdentifier: "calendar-1")
+        let sameCalendar = PhysicalCalendarReference(providerIdentifier: "calendar-1")
+        let otherCalendar = PhysicalCalendarReference(providerIdentifier: "calendar-2")
+        let firstEvent = CalendarEventReference(providerIdentifier: "event-1")
+        let sameEvent = CalendarEventReference(providerIdentifier: "event-1")
+
+        try expect(
+            firstCalendar == sameCalendar, "Equal provider calendar identifiers should produce equal opaque references")
+        try expect(firstCalendar != otherCalendar, "Different physical calendars should remain distinct")
+        try expect(firstEvent == sameEvent, "Equal provider event identifiers should produce equal opaque references")
+        try expect(
+            !String(describing: firstCalendar).contains("calendar-1"),
+            "Physical calendar references should not expose provider identifiers through descriptions")
+        try expect(
+            !String(describing: firstEvent).contains("event-1"),
+            "Event references should not expose provider identifiers through descriptions")
     }
 
     private static func testExactOccurrenceSelectionUsesOriginalOccurrenceDate() throws {

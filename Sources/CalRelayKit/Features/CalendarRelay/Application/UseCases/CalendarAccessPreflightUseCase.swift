@@ -108,8 +108,8 @@ public struct CalendarAccessPreflightUseCase: Sendable {
     private func appendCollisionIssues(
         for resolutions: [RoleResolution], to issues: inout [CalendarAccessPreflightIssue]
     ) {
-        var rolesByCalendarID: [String: [ConfiguredCalendarRole]] = [:]
-        var calendarIDOrder: [String] = []
+        var rolesByCalendarID: [PhysicalCalendarReference: [ConfiguredCalendarRole]] = [:]
+        var calendarIDOrder: [PhysicalCalendarReference] = []
 
         for resolution in resolutions {
             if rolesByCalendarID[resolution.calendar.id] == nil { calendarIDOrder.append(resolution.calendar.id) }

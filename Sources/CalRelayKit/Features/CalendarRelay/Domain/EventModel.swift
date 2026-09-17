@@ -1,7 +1,7 @@
 import Foundation
 
 public struct CalendarEvent: Equatable, Identifiable, Sendable {
-    public let id: String
+    public let id: CalendarEventReference
     public let calendar: CalendarIdentity
     public let title: String
     public let start: Date
@@ -15,6 +15,17 @@ public struct CalendarEvent: Equatable, Identifiable, Sendable {
 
     public init(
         id: String, calendar: CalendarIdentity, title: String, start: Date, end: Date, isAllDay: Bool,
+        availability: EventAvailability, status: EventStatus, occurrenceDate: Date? = nil,
+        occurrenceLookupStart: Date? = nil, occurrenceLookupEnd: Date? = nil
+    ) {
+        self.init(
+            id: CalendarEventReference(providerIdentifier: id), calendar: calendar, title: title, start: start,
+            end: end, isAllDay: isAllDay, availability: availability, status: status, occurrenceDate: occurrenceDate,
+            occurrenceLookupStart: occurrenceLookupStart, occurrenceLookupEnd: occurrenceLookupEnd)
+    }
+
+    public init(
+        id: CalendarEventReference, calendar: CalendarIdentity, title: String, start: Date, end: Date, isAllDay: Bool,
         availability: EventAvailability, status: EventStatus, occurrenceDate: Date? = nil,
         occurrenceLookupStart: Date? = nil, occurrenceLookupEnd: Date? = nil
     ) {

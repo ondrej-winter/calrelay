@@ -33,7 +33,7 @@ public enum CalendarListFormatter {
 
     private static func formatCLICalendar(_ calendar: RelayCalendar) -> String {
         let writability = calendar.isWritable ? "writable" : "read-only"
-        return "- \(calendar.sourceTitle) / \(calendar.title) [id: \(calendar.id), \(writability)]"
+        return "- \(calendar.sourceTitle) / \(calendar.title) [id: \(calendar.id.diagnosticIdentifier), \(writability)]"
     }
 
     private static func formatAppCalendar(_ calendar: RelayCalendar) -> String {

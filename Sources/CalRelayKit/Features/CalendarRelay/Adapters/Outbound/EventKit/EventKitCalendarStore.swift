@@ -105,7 +105,7 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
     public func events(in calendar: CalendarIdentity, from start: Date, to end: Date) async throws -> [CalendarEvent] {
         try await requireFullAccess()
 
-        guard let eventKitCalendar = eventStore.calendar(withIdentifier: calendar.id) else {
+        guard let eventKitCalendar = eventStore.calendar(withIdentifier: calendar.id.eventKitIdentifier) else {
             throw EventKitCalendarStoreError.calendarNotFound(calendar)
         }
 
@@ -141,7 +141,7 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
 
         let eventKitEvent = try exactEvent(for: event)
 
-        guard eventKitEvent.calendar.calendarIdentifier == event.calendar.id else {
+        guard eventKitEvent.calendar.calendarIdentifier == event.calendar.id.eventKitIdentifier else {
             throw EventKitCalendarStoreError.eventCalendarMismatch(expected: event.calendar)
         }
 
@@ -150,7 +150,7 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
 
     private func exactEvent(for event: CalendarEventIdentity) throws -> EKEvent {
         if event.occurrenceDate == nil {
-            guard let eventKitEvent = eventStore.event(withIdentifier: event.id) else {
+            guard let eventKitEvent = eventStore.event(withIdentifier: event.id.eventKitIdentifier) else {
                 throw EventKitCalendarStoreError.eventNotFound(event)
             }
 
@@ -161,7 +161,7 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
             throw EventKitCalendarStoreError.eventNotFound(event)
         }
 
-        guard let calendar = eventStore.calendar(withIdentifier: event.calendar.id) else {
+        guard let calendar = eventStore.calendar(withIdentifier: event.calendar.id.eventKitIdentifier) else {
             throw EventKitCalendarStoreError.calendarNotFound(event.calendar)
         }
 
@@ -183,7 +183,7 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
     }
 
     private func writableEventKitCalendar(for calendar: CalendarIdentity) throws -> EKCalendar {
-        guard let eventKitCalendar = eventStore.calendar(withIdentifier: calendar.id) else {
+        guard let eventKitCalendar = eventStore.calendar(withIdentifier: calendar.id.eventKitIdentifier) else {
             throw EventKitCalendarStoreError.calendarNotFound(calendar)
         }
 

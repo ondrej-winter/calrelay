@@ -11,13 +11,13 @@ struct TestCalendarAuthorizationStatus: CalendarAuthorizationStatusPort {
 
 actor CommandHandlerCalendarStore: CalendarStorePort {
     private let calendars: [RelayCalendar]
-    private var eventsByCalendarID: [String: [CalendarEvent]]
+    private var eventsByCalendarID: [PhysicalCalendarReference: [CalendarEvent]]
     private var recordedCreates: [CalendarEventProjection] = []
     private var recordedDeletes: [CalendarEventIdentity] = []
     private var listCalendarsCalls = 0
-    private var recordedEventRequests: [String] = []
+    private var recordedEventRequests: [PhysicalCalendarReference] = []
 
-    init(calendars: [RelayCalendar], eventsByCalendarID: [String: [CalendarEvent]] = [:]) {
+    init(calendars: [RelayCalendar], eventsByCalendarID: [PhysicalCalendarReference: [CalendarEvent]] = [:]) {
         self.calendars = calendars
         self.eventsByCalendarID = eventsByCalendarID
     }
@@ -45,5 +45,5 @@ actor CommandHandlerCalendarStore: CalendarStorePort {
 
     func listCalendarsCallCount() -> Int { listCalendarsCalls }
 
-    func eventRequestCalendarIDs() -> [String] { recordedEventRequests }
+    func eventRequestCalendarIDs() -> [PhysicalCalendarReference] { recordedEventRequests }
 }

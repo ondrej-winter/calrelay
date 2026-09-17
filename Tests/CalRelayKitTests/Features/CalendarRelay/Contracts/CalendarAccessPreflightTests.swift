@@ -36,7 +36,7 @@ enum CalendarAccessPreflightTests {
         let ready = RelayCalendar(id: "ready", title: "Delta Work", sourceTitle: "Local", isWritable: true)
         let store = PreflightCalendarStore(
             calendars: [sharedHub, sharedWork, ambiguousOne, ambiguousTwo, broken, ready],
-            readFailureCalendarIDs: ["broken"])
+            readFailureCalendarIDs: [PhysicalCalendarReference(providerIdentifier: "broken")])
         let useCase = CalendarAccessPreflightUseCase(
             authorizationStatus: PreflightAuthorizationStatus(state: .fullAccess), calendarStore: store)
 
@@ -71,8 +71,12 @@ enum CalendarAccessPreflightTests {
                     role: .work(name: "Gamma", declarationIndex: 3), selector: selector("CalDAV", "Gamma Work"))),
             "Preflight should report a role read failure")
         try expect(
-            await store.eventRequestCalendarIDs() == ["shared", "shared", "broken", "ready"],
-            "Preflight should read every uniquely resolved role hub-first and then in declaration order")
+            await store.eventRequestCalendarIDs() == [
+                PhysicalCalendarReference(providerIdentifier: "shared"),
+                PhysicalCalendarReference(providerIdentifier: "shared"),
+                PhysicalCalendarReference(providerIdentifier: "broken"),
+                PhysicalCalendarReference(providerIdentifier: "ready")
+            ], "Preflight should read every uniquely resolved role hub-first and then in declaration order")
         try expect(await store.mutationCount() == 0, "Preflight must never mutate as a capability probe")
     }
 
@@ -95,7 +99,11 @@ enum CalendarAccessPreflightTests {
             "Ready snapshot should preserve configured role order")
         try expect(snapshot.calendars[0].events.isEmpty, "Ready snapshot should contain the hub events")
         try expect(snapshot.calendars[1].events == [event], "Ready snapshot should contain work-calendar events")
-        try expect(await store.eventRequestCalendarIDs() == ["hub", "work"], "Ready reads should be hub-first")
+        try expect(
+            await store.eventRequestCalendarIDs() == [
+                PhysicalCalendarReference(providerIdentifier: "hub"),
+                PhysicalCalendarReference(providerIdentifier: "work")
+            ], "Ready reads should be hub-first")
         try expect(
             await store.eventRequestWindows() == [window(), window()],
             "Every role should use the same captured access window")
@@ -182,16 +190,16 @@ private struct AuthorizationFailureCalendarStore: CalendarStorePort {
 
 private actor PreflightCalendarStore: CalendarStorePort {
     private let calendars: [RelayCalendar]
-    private let eventsByCalendarID: [String: [CalendarEvent]]
-    private let readFailureCalendarIDs: Set<String>
+    private let eventsByCalendarID: [PhysicalCalendarReference: [CalendarEvent]]
+    private let readFailureCalendarIDs: Set<PhysicalCalendarReference>
     private var listCalls = 0
-    private var eventRequests: [(calendarID: String, window: CalendarAccessWindow)] = []
+    private var eventRequests: [(calendarID: PhysicalCalendarReference, window: CalendarAccessWindow)] = []
     private var creates = 0
     private var deletes = 0
 
     init(
-        calendars: [RelayCalendar], eventsByCalendarID: [String: [CalendarEvent]] = [:],
-        readFailureCalendarIDs: Set<String> = []
+        calendars: [RelayCalendar], eventsByCalendarID: [PhysicalCalendarReference: [CalendarEvent]] = [:],
+        readFailureCalendarIDs: Set<PhysicalCalendarReference> = []
     ) {
         self.calendars = calendars
         self.eventsByCalendarID = eventsByCalendarID
@@ -215,7 +223,7 @@ private actor PreflightCalendarStore: CalendarStorePort {
 
     func listCalendarsCallCount() -> Int { listCalls }
 
-    func eventRequestCalendarIDs() -> [String] { eventRequests.map(\.calendarID) }
+    func eventRequestCalendarIDs() -> [PhysicalCalendarReference] { eventRequests.map(\.calendarID) }
 
     func eventRequestWindows() -> [CalendarAccessWindow] { eventRequests.map(\.window) }
 
