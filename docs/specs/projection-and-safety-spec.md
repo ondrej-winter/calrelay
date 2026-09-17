@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 5 — accepted on September 16, 2026 after the projection and safety stress-test interview; eligibility precedence, overlap membership, all-day projection, recurrence limits, destructive namespaces, and bounded historical ownership were clarified.
+- **Revision:** 6 — accepted on September 17, 2026 after the routing stress-test interview; the complete valid-marker namespace in the shared hub was explicitly reserved for authoritative blocker semantics.
 - **Canonical artifact:** `docs/specs/projection-and-safety-spec.md`.
 - **Scope:** Source-event eligibility, reconciliation and cleanup windows, projection shape, marker ownership, and deletion safety.
 
@@ -58,8 +58,9 @@
 
 - In the hub, an event marked with a current locally configured work marker is a locally managed work projection and may be deleted when stale, cancelled, or part of duplicate replacement.
 - In the hub, a valid marked event whose marker is not a current locally configured work marker is preserved during ordinary reconciliation and treated as a remote-style blocker source.
+- The complete valid leading-marker namespace in the shared hub is reserved for authoritative blocker semantics as defined by [`routing-spec.md`](routing-spec.md). A manually or externally created non-cancelled valid marked hub event is indistinguishable from routing input and is relayed without origin authentication or remote-marker registration.
 - In every configured work calendar, the valid leading-marker namespace is reserved for CalRelay-managed blocker semantics. Any valid marked event may be suppressed as feedback and deleted when absent from the expected hub-derived blocker set.
-- Because title markers are the visible ownership mechanism, a manually created event using a current local work marker in the hub or any valid marker in a configured work calendar is indistinguishable from a managed projection and may be overwritten or deleted. User-facing documentation must warn about both destructive namespaces.
+- Because title markers are the visible ownership mechanism, a manually created event using a current local work marker in the hub or any valid marker in a configured work calendar is indistinguishable from a managed projection and may be overwritten or deleted. Any valid marked hub event may also propagate its title across configured account boundaries. User-facing documentation must warn about the hub routing/disclosure risk and both destructive namespaces.
 - CalRelay must never delete an unmarked work/client event or otherwise mutate an original unmarked source event.
 - Manual edits to marked generated events may be overwritten or deleted by ordinary reconciliation.
 - Ordinary ownership and stale-repair guarantees cover only the current effective window. A current-marker projection that has moved before the two-date lookback may remain indefinitely after a later source deletion, rename, or correction.
@@ -92,7 +93,7 @@
 - **PROJECT-AC-06:** Recurrence tests treat every returned occurrence, including a detached edit, independently and make no claim about occurrences absent from a successful EventKit snapshot.
 - **PROJECT-AC-07:** Dry-run, apply, and explanation use one captured effective window for input reads, projection generation, matching, creates, and stale, cancelled, or duplicate-replacement deletes.
 - **SAFE-AC-01:** Ordinary reconciliation deletes stale local-work-marker hub projections, preserves non-local marked hub events, treats non-cancelled marked hub events as authoritative blockers, and never plans deletion of an unmarked original work/client event.
-- **SAFE-AC-02:** Representative manually marked hub and work-calendar events demonstrate both documented reserved-namespace deletion risks.
+- **SAFE-AC-02:** Representative manually marked events demonstrate authoritative routing for any valid marked hub event, deletion risk for a current-local-marker hub event, and deletion risk for any valid marked event in a configured work calendar.
 - **SAFE-AC-03:** CLI and app cleanup select exact legacy-marker matches across the configured hub and work calendars, select no current-marker, malformed-marker, or unmarked events, and perform no creates or ordinary reconciliation deletes.
 - **SAFE-AC-04:** Deterministic tests demonstrate the bounded historical ownership rule and the accepted plan-time deletion authority when an event changes after planning.
 - **SAFE-AC-05:** Defaults remain deterministic and do not require live EventKit access to test.
@@ -110,6 +111,7 @@
 
 ## Compatibility and breaking changes
 
+- Revision 6 explicitly reserves every valid leading marker in the shared hub for authoritative blocker routing and documents that manually or externally created marked events propagate without origin authentication.
 - Revision 5 replaces the broad tentative/declined/all-day defaults with explicit current-user attendee and availability precedence, includes eligible all-day events, defines positive-overlap window membership, and treats returned recurring occurrences as authoritative only for the current run.
 - Revision 5 also records title disclosure, provider-default projection availability, bounded historical ownership, both destructive marker namespaces, exact-only legacy cleanup, and plan-time deletion authority as accepted trade-offs.
 - Revision 4 permits the explicit app cleanup workflow to exercise the existing bounded legacy-marker deletion authority; the selected events and safety boundaries are unchanged.

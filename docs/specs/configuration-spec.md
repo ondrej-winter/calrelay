@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 7 — accepted on September 16, 2026 after the reconciliation stress-test interview; work-calendar declaration order became mutation-relevant, and standing authorization gained policy-version and resolved-topology bindings without changing the YAML schema.
+- **Revision:** 8 — accepted on September 17, 2026 after the routing stress-test interview; marker retirement and reuse prerequisites now account for dormant writers, removed calendars, bounded recurring cleanup, and global artifact verification without changing the YAML schema.
 - **Canonical artifact:** `docs/specs/configuration-spec.md`.
 - **Scope:** YAML settings, marker and selector contracts, canonical configuration discovery, structural validation, migration-pending state, and legacy-marker cleanup coverage.
 
@@ -90,6 +90,10 @@
 - Cleanup success is local and point-in-time. It does not prove global marker retirement, prevent later recreation, cover calendars not visible to that run, or cover events older than the two-date lookback.
 - Multi-computer migration uses eventual convergence. A not-yet-migrated computer may recreate retired-marker events after another computer succeeds, and repeated idempotent cleanup is expected until all publishers have migrated.
 - Historical artifacts that do not satisfy the current exact marked-title grammar are outside automatic cleanup and require manual identification and removal. `legacyMarkers` never enable fuzzy, raw-prefix, or heuristic deletion.
+- A removed work calendar is outside cleanup coverage once it is no longer configured; the operator must manually inspect and remove obsolete marked artifacts that remain there as required by [`routing-spec.md`](routing-spec.md).
+- Retirement must account for dormant or long-offline writers. Such a writer must adopt the current topology and pass normal readiness before reconciling with the shared hub again.
+- A retired marker may be reused as a current work or personal marker only after operators manually verify that no exact matching artifact remains anywhere it could exist and that no stale writer can republish the old assignment. Successful bounded cleanup is insufficient proof.
+- Operators must manually inspect and remove recurring series capable of producing matching occurrences outside the cleanup range before retirement is complete or reuse is allowed. Cleanup remains exact-occurrence deletion and does not gain whole-series authority.
 
 ### CONFIG-09 — Fresh app loading and ordinary authorization identities
 
@@ -106,6 +110,7 @@
 
 ## Compatibility and breaking changes
 
+- Revision 8 does not change the YAML schema or cleanup mutation authority. It makes the operator-managed completion and reuse prerequisites explicit for removed calendars, dormant writers, bounded recurring cleanup, and global artifact verification.
 - Revision 7 makes `workCalendars` declaration order mutation-relevant and therefore authorization-relevant; reordering entries now requires renewed app standing authorization.
 - Revision 7 binds standing authorization to an explicit reconciliation-policy version and opaque resolved-topology identity. The delete-first Revision 6 reconciliation policy invalidates authorization granted under the prior create-first policy, and unproven physical calendar identity churn requires a new dry run and renewed authorization.
 - Revision 6 replaces the fixed September 15, 2026 cleanup epoch with the moving bounded `D - 2...D + 365` range and explicitly accepts that older legacy projections may remain indefinitely.
@@ -145,9 +150,10 @@
 - **CONFIG-AC-12:** App status and every app run load the selected file afresh; missing, invalid, or migration-pending changes suppress mutation without a last-known-valid fallback.
 - **CONFIG-AC-13:** Representation-only equivalent YAML produces the same configuration mutation identity; every mutation-relevant value or `workCalendars` declaration-order change produces a different identity; an observed change invalidates standing authorization until renewed; and persisted opaque data reveals none of the prohibited configuration values.
 - **CONFIG-AC-14:** A selected-file configuration identity change before the first app mutation aborts without mutation, including when the file later returns to a previously authorized identity.
-- **CONFIG-AC-15:** Migration documentation requires retirement of a tombstoned marker from every active configuration sharing the hub and directs non-exact historical artifacts to manual removal rather than fuzzy cleanup.
+- **CONFIG-AC-15:** Migration documentation requires retirement of a tombstoned marker from every active configuration sharing the hub, requires removed-calendar and non-exact historical artifacts to be handled manually, and prohibits fuzzy cleanup.
 - **CONFIG-AC-16:** Reconciliation-policy tests change the version whenever identical configuration and snapshot inputs can produce different executable actions, exact targets, or order, invalidate prior standing authorization after such a change, and do not change the version for presentation-only revisions.
 - **CONFIG-AC-17:** Resolved-topology tests bind standing authorization to an opaque hub-and-declaration-ordered role mapping, invalidate authorization when any physical EventKit calendar identity changes or cannot prove continuity, and never persist or display raw calendar IDs.
+- **CONFIG-AC-18:** Migration documentation requires dormant writers to adopt the current topology before reconnecting and permits retired-marker reuse only after manual global artifact verification, removal of future-producing recurring series, and prevention of stale republishing.
 
 ## Open decision
 
