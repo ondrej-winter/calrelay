@@ -10,23 +10,29 @@ import SwiftUI
     @Published var migrationSummary = "Migration state has not been checked."
     @Published var isLoading = false
     @Published var canRunOrdinarySync = false
+    @Published var manualReview: CalendarManualApplyReview?
+    @Published var reviewNotice = ""
 
     private let inventory: CalendarInventoryUseCase
     private let setup: CalendarAccessSetupUseCase
     private let status: CalendarControlPanelStatusUseCase
     private let manualDryRun: CalendarManualDryRunUseCase
+    private let manualApply: CalendarManualApplyUseCase
 
     init(
         inventory: CalendarInventoryUseCase, setup: CalendarAccessSetupUseCase,
-        status: CalendarControlPanelStatusUseCase, manualDryRun: CalendarManualDryRunUseCase
+        status: CalendarControlPanelStatusUseCase, manualDryRun: CalendarManualDryRunUseCase,
+        manualApply: CalendarManualApplyUseCase
     ) {
         self.inventory = inventory
         self.setup = setup
         self.status = status
         self.manualDryRun = manualDryRun
+        self.manualApply = manualApply
     }
 
     func refreshStatus() {
+        guard !isLoading, manualReview == nil else { return }
         isLoading = true
         canRunOrdinarySync = false
         output = "Refreshing configuration, Calendar access, and configured readiness…"
@@ -46,6 +52,7 @@ import SwiftUI
     }
 
     func setUpCalendarAccess() {
+        guard !isLoading, manualReview == nil else { return }
         isLoading = true
         canRunOrdinarySync = false
         output = "Checking Calendar access…"
@@ -116,6 +123,7 @@ import SwiftUI
     }
 
     func listCalendars() {
+        guard !isLoading, manualReview == nil else { return }
         isLoading = true
         output = "Loading the non-prompting Calendar inventory…"
 
@@ -129,6 +137,7 @@ import SwiftUI
     }
 
     func runDryRun() {
+        guard !isLoading, manualReview == nil else { return }
         isLoading = true
         output = "Loading fresh configuration and Calendar state for a dry run…"
 
@@ -139,6 +148,56 @@ import SwiftUI
             }
 
             isLoading = false
+        }
+    }
+
+    func reviewSync() {
+        guard !isLoading, manualReview == nil else { return }
+        isLoading = true
+        output = "Loading a fresh sync plan for review…"
+        Task {
+            defer { isLoading = false }
+            do {
+                manualReview = try await manualApply.review()
+                reviewNotice = "No calendar mutations have been performed."
+            } catch {
+                canRunOrdinarySync = false
+                output = CalendarManualApplyFormatter.formatFailure(error)
+            }
+        }
+    }
+
+    func cancelSyncReview() {
+        guard !isLoading else { return }
+        isLoading = true
+        Task {
+            await manualApply.cancelReview()
+            manualReview = nil
+            output = "Sync review cancelled. No calendar mutations were performed."
+            isLoading = false
+        }
+    }
+
+    func confirmSync() {
+        guard !isLoading, let review = manualReview else { return }
+        isLoading = true
+        Task {
+            defer { isLoading = false }
+            do {
+                switch try await manualApply.confirm(reviewID: review.id) {
+                case .reviewRequired(let fresh):
+                    reviewNotice =
+                        "The executable plan changed. Nothing was applied. Review and confirm this fresh plan, even if its counts look unchanged."
+                    manualReview = fresh
+                case .applied(let result):
+                    manualReview = nil
+                    output = CalendarManualApplyFormatter.format(result)
+                }
+            } catch {
+                manualReview = nil
+                canRunOrdinarySync = false
+                output = CalendarManualApplyFormatter.formatFailure(error)
+            }
         }
     }
 

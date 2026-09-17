@@ -12,14 +12,31 @@ struct CalendarListView: View {
             inventoryControls
             syncControls
             calendarOutput
-        }.padding().task { viewModel.refreshStatus() }
+        }.padding().task { viewModel.refreshStatus() }.sheet(item: $viewModel.manualReview) { review in
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Review Sync Plan").font(.title2)
+                Text(viewModel.reviewNotice)
+                Text("Planned deletes: \(review.summary.plannedDeletes)")
+                Text("Planned creates: \(review.summary.plannedCreates)")
+                Text(
+                    "Confirmation applies only to this ordered plan. Current configuration and calendars will be checked again before any mutation."
+                )
+                HStack {
+                    Button("Cancel") { viewModel.cancelSyncReview() }.keyboardShortcut(.cancelAction)
+                    Spacer()
+                    Button(viewModel.isLoading ? "Checking and applying…" : "Confirm Run Sync") {
+                        viewModel.confirmSync()
+                    }
+                }.disabled(viewModel.isLoading)
+            }.padding(24).frame(width: 460).interactiveDismissDisabled()
+        }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("CalRelay").font(.largeTitle)
             Text(
-                "Use this control panel to verify Calendar access, inspect visible calendars, and review an ordinary sync dry run."
+                "Verify Calendar access, inspect visible calendars, and review or explicitly confirm an ordinary sync."
             ).foregroundStyle(.secondary)
         }
     }
@@ -69,6 +86,8 @@ struct CalendarListView: View {
     private var syncControls: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button(viewModel.isLoading ? "Planning…" : "Dry Run Sync") { viewModel.runDryRun() }.disabled(
+                viewModel.isLoading || !viewModel.canRunOrdinarySync)
+            Button("Run Sync Now") { viewModel.reviewSync() }.disabled(
                 viewModel.isLoading || !viewModel.canRunOrdinarySync)
 
             Text(

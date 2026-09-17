@@ -32,11 +32,22 @@ Use **Set Up or Recover Calendar Access** to trigger the permission prompt for b
 
 Use only harmless dedicated calendars for steps that can mutate EventKit data.
 
-## Pending app mutation and automation milestone checks
+## Implemented manual ordinary apply checks
 
-The following checks belong to macOS App Specification Revision 6 but the corresponding manual apply, app-cleanup, scheduling, standing-authorization, and automation controls are not implemented yet. Record them as pending rather than interpreting absent controls as a pass.
+Use only confirmed dedicated test calendars for these mutation checks. Do not replace an existing personal configuration just to run them.
 
-1. Review a fresh app ordinary plan, confirm **Run Sync Now** requires confirmation for that exact ordered plan, and confirm scheduling cannot be enabled until explicit standing authorization is granted.
+1. Click **Run Sync Now** and confirm an aggregate review appears without event details or mutation. Cancel and confirm nothing changes.
+2. Confirm an unchanged fresh plan and verify delete-first execution and aggregate confirmed counts. Ordinary completion does not perform post-apply verification or imply immediate provider convergence.
+3. Change an exact action, physical destination, occurrence, or order while the review is open. Confirm the old confirmation causes no mutation and a new review is required, even with identical counts. Rationale-only changes with identical executable actions do not require renewed confirmation.
+4. Change mutation-relevant configuration during review, or invalidate/remove it before mutation. Confirm no stale configuration is used. A changed semantic identity requires fresh review even for an empty plan; comments and diagnostic role-name changes do not change mutation identity.
+5. Cause a partial failure only on harmless test calendars. Confirm later actions stop, no rollback occurs, and recovery requires a new manual review. No per-event details are included in the partial result.
+6. Confirm repeated clicks cannot start overlapping manual operations, a consumed confirmation cannot be reused, and migration pending disables ordinary actions.
+
+## Pending app cleanup and automation milestone checks
+
+The following checks belong to macOS App Specification Revision 6 but app-cleanup, scheduling, standing-authorization, persisted history, and automation controls are not implemented yet. Record them as pending rather than interpreting absent controls as a pass.
+
+1. Confirm scheduling cannot be enabled until explicit standing authorization is granted.
 2. Enable scheduling and validate launch-at-login, launch/wake runs, the fixed cadence, bounded retry, freshness, notifications, pause, and Quit warning.
 3. Validate exact-plan reconfirmation, topology/policy/configuration invalidation, trigger coalescing, and privacy-safe persisted operation status.
 

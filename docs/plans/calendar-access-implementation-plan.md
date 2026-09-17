@@ -4,7 +4,7 @@
 
 - **Requirements basis:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), revision 7, accepted September 16, 2026.
 - **Status:** Ready.
-- **Implementation progress:** Partial as of September 17, 2026. The reusable access, complete CLI, cleanup, app-status, app ordinary dry-run, opaque-reference, and ordinary explanation slices are implemented; D-05 manual apply, app cleanup, scheduling, persisted status, and manual EventKit validation remain open.
+- **Implementation progress:** Partial as of September 17, 2026. The reusable access, complete CLI, cleanup, app-status, app ordinary dry-run and reviewed manual apply, opaque-reference, and ordinary explanation slices are implemented. Live app launch/status refresh and CLI unavailable-access checks have been exercised; full-access dedicated-calendar validation, D-05 app cleanup, scheduling, and persisted status remain open.
 - **Scope:** Calendar authorization ownership, inventory, ordinary and cleanup preflight, mutation-time access failure, privacy-safe diagnostics, and the EventKit boundary.
 - **Execution approach:** Thin, test-backed slices. Cross-capability behavior remains owned by the accepted configuration, projection/safety, reconciliation, CLI, and macOS app specifications.
 
@@ -115,7 +115,7 @@ Make the clearly labeled setup/recovery action the only prompt owner. Separate a
 
 **Dependencies:** CA-03 through CA-08 and D-05.
 
-**Evidence:** The access-owned app slice is complete: the normal Dock-visible app has no menu-bar item; only **Set Up or Recover Calendar Access** can request permission; ID-free inventory is separate; and a reusable status use case presents dependency-ordered configuration, authorization, complete readiness, and migration states without prompting. **Dry Run Sync** reloads the canonical settings and current Calendar snapshot through a framework-free application use case, reuses the shared ordinary preflight and planner, remains unavailable while the displayed status is not ready, and performs no mutation. Deterministic status and manual-dry-run tests cover migration blocking before EventKit access and fresh settings loading on every invocation. The task remains open because D-05-owned confirmed manual apply, app cleanup, scheduled/automatic runs, standing authorization, and persisted operation status are not yet implemented.
+**Evidence:** The access-owned app slice is complete: the normal Dock-visible app has no menu-bar item; only **Set Up or Recover Calendar Access** can request permission; ID-free inventory is separate; and a reusable status use case presents dependency-ordered configuration, authorization, complete readiness, and migration states without prompting. **Dry Run Sync** reloads the canonical settings and current Calendar snapshot, uses shared preflight/planning, and performs no mutation. **Run Sync Now** now provides exact-plan reviewed manual apply with fresh preflight and pre-mutation configuration validation; see D05-03. The task remains open for app cleanup, scheduled/automatic runs, standing authorization, configuration observation/status recovery, and persisted operation status.
 
 ### - [ ] CA-11 — Centralize privacy-safe diagnostics and presentation
 
@@ -131,7 +131,7 @@ Register focused authorization, inventory, preflight, cleanup, mutation, privacy
 
 **Dependencies:** incremental alongside CA-01 through CA-11.
 
-**Evidence:** Focused authorization, inventory, preflight, window, cleanup, mutation, privacy, control-panel status, manual app dry-run, handler, contract, and process-smoke suites are registered in the custom runner. `CalendarManualDryRunTests` proves fresh settings loading, shared planning, migration blocking before Calendar access, non-mutation, and aggregate-only presentation. The task remains open for manual apply, automatic app operation, persisted-state, and app-cleanup acceptance checks.
+**Evidence:** Focused authorization, inventory, preflight, window, cleanup, mutation, privacy, control-panel status, manual app dry-run/apply, handler, contract, and process-smoke suites are registered in the custom runner. `CalendarManualDryRunTests` proves fresh settings loading, shared planning, migration blocking before Calendar access, non-mutation, and aggregate-only presentation. `CalendarReviewedActionTests` and `CalendarManualApplyTests` cover reviewed executable identities, fresh snapshots/configuration, stale confirmation, cancellation, empty plans, partial failure, and reentrant confirmation. The task remains open for automatic app operation, persisted-state, and app-cleanup acceptance checks.
 
 ### - [ ] CA-13 — Update operational documentation and validate
 
@@ -139,7 +139,71 @@ Update manual validation for permission recovery, no-prompt CLI behavior, invent
 
 **Dependencies:** all implementation tasks.
 
-**Evidence:** Updated `README.md`, `docs/configuration.md`, and `docs/manual-validation.md` for permission ownership, inventory/readiness separation, config check, complete ordinary explanation, cleanup, partial failure, app ordinary dry run, and pending app mutation/automation workflows. `CalendarManualDryRunTests`, `make format-check`, `make check`, `make app`, and `git diff HEAD --check` pass on September 17, 2026. The app-bundle target clears disallowed extended attributes before and after signing and runs `codesign --verify --deep --strict` before reporting success. On this file-provider-backed workspace, provenance metadata is reattached asynchronously, so a delayed standalone strict verification is not stable even though in-target verification passes. Formatter output contains only pre-existing warnings in untouched files. Explicit harmless EventKit permission, provider, successful live app dry run, successful live explanation, recurring-occurrence, and mutation validation was not run in this automated session, so the task remains open.
+**Earlier evidence:** Updated `README.md`, `docs/configuration.md`, and `docs/manual-validation.md` for permission ownership, inventory/readiness separation, config check, complete ordinary explanation, cleanup, partial failure, and app ordinary dry run. The earlier September 17 gate passed but delayed bundle verification was unstable in the file-provider workspace. D05-01 through D05-03 below supersede that packaging limitation and record the subsequent manual-apply implementation, final gate, and non-mutating live evidence. Full-access permission, provider, successful live dry run/explanation, recurring-occurrence, and mutation validation remain unresolved under D05-04, so CA-13 remains open.
+
+## September 17 manual verification and D-05 continuation
+
+The following checkpoints supplement CA-10 through CA-13; they do not close the
+parent tasks while cleanup, automation, persistence, or required live checks remain
+unresolved.
+
+### - [x] D05-01 — Repair and verify local app packaging
+
+`make app` reproduced a strict signing failure caused by disallowed
+`com.apple.FinderInfo` being attached inside the file-provider workspace. A clean
+copy outside the workspace passed signing and delayed strict verification. The
+build script now assembles the app in a workspace-keyed local cache and exposes
+the existing `.build/CalRelay.app` launch path through a symlink. Bundle identity,
+ad-hoc signing, and strict verification are unchanged. See ADR 0002.
+
+### - [x] D05-02 — Exercise available non-mutating live checks
+
+The rebuilt CLI's inventory, config check, ordinary dry run, explanation, and
+cleanup dry run all failed nonzero with empty stdout and app recovery guidance
+while access was unavailable. Configuration-dependent checks used synthetic
+temporary configuration, never the personal configuration. The built app launched
+with regular Dock-visible activation policy and one window. Accessibility-based
+inspection pressed **Refresh Status**, observed its completion, identified distinct
+configuration/access/readiness/migration status areas, and confirmed both
+**Dry Run Sync** and **Run Sync Now** were disabled while access was not determined.
+No permission setup action was pressed, no authorization state was reset, and no
+calendar mutation was attempted.
+
+### - [x] D05-03 — Deliver reviewed manual ordinary apply and validation
+
+Added one-use review tokens and aggregate confirmation UI for **Run Sync Now**.
+Confirmation reloads settings, repeats complete preflight/planning, compares ordered
+executable identities and semantic configuration, then reloads configuration once
+more immediately before execution. Changed plans return a fresh review even when
+counts match. Exact delete identity excludes rationale/fetched field changes and
+lookup ranges; execution uses the fresh snapshot's occurrence lookup data. Partial
+failure consumes review authorization and displays aggregate counts without raw
+errors or event details. Actor and view-model guards prevent overlapping current
+manual workflows. Global trigger coalescing remains part of the automation slice.
+
+`CalendarReviewedActionTests` and `CalendarManualApplyTests` are registered in the
+custom executable runner. The initial missing APIs failed to compile as expected;
+an additional empty-plan/configuration-change regression failed at runtime before
+the configuration binding was added. Focused tests then passed, including changed
+snapshot physical calendars, event references and recurring occurrences, fresh
+lookup data, changed writability, configuration races, empty success, cancellation,
+privacy-safe partial failure, and concurrent confirmation. Final
+`make format-check`, `make check`, `make app`, property-list validation, shell syntax,
+`git diff HEAD --check`, and delayed strict signature verification passed on
+September 17, 2026. SwiftLint reported zero violations; formatting reported only
+pre-existing warnings in untouched files. The installed Swift toolchain also
+reported missing search-path warnings, without build or test failure. The rebuilt
+app's denied/unavailable-access surface was exercised; full-access manual apply
+remains a separate unresolved D05-04 checkpoint.
+
+### - [ ] D05-04 — Complete dedicated-calendar live acceptance
+
+Still requires explicit Calendar permission interaction and confirmed dedicated
+test calendars: successful inventory/readiness/dry run/explanation, full-access
+manual review/apply/cancel/reconfirmation, provider convergence, cleanup mutation
+and verification, and exact recurring-occurrence deletion. Do not treat denied
+access checks or fake-backed tests as evidence of these outcomes. Preserve the
+existing canonical configuration and do not mutate personal calendars.
 
 ## Risks and mitigations
 
@@ -177,7 +241,15 @@ Real Calendar mutation is reserved for explicit harmless manual validation.
 - [ ] CA-11 — Centralize privacy-safe diagnostics and presentation
 - [ ] CA-12 — Complete deterministic acceptance coverage
 - [ ] CA-13 — Update operational documentation and validate
+- [x] D05-01 — Repair and verify local app packaging
+- [x] D05-02 — Exercise available non-mutating live checks
+- [x] D05-03 — Deliver reviewed manual ordinary apply and validation
+- [ ] D05-04 — Complete dedicated-calendar live acceptance
 
 ## Next action
 
-Perform the explicit harmless EventKit validation in `docs/manual-validation.md`, then continue D-05 with exact-plan reviewed manual apply, app cleanup, standing authorization, scheduling, and privacy-safe persisted operational state before closing CA-10 through CA-13.
+Finish dedicated-calendar live acceptance with the operator and continue D-05
+with separately confirmed app cleanup, configuration observation and status
+recovery, standing authorization, serialized
+trigger coalescing, scheduling, and privacy-safe persisted operational state.
+Keep CA-10 through CA-13 open until those remaining requirements have evidence.

@@ -51,6 +51,13 @@ Build the app bundle with:
 make app
 ```
 
+The signed bundle lives in a workspace-specific directory under
+`~/Library/Caches/dev.owinter.CalRelay/builds`; `.build/CalRelay.app` is a symlink.
+This keeps file-provider metadata from breaking code signing while preserving
+the usual launch path. `make app` recreates the cached bundle and verifies its
+signature strictly. `make clean` removes SwiftPM products, not this external
+cache. See [ADR 0002](adr/0002-build-local-app-bundles-outside-file-provider-workspaces.md).
+
 Open the built app when you need macOS Calendar permission and EventKit visibility checks:
 
 ```sh

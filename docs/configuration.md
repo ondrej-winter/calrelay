@@ -194,7 +194,9 @@ Successful explanation output reports the effective start/end boundaries and con
 
 The current app implements Calendar setup/recovery, ID-free inventory, canonical configuration status, complete configured readiness, migration status, and non-mutating **Dry Run Sync**. Each dry run reloads the canonical configuration and current Calendar snapshot, uses the shared ordinary preflight and planner, and presents only aggregate planned delete/create counts without event titles or EventKit IDs. It does not use a last-known-valid configuration fallback.
 
-The remaining accepted automation milestone—reviewed manual apply, app cleanup, standing authorization, scheduling, launch-at-login, retry, freshness, and notifications—must use the same reusable preflight, plans, mutation executor, and cleanup verification behavior as the CLI. Those controls remain pending in the app surface.
+**Run Sync Now** loads a fresh plan and opens an aggregate review with explicit confirmation. Confirmation repeats configuration loading and complete preflight, compares the exact ordered executable targets, and checks the configuration mutation identity again before mutation. A changed plan or mutation-relevant configuration requires fresh review even if counts remain equal. Cancel performs no mutation; partial failure stops without rollback and requires a new review for manual recovery. Ordinary success counts confirmed actions and does not claim immediate provider convergence or perform a post-apply verification read.
+
+The remaining accepted automation milestone—app cleanup, standing authorization, scheduling, launch-at-login, retry, freshness, and notifications—must use the same reusable preflight, plans, mutation executor, and cleanup verification behavior as the CLI. Those controls and persisted operational history remain pending in the app surface.
 
 Before scheduling can be enabled for the first time, the app requires a successful ordinary dry run, presents its create/delete summary, and obtains explicit standing authorization for automatic ordinary apply runs. Enabling scheduling also enables launch-at-login for the normal Dock-visible app.
 

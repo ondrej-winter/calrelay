@@ -4,7 +4,13 @@ import Foundation
     static func main() async throws {
         let filters = Set(CommandLine.arguments.dropFirst())
         try runConfigurationSuites(filters: filters)
+        if filters.isEmpty || filters.contains("CalendarReviewedActionTests") {
+            try CalendarReviewedActionTests.runAll()
+        }
         try await runAccessSuites(filters: filters)
+        if filters.isEmpty || filters.contains("CalendarManualApplyTests") {
+            try await CalendarManualApplyTests.runAll()
+        }
         try await runCommandSuites(filters: filters)
         try await runContractSuites(filters: filters)
         print("CalRelayKitTests passed")
