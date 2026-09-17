@@ -4,7 +4,7 @@
 
 - **Requirements basis:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), revision 7, accepted September 16, 2026.
 - **Status:** Ready.
-- **Implementation progress:** Partial as of September 17, 2026. The reusable access, CLI, cleanup, app-status, and opaque-reference slices are implemented and automated gates pass; D-03/D-05-dependent explanation, app run workflows, and manual EventKit validation remain open.
+- **Implementation progress:** Partial as of September 17, 2026. The reusable access, complete CLI, cleanup, app-status, opaque-reference, and ordinary explanation slices are implemented; D-05 app run workflows and manual EventKit validation remain open.
 - **Scope:** Calendar authorization ownership, inventory, ordinary and cleanup preflight, mutation-time access failure, privacy-safe diagnostics, and the EventKit boundary.
 - **Execution approach:** Thin, test-backed slices. Cross-capability behavior remains owned by the accepted configuration, projection/safety, reconciliation, CLI, and macOS app specifications.
 
@@ -101,13 +101,13 @@ Execute exact ordered actions one at a time, confirm each mutation only after Ev
 
 **Evidence:** Added a shared action/confirmation/result boundary and `CalendarMutationExecutor`. Ordinary apply constructs the accepted hub-delete, work-delete, hub-create, work-create phases with deterministic within-calendar ordering. Ordinary and cleanup apply confirm only successful actions, stop on first failure, return privacy-safe role/count/category partial results, and perform no rollback. Empty plans succeed without store calls. Executor, ordinary use-case, cleanup, and full contract tests pass.
 
-### - [ ] CA-09 — Wire the complete CLI contract
+### - [x] CA-09 — Wire the complete CLI contract
 
 Add config check and cleanup modes, early option-conflict validation, non-prompting composition, progressive stdout confirmations, stderr failures, binary status semantics, execution-ordered review rows, and the specification's narrow ID-disclosure exceptions.
 
 **Dependencies:** CA-04, CA-06 through CA-08, and D-04.
 
-**Evidence:** Added `calrelay config check`, `--cleanup-legacy`, early ArgumentParser option-conflict validation, ordinary migration blocking, the config-check migration exception, cleanup dry-run/apply review, progressive post-success confirmations, verified cleanup success, and process-level help/validation smoke tests. Ordinary and cleanup rows follow application-owned execution order. Successful results use stdout; thrown failures use ArgumentParser's nonzero stderr path. The task remains open because the D-03-owned ordinary explanation model does not yet provide the complete two-section explanation, causal action links, and approved ID correlation required by the CLI contract.
+**Evidence:** Added `calrelay config check`, `--cleanup-legacy`, early ArgumentParser option-conflict validation, ordinary migration blocking, the config-check migration exception, cleanup dry-run/apply review, progressive post-success confirmations, verified cleanup success, and process-level help/validation smoke tests. Ordinary and cleanup rows follow application-owned execution order. Successful results use stdout; thrown failures use ArgumentParser's nonzero stderr path. Ordinary explanation now uses the shared effective window and ordered plan, reports the configured horizon, classifies every input independently across eligibility, exact routing/source treatment, expectation match, and disposition, retains every causal input identity for collapsed creates and exact delete identity/reasons, and renders the approved ID correlation only on successful `--explain`. Planner alignment covers attendee/no-attendee eligibility, all-day and unavailable events, exact marker parsing, authoritative marked-hub routing, reconciled-logical-hub suppression, cancelled replacement, replace-all duplicates, and source-title normalization. Focused contract/handler tests and binary failure tests prove non-mutation, action-order equality, stdout/stderr semantics, and no partial explanation or ID disclosure on failure. `make format-check`, `make check`, and `make app` pass on September 17, 2026. Successful live EventKit explanation remains an explicit CA-13 manual check.
 
 ### - [ ] CA-10 — Wire app permission, inventory, readiness, and run integrations
 
@@ -139,7 +139,7 @@ Update manual validation for permission recovery, no-prompt CLI behavior, invent
 
 **Dependencies:** all implementation tasks.
 
-**Evidence:** Updated `README.md`, `docs/configuration.md`, and `docs/manual-validation.md` for permission ownership, inventory/readiness separation, config check, cleanup, partial failure, and pending app workflows. `make format-check`, `make check`, `make app`, and `git diff HEAD --check` pass on September 17, 2026. The app-bundle target clears disallowed extended attributes before and after signing and runs `codesign --verify --deep --strict` before reporting success. On this file-provider-backed workspace, provenance metadata is reattached asynchronously, so a delayed standalone strict verification is not stable even though in-target verification passes. Formatter output contains only pre-existing warnings in untouched files. Explicit harmless EventKit permission, provider, recurring-occurrence, and mutation validation was not run in this automated session, so the task remains open.
+**Evidence:** Updated `README.md`, `docs/configuration.md`, and `docs/manual-validation.md` for permission ownership, inventory/readiness separation, config check, complete ordinary explanation, cleanup, partial failure, and pending app workflows. `make format-check`, `make check`, `make app`, and `git diff HEAD --check` pass on September 17, 2026. The app-bundle target clears disallowed extended attributes before and after signing and runs `codesign --verify --deep --strict` before reporting success. On this file-provider-backed workspace, provenance metadata is reattached asynchronously, so a delayed standalone strict verification is not stable even though in-target verification passes. Formatter output contains only pre-existing warnings in untouched files. Explicit harmless EventKit permission, provider, successful live explanation, recurring-occurrence, and mutation validation was not run in this automated session, so the task remains open.
 
 ## Risks and mitigations
 
@@ -172,7 +172,7 @@ Real Calendar mutation is reserved for explicit harmless manual validation.
 - [x] CA-06 — Integrate ordinary configured readiness
 - [x] CA-07 — Implement cleanup preflight and verification
 - [x] CA-08 — Implement ordered mutation execution and partial results
-- [ ] CA-09 — Wire the complete CLI contract
+- [x] CA-09 — Wire the complete CLI contract
 - [ ] CA-10 — Wire app permission, inventory, readiness, and run integrations
 - [ ] CA-11 — Centralize privacy-safe diagnostics and presentation
 - [ ] CA-12 — Complete deterministic acceptance coverage
@@ -180,4 +180,4 @@ Real Calendar mutation is reserved for explicit harmless manual validation.
 
 ## Next action
 
-Perform the explicit harmless EventKit validation in `docs/manual-validation.md`, then derive and execute focused D-03 and D-05 plans for complete ordinary explanation, reviewed app runs, app cleanup, scheduling, and privacy-safe persisted operational state before closing CA-09 through CA-13.
+Perform the explicit harmless EventKit validation in `docs/manual-validation.md`, then execute the D-05 plan for reviewed app runs, app cleanup, scheduling, and privacy-safe persisted operational state before closing CA-10 through CA-13.

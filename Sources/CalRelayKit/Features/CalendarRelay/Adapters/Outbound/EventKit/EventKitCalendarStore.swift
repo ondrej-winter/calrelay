@@ -64,21 +64,40 @@ public enum EventKitParticipantStatusValue: Equatable, Sendable {
     case other
 }
 
-public enum EventKitEventStatusMapper {
-    public static func mapStatus(
-        currentUserParticipantStatus: EventKitParticipantStatusValue?, eventStatus: EventKitEventStatusValue
-    ) -> EventStatus {
-        switch currentUserParticipantStatus {
-        case .declined: return .declined
-        case .tentative: return .tentative
-        case .accepted, .other, nil: break
-        }
+public struct EventKitEventStatusMapping: Equatable, Sendable {
+    public let eventStatus: EventStatus
+    public let currentUserParticipantStatus: CurrentUserParticipantStatus?
 
-        switch eventStatus {
-        case .confirmed: return .confirmed
-        case .tentative: return .tentative
-        case .cancelled: return .cancelled
-        case .unknown: return .unknown
+    public init(eventStatus: EventStatus, currentUserParticipantStatus: CurrentUserParticipantStatus?) {
+        self.eventStatus = eventStatus
+        self.currentUserParticipantStatus = currentUserParticipantStatus
+    }
+}
+
+public enum EventKitEventStatusMapper {
+    public static func map(
+        currentUserParticipantStatus: EventKitParticipantStatusValue?, eventStatus: EventKitEventStatusValue
+    ) -> EventKitEventStatusMapping {
+        EventKitEventStatusMapping(
+            eventStatus: mapEventStatus(eventStatus),
+            currentUserParticipantStatus: currentUserParticipantStatus.map(mapParticipantStatus))
+    }
+
+    private static func mapEventStatus(_ status: EventKitEventStatusValue) -> EventStatus {
+        switch status {
+        case .confirmed: .confirmed
+        case .tentative: .tentative
+        case .cancelled: .cancelled
+        case .unknown: .unknown
+        }
+    }
+
+    private static func mapParticipantStatus(_ status: EventKitParticipantStatusValue) -> CurrentUserParticipantStatus {
+        switch status {
+        case .accepted: .accepted
+        case .declined: .declined
+        case .tentative: .tentative
+        case .other: .other
         }
     }
 }
@@ -112,11 +131,13 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
         let predicate = eventStore.predicateForEvents(withStart: start, end: end, calendars: [eventKitCalendar])
 
         return eventStore.events(matching: predicate).map { event in
-            CalendarEvent(
+            let status = Self.mapStatus(event)
+            return CalendarEvent(
                 id: event.eventIdentifier ?? event.calendarItemIdentifier, calendar: calendar, title: event.title ?? "",
                 start: event.startDate, end: event.endDate, isAllDay: event.isAllDay,
-                availability: Self.mapAvailability(event.availability), status: Self.mapStatus(event),
-                occurrenceDate: event.occurrenceDate, occurrenceLookupStart: start, occurrenceLookupEnd: end)
+                availability: Self.mapAvailability(event.availability), status: status.eventStatus,
+                currentUserParticipantStatus: status.currentUserParticipantStatus, occurrenceDate: event.occurrenceDate,
+                occurrenceLookupStart: start, occurrenceLookupEnd: end)
         }
     }
 
@@ -210,11 +231,8 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
         }
     }
 
-    /// Maps EventKit event status to `EventStatus`, prioritizing the current user's own attendee
-    /// response when it excludes the event from sync. Other attendees declining or tentatively
-    /// accepting a shared meeting must not exclude the event from sync for the calendar owner.
-    private static func mapStatus(_ event: EKEvent) -> EventStatus {
-        EventKitEventStatusMapper.mapStatus(
+    private static func mapStatus(_ event: EKEvent) -> EventKitEventStatusMapping {
+        EventKitEventStatusMapper.map(
             currentUserParticipantStatus: event.attendees?.first(where: { $0.isCurrentUser }).map {
                 mapParticipantStatus($0.participantStatus)
             }, eventStatus: mapEventStatus(event.status))

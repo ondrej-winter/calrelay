@@ -2,14 +2,11 @@ struct ManagedEventTitlePolicy: Sendable {
     let managedPrefixes: Set<String>
 
     func isManagedProjection(_ event: CalendarEvent) -> Bool {
-        managedPrefixes.contains { prefix in event.title.hasPrefix(prefix) }
+        guard let marker = MarkedEventTitle.marker(in: event.title) else { return false }
+        return managedPrefixes.contains(marker)
     }
 
-    func hasAnyBracketedPrefix(_ event: CalendarEvent) -> Bool {
-        event.title.hasPrefix("[") && event.title.contains("]")
-    }
+    func hasValidMarker(_ event: CalendarEvent) -> Bool { MarkedEventTitle.marker(in: event.title) != nil }
 
-    func isRelayedWorkBlocker(_ event: CalendarEvent) -> Bool {
-        hasAnyBracketedPrefix(event) || isManagedProjection(event)
-    }
+    func isRelayedWorkBlocker(_ event: CalendarEvent) -> Bool { hasValidMarker(event) }
 }

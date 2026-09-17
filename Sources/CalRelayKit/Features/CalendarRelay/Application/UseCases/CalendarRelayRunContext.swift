@@ -4,6 +4,9 @@ struct ReconciliationRunContext {
     let hubCalendar: ResolvedCalendar
     let workCalendars: [WorkCalendarResolution]
     let managedPrefixes: Set<String>
+    let personalPrefix: String
+    let window: CalendarAccessWindow
+    let syncWindowDays: Int
     let hubEvents: [CalendarEvent]
 
     var allWorkEvents: [CalendarEvent] { workCalendars.flatMap(\.events) }

@@ -83,10 +83,17 @@ enum ReconcileCommandHandlerTests {
 
     private static func testReconcileHandlerFormatsExplanationFromInjectedStoreAndConfig() async throws {
         let fixture = reconciliationFixture()
+        let staleHubEvent = CalendarEvent(
+            id: "stale-hub",
+            calendar: CalendarIdentity(
+                id: fixture.hubCalendar.id, title: fixture.hubCalendar.title,
+                sourceTitle: fixture.hubCalendar.sourceTitle), title: "[ACME] Old Planning",
+            start: fixture.workEvent.start, end: fixture.workEvent.end, isAllDay: false, availability: .busy,
+            status: .confirmed)
         let configURL = try writeTemporaryConfigFile()
         let store = CommandHandlerCalendarStore(
             calendars: [fixture.hubCalendar, fixture.workCalendar],
-            eventsByCalendarID: [fixture.workCalendar.id: [fixture.workEvent]])
+            eventsByCalendarID: [fixture.hubCalendar.id: [staleHubEvent], fixture.workCalendar.id: [fixture.workEvent]])
         let handler = ReconcileCommandHandler(
             authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { fixture.now })
 
@@ -94,8 +101,27 @@ enum ReconcileCommandHandlerTests {
 
         try expect(output.contains("Google / ACME Work"), "Explanation output should include candidate calendar")
         try expect(output.contains("Client Planning"), "Explanation output should include candidate event title")
-        try expect(output.contains("-> included"), "Explanation output should include inclusion reason")
+        try expect(output.contains("event-id=acme-source-1"), "Successful explanation may include the source event ID")
+        try expect(output.contains("calendar-id=acme-1"), "Successful explanation may include the source calendar ID")
+        try expect(output.contains("caused-by=acme-source-1"), "Create explanation should cite its causal event ID")
+        try expect(output.contains("Effective window:"), "Explanation should include the effective window boundaries")
+        try expect(output.contains("configuredForwardDays=1"), "Explanation should include the configured horizon")
+        try expect(output.contains("routing=work-to-hub-source"), "Explanation should include routing treatment")
+        try expect(
+            output.contains("expectation=no-matching-expectation"), "Explanation should include expectation state")
+        try expect(
+            output.contains("disposition=preserved-unmanaged-or-non-local"),
+            "Explanation should include existing-state disposition")
+        guard let deleteIndex = output.range(of: "- delete")?.lowerBound,
+            let createIndex = output.range(of: "- create")?.lowerBound
+        else { throw TestFailure("Expected explained delete and create rows") }
+        try expect(deleteIndex < createIndex, "Explanation action rows should follow execution order")
+        try expect(
+            output.contains("eligibility=included (no current-user attendee; availability: busy)"),
+            "Explanation output should include eligibility classification")
         try expect(!output.contains("Dry-run mode"), "Explanation output should not include dry-run plan mode")
+        try expect((await store.createdEvents()).isEmpty, "Explanation should not create events")
+        try expect((await store.deletedEvents()).isEmpty, "Explanation should not delete events")
     }
 
     private static func testOrdinaryMigrationPendingFailsBeforeCalendarAccess() async throws {

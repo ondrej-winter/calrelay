@@ -21,20 +21,23 @@ public enum ReconciliationPlanner {
         expected: [CalendarEventProjection], existing: [CalendarEvent], shouldDeleteStaleEvent: (CalendarEvent) -> Bool
     ) -> ReconciliationPlan {
         let uniqueExpected = uniqueProjections(from: expected)
-        let existingKeys = Set(existing.map(VisibleEventKey.init(event:)))
         let expectedKeys = Set(uniqueExpected.map(visibleKey(for:)))
+        let activeManagedCounts = existing.reduce(into: [VisibleEventKey: Int]()) { counts, event in
+            guard event.status != .cancelled, shouldDeleteStaleEvent(event) else { return }
+            counts[VisibleEventKey(event: event), default: 0] += 1
+        }
 
-        let creates = uniqueExpected.filter { projection in !existingKeys.contains(visibleKey(for: projection)) }
+        let creates = uniqueExpected.filter { projection in
+            activeManagedCounts[visibleKey(for: projection), default: 0] != 1
+        }
 
-        var retainedKeys = Set<VisibleEventKey>()
         let deletes = existing.filter { event in
+            guard shouldDeleteStaleEvent(event) else { return false }
             let key = VisibleEventKey(event: event)
 
-            guard expectedKeys.contains(key) else { return shouldDeleteStaleEvent(event) }
-
-            guard retainedKeys.insert(key).inserted else { return shouldDeleteStaleEvent(event) }
-
-            return false
+            guard expectedKeys.contains(key) else { return true }
+            guard event.status != .cancelled else { return true }
+            return activeManagedCounts[key, default: 0] != 1
         }
 
         return ReconciliationPlan(creates: creates, deletes: deletes)
@@ -53,6 +56,7 @@ public enum ReconciliationPlanner {
     }
 
     private static func isManaged(_ event: CalendarEvent, by managedPrefixes: Set<String>) -> Bool {
-        managedPrefixes.contains { prefix in event.title.hasPrefix(prefix) }
+        guard let marker = MarkedEventTitle.marker(in: event.title) else { return false }
+        return managedPrefixes.contains(marker)
     }
 }

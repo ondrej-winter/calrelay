@@ -1,20 +1,24 @@
 import Foundation
 
 public enum EventInclusionPolicy {
-    public static func includes(_ event: CalendarEvent) -> Bool { evaluate(event) == .included }
+    public static func includes(_ event: CalendarEvent) -> Bool {
+        switch evaluate(event) {
+        case .currentUserAccepted, .noCurrentUserAttendeeIncluded: true
+        case .cancelled, .currentUserNonAccepted, .noCurrentUserAttendeeExcluded: false
+        }
+    }
 
     public static func evaluate(_ event: CalendarEvent) -> EventInclusionReason {
-        guard !event.isAllDay else { return .allDay }
-
         guard event.status != .cancelled else { return .cancelled }
 
-        guard event.status != .declined else { return .declined }
-
-        guard event.status != .tentative else { return .tentative }
+        if let currentUserParticipantStatus = event.currentUserParticipantStatus {
+            if currentUserParticipantStatus == .accepted { return .currentUserAccepted }
+            return .currentUserNonAccepted(currentUserParticipantStatus)
+        }
 
         switch event.availability {
-        case .busy, .notSupported: return .included
-        case .tentative, .free, .unavailable, .unknown: return .unsupportedAvailability(event.availability)
+        case .busy, .unavailable, .notSupported: return .noCurrentUserAttendeeIncluded(event.availability)
+        case .tentative, .free, .unknown: return .noCurrentUserAttendeeExcluded(event.availability)
         }
     }
 }

@@ -188,7 +188,7 @@ swift run calrelay reconcile --apply
 swift run calrelay reconcile --explain
 ```
 
-The current implementation reports candidate event inclusion diagnostics. The accepted complete explanation contract—effective boundaries, every input event's full classifications, and every planned action in execution order with causal EventKit ID correlation—remains pending reconciliation-slice work. Do not treat the current output as a complete explanation audit.
+Successful explanation output reports the effective start/end boundaries and configured forward horizon, every loaded input event's eligibility, routing/source treatment, and existing-state disposition, and every planned create/delete in execution order with causal EventKit event and calendar ID correlation. Those IDs are diagnostic output for this explicit successful mode only; they do not become selectors, ownership markers, or reconciliation keys. Explanation performs no mutation.
 
 ## macOS app scheduling contract
 

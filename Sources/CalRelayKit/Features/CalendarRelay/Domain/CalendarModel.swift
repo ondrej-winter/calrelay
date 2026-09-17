@@ -29,6 +29,7 @@ public struct CalendarEventReference: Equatable, Hashable, Comparable, Sendable,
     package init(providerIdentifier: String) { self.providerIdentifier = providerIdentifier }
 
     var eventKitIdentifier: String { providerIdentifier }
+    var diagnosticIdentifier: String { providerIdentifier }
 
     func totalOrderKey(occurrenceDate: Date?) -> String {
         let occurrence = occurrenceDate?.timeIntervalSinceReferenceDate.description ?? ""

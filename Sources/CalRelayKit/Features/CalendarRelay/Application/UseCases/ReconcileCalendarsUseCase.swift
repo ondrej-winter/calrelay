@@ -37,13 +37,22 @@ public struct ReconcileCalendarsUseCase: Sendable {
         try await plan(settings: settings, now: now)
     }
 
-    /// Explains inclusion/exclusion decisions for every candidate hub and work event in the
-    /// sync window. This is diagnostic-only and does not affect reconciliation planning.
+    /// Explains every loaded input event and the ordered executable actions produced by the
+    /// shared ordinary reconciliation computation.
     public func explain(settings: CalendarRelaySettings, now: Date) async throws -> ReconciliationExplanation {
-        let context = try await loadRunContext(settings: settings, now: now)
-        let candidates = (context.hubEvents + context.allWorkEvents).map(candidateExplanation(for:))
+        let computation = try await compute(settings: settings, now: now)
+        let candidates = (computation.context.hubEvents + computation.context.allWorkEvents).map({
+            candidateExplanation(for: $0, computation: computation)
+        })
+        let actions = computation.result.actions.map { action in
+            PlannedActionExplanation(
+                action: action, reason: explanationReason(for: action, computation: computation),
+                causalEvents: causalEvents(for: action, computation: computation))
+        }
 
-        return ReconciliationExplanation(candidates: candidates)
+        return ReconciliationExplanation(
+            window: computation.context.window, syncWindowDays: computation.context.syncWindowDays,
+            candidates: candidates, actions: actions)
     }
 
     public func apply(
@@ -65,36 +74,56 @@ public struct ReconcileCalendarsUseCase: Sendable {
     }
 
     private func plan(settings: CalendarRelaySettings, now: Date) async throws -> OrdinaryReconciliationResult {
+        try await compute(settings: settings, now: now).result
+    }
+
+    private func compute(settings: CalendarRelaySettings, now: Date) async throws -> OrdinaryReconciliationComputation {
         let context = try await loadRunContext(settings: settings, now: now)
         let titlePolicy = ManagedEventTitlePolicy(managedPrefixes: context.managedPrefixes)
-
-        let expectedHubEvents = context.workCalendars.flatMap { workCalendar in
-            WorkToHubProjector.project(
-                events: context.workEvents(for: workCalendar).filter { event in !titlePolicy.isRelayedWorkBlocker(event)
-                }, from: workCalendar.settings, to: context.hubCalendar.reference)
-        }
-
         let workTargets = context.workCalendars.map { workCalendar in
             WorkCalendarProjectionTarget(settings: workCalendar.settings, calendar: workCalendar.calendar.reference)
         }
-        let expectedHubCalendarEvents = expectedHubEvents.map { calendarEventProjection in
-            calendarEvent(for: calendarEventProjection, idPrefix: "expected-hub")
-        }
-        let expectedWorkEvents = HubToWorkProjector.project(
-            hubEvents: context.hubEvents + expectedHubCalendarEvents, to: workTargets,
-            personalPrefix: settings.personalPrefix)
 
+        let hubExpectations = context.workCalendars.flatMap { workCalendar in
+            let sourceEvents = context.workEvents(for: workCalendar).filter { event in
+                !titlePolicy.isRelayedWorkBlocker(event)
+            }
+            return sourceEvents.flatMap { event in
+                WorkToHubProjector.project(
+                    events: [event], from: workCalendar.settings, to: context.hubCalendar.reference
+                ).map { projection in ProjectionExpectation(projection: projection, causalEvents: [event.identity]) }
+            }
+        }
+        let expectedHubEvents = hubExpectations.map(\.projection)
         let hubPlan = ReconciliationPlanner.plan(
             expected: expectedHubEvents, existing: context.hubEvents, managedPrefixes: context.managedPrefixes)
+        let reconciledExistingHubEvents = context.hubEvents.filter { !hubPlan.deletes.contains($0) }
+
+        let existingHubExpectations = reconciledExistingHubEvents.flatMap { event in
+            HubToWorkProjector.project(hubEvents: [event], to: workTargets, personalPrefix: settings.personalPrefix).map
+            { projection in ProjectionExpectation(projection: projection, causalEvents: [event.identity]) }
+        }
+        let projectedHubExpectations = hubExpectations.flatMap { expectation in
+            let event = calendarEvent(for: expectation.projection, idPrefix: "expected-hub")
+            return HubToWorkProjector.project(
+                hubEvents: [event], to: workTargets, personalPrefix: settings.personalPrefix
+            ).map { projection in ProjectionExpectation(projection: projection, causalEvents: expectation.causalEvents)
+            }
+        }
+        let workExpectations = existingHubExpectations + projectedHubExpectations
+        let expectedWorkEvents = workExpectations.map(\.projection)
+
         let shouldDeleteWorkEvent: (CalendarEvent) -> Bool = titlePolicy.isRelayedWorkBlocker
         let workPlan = ReconciliationPlanner.plan(
             expected: expectedWorkEvents, existing: context.allWorkEvents, shouldDeleteStaleEvent: shouldDeleteWorkEvent
         )
         let reconciliationPlan = ReconciliationPlan(
             creates: hubPlan.creates + workPlan.creates, deletes: hubPlan.deletes + workPlan.deletes)
-
-        return OrdinaryReconciliationResult(
+        let result = OrdinaryReconciliationResult(
             plan: reconciliationPlan, actions: ordinaryActions(for: reconciliationPlan, context: context))
+
+        return OrdinaryReconciliationComputation(
+            context: context, result: result, expectations: hubExpectations + workExpectations)
     }
 
     private func loadRunContext(settings: CalendarRelaySettings, now: Date) async throws -> ReconciliationRunContext {
@@ -131,6 +160,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
 
         return ReconciliationRunContext(
             hubCalendar: hubCalendar, workCalendars: workCalendars, managedPrefixes: managedPrefixes,
+            personalPrefix: settings.personalPrefix, window: snapshot.window, syncWindowDays: settings.syncWindowDays,
             hubEvents: hubSnapshot.events)
     }
 
@@ -182,8 +212,123 @@ public struct ReconcileCalendarsUseCase: Sendable {
         ActionSortKey(projection: lhs) < ActionSortKey(projection: rhs)
     }
 
-    private func candidateExplanation(for event: CalendarEvent) -> CandidateEventExplanation {
-        CandidateEventExplanation(event: event, inclusion: EventInclusionPolicy.evaluate(event))
+    private func causalEvents(for action: CalendarMutationAction, computation: OrdinaryReconciliationComputation)
+        -> [CalendarEventIdentity]
+    {
+        guard case .create(_, let event) = action else {
+            if case .delete(_, let event) = action { return [event.identity] }
+            return []
+        }
+        var causalEvents: [CalendarEventIdentity] = []
+        for expectation in computation.expectations where expectation.projection == event {
+            for causalEvent in expectation.causalEvents where !causalEvents.contains(causalEvent) {
+                causalEvents.append(causalEvent)
+            }
+        }
+        return causalEvents
+    }
+
+    private func explanationReason(for action: CalendarMutationAction, computation: OrdinaryReconciliationComputation)
+        -> PlannedActionExplanationReason
+    {
+        switch action {
+        case .create: return .missingExpectedProjection
+        case .delete(_, let event):
+            if event.status == .cancelled { return .cancelledManagedProjection }
+            let key = VisibleEventKey(event: event)
+            let hasExpectation = computation.expectations.contains { visibleKey(for: $0.projection) == key }
+            let duplicateCount = (computation.context.hubEvents + computation.context.allWorkEvents).count {
+                VisibleEventKey(event: $0) == key
+            }
+            if hasExpectation && duplicateCount > 1 { return .replaceAllManagedDuplicate }
+            return .staleManagedProjection
+        }
+    }
+
+    private func visibleKey(for projection: CalendarEventProjection) -> VisibleEventKey {
+        VisibleEventKey(
+            calendar: projection.destinationCalendar, title: projection.title, start: projection.start,
+            end: projection.end, isAllDay: projection.isAllDay)
+    }
+
+    private func candidateExplanation(for event: CalendarEvent, computation: OrdinaryReconciliationComputation)
+        -> CandidateEventExplanation
+    {
+        CandidateEventExplanation(
+            event: event, eligibility: candidateEligibility(for: event, context: computation.context),
+            routing: candidateRouting(for: event, context: computation.context),
+            expectation: candidateExpectation(for: event, computation: computation),
+            disposition: candidateDisposition(for: event, computation: computation))
+    }
+
+    private func candidateEligibility(for event: CalendarEvent, context: ReconciliationRunContext)
+        -> CandidateEventEligibilityExplanation
+    {
+        if event.status == .cancelled { return .reliableCancellation }
+        if event.calendar == context.hubCalendar.reference, MarkedEventTitle.marker(in: event.title) != nil {
+            return .markedHubEligibilityBypass
+        }
+
+        switch EventInclusionPolicy.evaluate(event) {
+        case .cancelled: return .reliableCancellation
+        case .currentUserAccepted: return .currentUserAccepted
+        case .currentUserNonAccepted(let status): return .currentUserNonAccepted(status)
+        case .noCurrentUserAttendeeIncluded(let availability): return .noCurrentUserAttendeeIncluded(availability)
+        case .noCurrentUserAttendeeExcluded(let availability): return .noCurrentUserAttendeeExcluded(availability)
+        }
+    }
+
+    private func candidateRouting(for event: CalendarEvent, context: ReconciliationRunContext)
+        -> CandidateEventRoutingExplanation
+    {
+        guard event.calendar == context.hubCalendar.reference else {
+            return MarkedEventTitle.marker(in: event.title) == nil
+                ? .workToHubSource : .feedbackSuppressedMarkedWorkProjection
+        }
+
+        guard let marker = MarkedEventTitle.marker(in: event.title) else {
+            return EventInclusionPolicy.includes(event) ? .hubPersonalSource : .invalidOrUnmarkedHubSource
+        }
+        if event.status == .cancelled { return .cancelledMarkedHubPreservation }
+        if marker == context.personalPrefix { return .exactLocalMarkerHubSource(role: .hub) }
+        if let index = context.workCalendars.firstIndex(where: { $0.settings.prefix == marker }) {
+            let workCalendar = context.workCalendars[index]
+            return .exactLocalMarkerHubSource(role: .work(name: workCalendar.settings.name, declarationIndex: index))
+        }
+        return .nonLocalValidMarkerHubSource
+    }
+
+    private func candidateExpectation(for event: CalendarEvent, computation: OrdinaryReconciliationComputation)
+        -> CandidateEventExpectationExplanation
+    {
+        let key = VisibleEventKey(event: event)
+        return computation.expectations.contains { visibleKey(for: $0.projection) == key }
+            ? .matchesExpectedProjection : .noMatchingExpectation
+    }
+
+    private func candidateDisposition(for event: CalendarEvent, computation: OrdinaryReconciliationComputation)
+        -> CandidateEventDispositionExplanation
+    {
+        if let deletion = computation.result.actions.first(where: { action in
+            guard case .delete(_, let deletedEvent) = action else { return false }
+            return deletedEvent.identity == event.identity
+        }) {
+            switch explanationReason(for: deletion, computation: computation) {
+            case .staleManagedProjection: return .selectedStaleManagedDeletion
+            case .cancelledManagedProjection: return .selectedCancelledManagedDeletion
+            case .replaceAllManagedDuplicate: return .selectedDuplicateSetDeletion
+            case .missingExpectedProjection: break
+            }
+        }
+
+        let titlePolicy = ManagedEventTitlePolicy(managedPrefixes: computation.context.managedPrefixes)
+        let isManaged =
+            event.calendar == computation.context.hubCalendar.reference
+            ? titlePolicy.isManagedProjection(event) : titlePolicy.isRelayedWorkBlocker(event)
+        if isManaged, candidateExpectation(for: event, computation: computation) == .matchesExpectedProjection {
+            return .retained
+        }
+        return .preservedUnmanagedOrNonLocal
     }
 
     private func validate(_ settings: CalendarRelaySettings) throws {
@@ -193,6 +338,17 @@ public struct ReconcileCalendarsUseCase: Sendable {
         guard settings.legacyMarkers.isEmpty else { throw ReconcileCalendarsError.migrationPending }
     }
 
+}
+
+private struct OrdinaryReconciliationComputation {
+    let context: ReconciliationRunContext
+    let result: OrdinaryReconciliationResult
+    let expectations: [ProjectionExpectation]
+}
+
+private struct ProjectionExpectation {
+    let projection: CalendarEventProjection
+    let causalEvents: [CalendarEventIdentity]
 }
 
 private struct ActionSortKey: Comparable {

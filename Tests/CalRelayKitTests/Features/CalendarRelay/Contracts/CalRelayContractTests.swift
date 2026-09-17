@@ -3,6 +3,11 @@ import Foundation
 
 enum CalRelayContractTests {
     static func runAll() async throws {
+        try runDomainAndConfigurationTests()
+        try await runApplicationAndPresentationTests()
+    }
+
+    private static func runDomainAndConfigurationTests() throws {
         try Self.testAcceptsValidSettings()
         try Self.testRejectsMissingWorkCalendars()
         try Self.testRejectsEmptyHubSelectorFields()
@@ -15,31 +20,40 @@ enum CalRelayContractTests {
         try Self.testIncludesTimedBusyEvents()
         try Self.testSkipsTimedTentativeEvents()
         try Self.testIncludesTimedEventsWhenAvailabilityIsNotSupported()
-        try Self.testSkipsAllDayEvents()
-        try Self.testSkipsDeclinedEvents()
-        try Self.testSkipsTentativeStatusEvents()
+        try Self.testIncludesUnavailableEvents()
+        try Self.testIncludesAllDayBusyEvents()
+        try Self.testIncludesAcceptedCurrentUserRegardlessOfAvailability()
+        try Self.testSkipsEveryNonAcceptedCurrentUserResponse()
+        try Self.testIgnoresNonCancelledOverallStatusWithoutCurrentUserAttendee()
         try Self.testSkipsCancelledEvents()
-        try Self.testEvaluateReturnsIncludedForBusyEvents()
-        try Self.testEvaluateReturnsAllDayReason()
+        try Self.testEvaluateReturnsAvailabilityIncludedForBusyEvents()
+        try Self.testEvaluateReturnsAvailabilityIncludedForAllDayBusyEvents()
         try Self.testEvaluateReturnsCancelledReason()
-        try Self.testEvaluateReturnsDeclinedReason()
-        try Self.testEvaluateReturnsTentativeReason()
-        try Self.testEvaluateReturnsUnsupportedAvailabilityReasonForTentativeEvents()
-        try Self.testEvaluateReturnsUnsupportedAvailabilityReasonForFreeEvents()
-        try Self.testEvaluateReturnsUnsupportedAvailabilityReasonForUnavailableEvents()
+        try Self.testEvaluateReturnsCurrentUserAcceptedReason()
+        try Self.testEvaluateReturnsCurrentUserNonAcceptedReason()
+        try Self.testEvaluateReturnsAvailabilityExcludedForTentativeEvents()
+        try Self.testEvaluateReturnsAvailabilityExcludedForFreeEvents()
+        try Self.testEvaluateReturnsAvailabilityIncludedForUnavailableEvents()
         try Self.testVisibleEventKeysRemainDistinctForAdjacentMeetings()
 
         try Self.testProjectsIncludedWorkEventToHub()
         try Self.testDoesNotProjectExcludedWorkEventToHub()
+        try Self.testWorkProjectionNormalizesSourceTitle()
         try Self.testProjectsPrefixedHubEventToOtherWorkCalendars()
         try Self.testProjectsUnprefixedHubEventToAllWorkCalendarsWithPersonalPrefix()
+        try Self.testPersonalProjectionNormalizesSourceTitle()
         try Self.testProjectsRemotePrefixedHubEventToLocalWorkCalendars()
+        try Self.testProjectsMarkedHubEventRegardlessOfAvailability()
+        try Self.testDoesNotProjectCancelledMarkedHubEvent()
+        try Self.testTreatsMalformedBracketedHubTitleAsPersonalSource()
         try Self.testPlansCreateForMissingExpectedProjection()
         try Self.testPlansOneCreateForDuplicateExpectedProjection()
         try Self.testPlansDeleteForStaleManagedProjection()
-        try Self.testDeletesSurplusManagedProjectionForExpectedKey()
+        try Self.testReplacesAllManagedDuplicatesForExpectedKey()
+        try Self.testReplacesCancelledManagedProjectionForExpectedKey()
+        try Self.testDeletesCancelledDuplicateWithoutReplacingRetainedProjection()
         try Self.testNeverDeletesUnprefixedEvents()
-        try Self.testPreservesDuplicateUnprefixedEventsForExpectedKey()
+        try Self.testPreservesUnmanagedMatchesWithoutTreatingThemAsManagedProjection()
         try Self.testPreservesUnknownPrefixedEvents()
         try Self.testPlansRenameAsDeleteOldAndCreateNew()
         try Self.testPlansNoChangesWhenExpectedStateAlreadyExists()
@@ -49,9 +63,12 @@ enum CalRelayContractTests {
         try Self.testRejectsUnknownYAMLFields()
         try Self.testRejectsDuplicateYAMLKeys()
         try Self.testReportsSettingsValidationErrorsFromYAML()
-        try Self.testMapsCurrentUserTentativeParticipantStatusToTentative()
-        try Self.testMapsCurrentUserDeclinedParticipantStatusToDeclined()
-        try Self.testMapsAcceptedParticipantStatusFromOverallEventStatus()
+        try Self.testMapsCurrentUserParticipantStatusSeparatelyFromOverallStatus()
+        try Self.testMapsCancellationAndAcceptedParticipantIndependently()
+        try Self.testMapsAbsentCurrentUserParticipantWithoutChangingOverallStatus()
+    }
+
+    private static func runApplicationAndPresentationTests() async throws {
         try await Self.testDryRunPlansChangesWithoutMutatingCalendarStore()
         try await Self.testOrdinaryReconciliationRejectsMigrationBeforeCalendarAccess()
         try await Self.testReconciliationLoadsTwoDaysInThePast()
@@ -63,12 +80,16 @@ enum CalRelayContractTests {
         try await Self.testApplyExecutesDeleteBeforeCreate()
         try await Self.testApplyStopsAfterFailureWithoutRollback()
         try await Self.testDoesNotReprojectManagedWorkProjectionsToHub()
+        try await Self.testProjectsMalformedBracketedWorkEventAsOrdinarySource()
         try await Self.testProjectsWorkSourceToOtherWorkCalendarsInSamePlan()
         try await Self.testDoesNotDoublePrefixRelayedWorkBlockers()
         try await Self.testDeletesUnknownPrefixedWorkBlockersWhenAbsentFromHub()
         try await Self.testPreservesUnknownPrefixedHubEvents()
+        try await Self.testStaleLocalHubProjectionDoesNotRouteForExtraCycle()
         try await Self.testReconciliationPropagatesCancellation()
         try await Self.testExplainReportsIncludedAndExcludedEvents()
+        try await Self.testExplanationClassifiesEveryInputDimensionAndReportsWindow()
+        try await Self.testExplanationUsesSharedOrderedActionsAndCreateCausality()
         try Self.testFormatsEmptyReconciliationPlan()
         try Self.testFormatsPlannedCreatesAndDeletes()
         try Self.testReconciliationPlanOutputAvoidsDebugDumps()
@@ -189,24 +210,41 @@ enum CalRelayContractTests {
             "Timed events from calendars without availability support should be included")
     }
 
-    private static func testSkipsAllDayEvents() throws {
+    private static func testIncludesUnavailableEvents() throws {
+        let event = calendarEvent(availability: .unavailable, status: .confirmed)
+
+        try expect(EventInclusionPolicy.includes(event), "Unavailable events should be included")
+    }
+
+    private static func testIncludesAllDayBusyEvents() throws {
         let event = calendarEvent(isAllDay: true, availability: .busy, status: .confirmed)
 
-        try expect(!EventInclusionPolicy.includes(event), "All-day events should be skipped")
+        try expect(EventInclusionPolicy.includes(event), "All-day events should use the same eligibility policy")
     }
 
-    private static func testSkipsDeclinedEvents() throws {
-        let event = calendarEvent(availability: .busy, status: .declined)
+    private static func testIncludesAcceptedCurrentUserRegardlessOfAvailability() throws {
+        let event = calendarEvent(availability: .free, status: .tentative, currentUserParticipantStatus: .accepted)
 
-        try expect(!EventInclusionPolicy.includes(event), "Declined events should be skipped")
+        try expect(
+            EventInclusionPolicy.includes(event), "An accepted current-user response should override availability")
     }
 
-    private static func testSkipsTentativeStatusEvents() throws {
+    private static func testSkipsEveryNonAcceptedCurrentUserResponse() throws {
+        for response in [CurrentUserParticipantStatus.declined, .tentative, .other] {
+            let event = calendarEvent(availability: .busy, status: .confirmed, currentUserParticipantStatus: response)
+
+            try expect(
+                !EventInclusionPolicy.includes(event),
+                "Every non-accepted current-user response should make the event ineligible")
+        }
+    }
+
+    private static func testIgnoresNonCancelledOverallStatusWithoutCurrentUserAttendee() throws {
         let event = calendarEvent(availability: .busy, status: .tentative)
 
         try expect(
-            !EventInclusionPolicy.includes(event),
-            "Tentative status events should be skipped even when availability is busy")
+            EventInclusionPolicy.includes(event),
+            "Non-cancelled overall event status should not override no-attendee availability")
     }
 
     private static func testSkipsCancelledEvents() throws {
@@ -215,17 +253,20 @@ enum CalRelayContractTests {
         try expect(!EventInclusionPolicy.includes(event), "Cancelled events should be skipped")
     }
 
-    private static func testEvaluateReturnsIncludedForBusyEvents() throws {
+    private static func testEvaluateReturnsAvailabilityIncludedForBusyEvents() throws {
         let event = calendarEvent(availability: .busy, status: .confirmed)
 
-        try expect(EventInclusionPolicy.evaluate(event) == .included, "Busy timed events should evaluate as included")
+        try expect(
+            EventInclusionPolicy.evaluate(event) == .noCurrentUserAttendeeIncluded(.busy),
+            "Busy timed events should identify the no-attendee availability decision")
     }
 
-    private static func testEvaluateReturnsAllDayReason() throws {
+    private static func testEvaluateReturnsAvailabilityIncludedForAllDayBusyEvents() throws {
         let event = calendarEvent(isAllDay: true, availability: .busy, status: .confirmed)
 
         try expect(
-            EventInclusionPolicy.evaluate(event) == .allDay, "All-day events should evaluate with the allDay reason")
+            EventInclusionPolicy.evaluate(event) == .noCurrentUserAttendeeIncluded(.busy),
+            "All-day busy events should use the same no-attendee availability reason")
     }
 
     private static func testEvaluateReturnsCancelledReason() throws {
@@ -236,44 +277,44 @@ enum CalRelayContractTests {
             "Cancelled events should evaluate with the cancelled reason")
     }
 
-    private static func testEvaluateReturnsDeclinedReason() throws {
-        let event = calendarEvent(availability: .busy, status: .declined)
+    private static func testEvaluateReturnsCurrentUserAcceptedReason() throws {
+        let event = calendarEvent(availability: .free, status: .confirmed, currentUserParticipantStatus: .accepted)
 
         try expect(
-            EventInclusionPolicy.evaluate(event) == .declined,
-            "Declined events should evaluate with the declined reason")
+            EventInclusionPolicy.evaluate(event) == .currentUserAccepted,
+            "Accepted attendee events should identify current-user acceptance")
     }
 
-    private static func testEvaluateReturnsTentativeReason() throws {
-        let event = calendarEvent(availability: .busy, status: .tentative)
+    private static func testEvaluateReturnsCurrentUserNonAcceptedReason() throws {
+        let event = calendarEvent(availability: .busy, status: .confirmed, currentUserParticipantStatus: .tentative)
 
         try expect(
-            EventInclusionPolicy.evaluate(event) == .tentative,
-            "Tentative status events should evaluate with the tentative reason")
+            EventInclusionPolicy.evaluate(event) == .currentUserNonAccepted(.tentative),
+            "Non-accepted attendee events should identify the current-user response")
     }
 
-    private static func testEvaluateReturnsUnsupportedAvailabilityReasonForTentativeEvents() throws {
+    private static func testEvaluateReturnsAvailabilityExcludedForTentativeEvents() throws {
         let event = calendarEvent(availability: .tentative, status: .confirmed)
 
         try expect(
-            EventInclusionPolicy.evaluate(event) == .unsupportedAvailability(.tentative),
-            "Tentative events should evaluate with the unsupportedAvailability reason")
+            EventInclusionPolicy.evaluate(event) == .noCurrentUserAttendeeExcluded(.tentative),
+            "Tentative availability should identify the no-attendee exclusion")
     }
 
-    private static func testEvaluateReturnsUnsupportedAvailabilityReasonForFreeEvents() throws {
+    private static func testEvaluateReturnsAvailabilityExcludedForFreeEvents() throws {
         let event = calendarEvent(availability: .free, status: .confirmed)
 
         try expect(
-            EventInclusionPolicy.evaluate(event) == .unsupportedAvailability(.free),
-            "Free events should evaluate with the unsupportedAvailability reason")
+            EventInclusionPolicy.evaluate(event) == .noCurrentUserAttendeeExcluded(.free),
+            "Free availability should identify the no-attendee exclusion")
     }
 
-    private static func testEvaluateReturnsUnsupportedAvailabilityReasonForUnavailableEvents() throws {
+    private static func testEvaluateReturnsAvailabilityIncludedForUnavailableEvents() throws {
         let event = calendarEvent(availability: .unavailable, status: .confirmed)
 
         try expect(
-            EventInclusionPolicy.evaluate(event) == .unsupportedAvailability(.unavailable),
-            "Unavailable events should evaluate with the unsupportedAvailability reason")
+            EventInclusionPolicy.evaluate(event) == .noCurrentUserAttendeeIncluded(.unavailable),
+            "Unavailable events should identify the no-attendee inclusion")
     }
 
     private static func testVisibleEventKeysRemainDistinctForAdjacentMeetings() throws {
@@ -308,13 +349,27 @@ enum CalRelayContractTests {
     }
 
     private static func testDoesNotProjectExcludedWorkEventToHub() throws {
-        let sourceEvent = calendarEvent(isAllDay: true, availability: .busy, status: .confirmed)
+        let sourceEvent = calendarEvent(availability: .free, status: .confirmed)
 
         let projections = WorkToHubProjector.project(
             events: [sourceEvent], from: workCalendarSettings(),
             to: CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"))
 
         try expect(projections.isEmpty, "Excluded source events should not produce hub projections")
+    }
+
+    private static func testWorkProjectionNormalizesSourceTitle() throws {
+        let hubCalendar = CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud")
+        let sourceEvents = [
+            calendarEvent(id: "trimmed", title: "  Client Planning \n"), calendarEvent(id: "empty", title: " \t")
+        ]
+
+        let projections = WorkToHubProjector.project(
+            events: sourceEvents, from: workCalendarSettings(), to: hubCalendar)
+
+        try expect(
+            projections.map(\.title) == ["[ACME] Client Planning", "[ACME] (Untitled)"],
+            "Work projections should trim source titles and replace empty normalized titles")
     }
 
     private static func testProjectsPrefixedHubEventToOtherWorkCalendars() throws {
@@ -351,6 +406,25 @@ enum CalRelayContractTests {
             projections.allSatisfy { $0.title == "[ME] Dentist" }, "Unprefixed hub event should use personal prefix")
     }
 
+    private static func testPersonalProjectionNormalizesSourceTitle() throws {
+        let hubEvents = [
+            calendarEvent(
+                id: "trimmed", calendar: CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
+                title: "  Dentist \n"),
+            calendarEvent(
+                id: "empty", calendar: CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
+                title: " \t")
+        ]
+        let target = workCalendarTarget(
+            name: "ACME", prefix: "[ACME]", calendarID: "acme-1", calendarTitle: "ACME Work")
+
+        let projections = HubToWorkProjector.project(hubEvents: hubEvents, to: [target], personalPrefix: "[ME]")
+
+        try expect(
+            projections.map(\.title) == ["[ME] Dentist", "[ME] (Untitled)"],
+            "Personal projections should trim source titles and replace empty normalized titles")
+    }
+
     private static func testProjectsRemotePrefixedHubEventToLocalWorkCalendars() throws {
         let hubEvent = calendarEvent(
             calendar: CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
@@ -367,6 +441,47 @@ enum CalRelayContractTests {
             "Remote prefixed hub event should target locally configured work calendar")
         try expect(
             projections[0].title == "[BETA] Sales Call", "Remote prefixed hub event should preserve remote prefix")
+    }
+
+    private static func testProjectsMarkedHubEventRegardlessOfAvailability() throws {
+        let hubEvent = calendarEvent(
+            calendar: CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
+            title: "[REMOTE] Partner Planning", availability: .free, status: .confirmed)
+
+        let projections = HubToWorkProjector.project(
+            hubEvents: [hubEvent],
+            to: [workCalendarTarget(name: "ACME", prefix: "[ACME]", calendarID: "acme-1", calendarTitle: "ACME Work")],
+            personalPrefix: "[ME]")
+
+        try expect(projections.count == 1, "A valid marked hub event should bypass availability eligibility")
+        try expect(projections[0].title == hubEvent.title, "A valid marked hub event should retain its title")
+    }
+
+    private static func testDoesNotProjectCancelledMarkedHubEvent() throws {
+        let hubEvent = calendarEvent(
+            calendar: CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
+            title: "[REMOTE] Partner Planning", availability: .busy, status: .cancelled)
+
+        let projections = HubToWorkProjector.project(
+            hubEvents: [hubEvent],
+            to: [workCalendarTarget(name: "ACME", prefix: "[ACME]", calendarID: "acme-1", calendarTitle: "ACME Work")],
+            personalPrefix: "[ME]")
+
+        try expect(projections.isEmpty, "A cancelled valid marked hub event should not route")
+    }
+
+    private static func testTreatsMalformedBracketedHubTitleAsPersonalSource() throws {
+        let hubEvent = calendarEvent(
+            calendar: CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud"),
+            title: "[ACME]Planning")
+
+        let projections = HubToWorkProjector.project(
+            hubEvents: [hubEvent], to: workCalendarTargets(), personalPrefix: "[ME]")
+
+        try expect(projections.count == 3, "A malformed marked title should not suppress any work-calendar target")
+        try expect(
+            projections.allSatisfy { $0.title == "[ME] [ACME]Planning" },
+            "A malformed marked title should be treated as an ordinary personal source")
     }
 
     private static func testPlansCreateForMissingExpectedProjection() throws {
@@ -396,7 +511,7 @@ enum CalRelayContractTests {
         try expect(plan.deletes == [stale], "Stale managed projection should be planned as delete")
     }
 
-    private static func testDeletesSurplusManagedProjectionForExpectedKey() throws {
+    private static func testReplacesAllManagedDuplicatesForExpectedKey() throws {
         let existing = calendarEvent(id: "managed-1", title: "[ACME] Client Planning")
         let duplicate = calendarEvent(
             id: "managed-2", calendar: existing.calendar, title: existing.title, start: existing.start,
@@ -408,8 +523,36 @@ enum CalRelayContractTests {
         let plan = ReconciliationPlanner.plan(
             expected: [expected], existing: [existing, duplicate], managedPrefixes: ["[ACME]"])
 
-        try expect(plan.creates.isEmpty, "An existing expected projection should not be created again")
-        try expect(plan.deletes == [duplicate], "Surplus managed projections should be removed")
+        try expect(plan.creates == [expected], "Managed duplicates should produce one canonical replacement create")
+        try expect(plan.deletes == [existing, duplicate], "Every managed duplicate should be removed")
+    }
+
+    private static func testReplacesCancelledManagedProjectionForExpectedKey() throws {
+        let cancelled = calendarEvent(title: "[ACME] Client Planning", status: .cancelled)
+        let expected = calendarEventProjection(
+            destinationCalendar: cancelled.calendar, title: cancelled.title, start: cancelled.start, end: cancelled.end,
+            isAllDay: cancelled.isAllDay)
+
+        let plan = ReconciliationPlanner.plan(expected: [expected], existing: [cancelled], managedPrefixes: ["[ACME]"])
+
+        try expect(plan.creates == [expected], "A cancelled managed match should not satisfy the expectation")
+        try expect(plan.deletes == [cancelled], "A cancelled managed match should be deleted")
+    }
+
+    private static func testDeletesCancelledDuplicateWithoutReplacingRetainedProjection() throws {
+        let retained = calendarEvent(title: "[ACME] Client Planning")
+        let cancelled = calendarEvent(
+            id: "event-2", calendar: retained.calendar, title: retained.title, start: retained.start, end: retained.end,
+            isAllDay: retained.isAllDay, status: .cancelled)
+        let expected = calendarEventProjection(
+            destinationCalendar: retained.calendar, title: retained.title, start: retained.start, end: retained.end,
+            isAllDay: retained.isAllDay)
+
+        let plan = ReconciliationPlanner.plan(
+            expected: [expected], existing: [retained, cancelled], managedPrefixes: ["[ACME]"])
+
+        try expect(plan.creates.isEmpty, "One active managed match should still satisfy the expectation")
+        try expect(plan.deletes == [cancelled], "The cancelled managed duplicate should be removed")
     }
 
     private static func testNeverDeletesUnprefixedEvents() throws {
@@ -420,7 +563,7 @@ enum CalRelayContractTests {
         try expect(plan.deletes.isEmpty, "Unprefixed events should never be deleted")
     }
 
-    private static func testPreservesDuplicateUnprefixedEventsForExpectedKey() throws {
+    private static func testPreservesUnmanagedMatchesWithoutTreatingThemAsManagedProjection() throws {
         let existing = calendarEvent(id: "manual-1", title: "Client Planning")
         let duplicate = calendarEvent(
             id: "manual-2", calendar: existing.calendar, title: existing.title, start: existing.start,
@@ -432,8 +575,8 @@ enum CalRelayContractTests {
         let plan = ReconciliationPlanner.plan(
             expected: [expected], existing: [existing, duplicate], managedPrefixes: ["[ACME]"])
 
-        try expect(plan.creates.isEmpty, "An existing expected projection should not be created again")
-        try expect(plan.deletes.isEmpty, "Duplicate unprefixed events should remain protected from deletion")
+        try expect(plan.creates == [expected], "Unmanaged matches should not satisfy a managed projection expectation")
+        try expect(plan.deletes.isEmpty, "Unmanaged matches should remain protected from deletion")
     }
 
     private static func testPreservesUnknownPrefixedEvents() throws {
@@ -573,29 +716,34 @@ enum CalRelayContractTests {
         throw ContractTestFailure("Expected settings validation error")
     }
 
-    private static func testMapsCurrentUserTentativeParticipantStatusToTentative() throws {
-        let status = EventKitEventStatusMapper.mapStatus(
-            currentUserParticipantStatus: .tentative, eventStatus: .confirmed)
+    private static func testMapsCurrentUserParticipantStatusSeparatelyFromOverallStatus() throws {
+        let values = EventKitEventStatusMapper.map(currentUserParticipantStatus: .tentative, eventStatus: .confirmed)
 
         try expect(
-            status == .tentative,
-            "Current-user Maybe/Tentative attendee status should map to tentative even when the event is confirmed")
+            values.eventStatus == .confirmed,
+            "Current-user response should not replace the overall EventKit event status")
+        try expect(
+            values.currentUserParticipantStatus == .tentative,
+            "Current-user tentative response should remain separately available")
     }
 
-    private static func testMapsCurrentUserDeclinedParticipantStatusToDeclined() throws {
-        let status = EventKitEventStatusMapper.mapStatus(
-            currentUserParticipantStatus: .declined, eventStatus: .confirmed)
+    private static func testMapsCancellationAndAcceptedParticipantIndependently() throws {
+        let values = EventKitEventStatusMapper.map(currentUserParticipantStatus: .accepted, eventStatus: .cancelled)
+
+        try expect(values.eventStatus == .cancelled, "Reliable cancellation should remain the overall event status")
+        try expect(
+            values.currentUserParticipantStatus == .accepted,
+            "Accepted current-user response should remain available alongside cancellation")
+    }
+
+    private static func testMapsAbsentCurrentUserParticipantWithoutChangingOverallStatus() throws {
+        let values = EventKitEventStatusMapper.map(currentUserParticipantStatus: nil, eventStatus: .tentative)
 
         try expect(
-            status == .declined,
-            "Current-user declined attendee status should map to declined even when the event is confirmed")
-    }
-
-    private static func testMapsAcceptedParticipantStatusFromOverallEventStatus() throws {
-        let status = EventKitEventStatusMapper.mapStatus(
-            currentUserParticipantStatus: .accepted, eventStatus: .confirmed)
-
-        try expect(status == .confirmed, "Accepted attendee status should preserve the overall EventKit event status")
+            values.eventStatus == .tentative, "Overall non-cancelled status should remain available for diagnostics")
+        try expect(
+            values.currentUserParticipantStatus == nil,
+            "An absent current-user attendee should remain distinct from an unknown response")
     }
 
     private static func testDryRunPlansChangesWithoutMutatingCalendarStore() async throws {
@@ -797,6 +945,24 @@ enum CalRelayContractTests {
             "Stale managed work projection should still be deleted when no longer expected")
     }
 
+    private static func testProjectsMalformedBracketedWorkEventAsOrdinarySource() async throws {
+        let fixtures = applicationFixtures()
+        let malformedWorkEvent = calendarEvent(
+            id: "work-source-1", calendar: fixtures.workReference, title: "[ME]Dentist",
+            start: Date(timeIntervalSince1970: 13_000), end: Date(timeIntervalSince1970: 14_000))
+        let store = FakeCalendarStore(
+            calendars: [fixtures.hubCalendar, fixtures.workCalendar],
+            eventsByCalendarID: [fixtures.hubCalendar.id: [], fixtures.workCalendar.id: [malformedWorkEvent]])
+
+        let plan = try await reconciliationUseCase(store: store).dryRun(settings: fixtures.settings, now: fixtures.now)
+
+        try expect(
+            plan.creates.contains {
+                $0.destinationCalendar == fixtures.hubReference && $0.title == "[ACME] [ME]Dentist"
+            }, "A malformed bracketed work title should remain an ordinary work-to-hub source")
+        try expect(!plan.deletes.contains(malformedWorkEvent), "A malformed bracketed work title should not be managed")
+    }
+
     private static func testProjectsWorkSourceToOtherWorkCalendarsInSamePlan() async throws {
         let now = Date(timeIntervalSince1970: 10_000)
         let hubCalendar = RelayCalendar(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: true)
@@ -917,6 +1083,24 @@ enum CalRelayContractTests {
         try expect(!plan.deletes.contains(remoteHubProjection), "Unknown prefixed hub events should still be preserved")
     }
 
+    private static func testStaleLocalHubProjectionDoesNotRouteForExtraCycle() async throws {
+        let fixtures = applicationFixtures()
+        let staleHubProjection = calendarEvent(
+            id: "stale-personal-hub-1", calendar: fixtures.hubReference, title: "[ME] Dentist",
+            start: Date(timeIntervalSince1970: 13_000), end: Date(timeIntervalSince1970: 14_000))
+        let store = FakeCalendarStore(
+            calendars: [fixtures.hubCalendar, fixtures.workCalendar],
+            eventsByCalendarID: [fixtures.hubCalendar.id: [staleHubProjection], fixtures.workCalendar.id: []])
+
+        let plan = try await reconciliationUseCase(store: store).dryRun(settings: fixtures.settings, now: fixtures.now)
+
+        try expect(plan.deletes.contains(staleHubProjection), "The stale local hub projection should be deleted")
+        try expect(
+            !plan.creates.contains {
+                $0.destinationCalendar == fixtures.workReference && $0.title == staleHubProjection.title
+            }, "A stale local hub projection should not route to work calendars for an extra cycle")
+    }
+
     private static func testReconciliationPropagatesCancellation() async throws {
         let fixtures = applicationFixtures()
         let store = FakeCalendarStore(calendars: [fixtures.hubCalendar, fixtures.workCalendar])
@@ -977,55 +1161,145 @@ enum CalRelayContractTests {
             id: "acme-excluded-1", calendar: fixtures.workReference, title: "AI QA Learning path sync",
             start: Date(timeIntervalSince1970: 15_000), end: Date(timeIntervalSince1970: 16_000), availability: .free,
             status: .confirmed)
+        let acceptedWorkEvent = calendarEvent(
+            id: "acme-accepted-1", calendar: fixtures.workReference, title: "Accepted Invitation",
+            start: Date(timeIntervalSince1970: 17_000), end: Date(timeIntervalSince1970: 18_000), availability: .free,
+            currentUserParticipantStatus: .accepted)
+        let tentativeWorkEvent = calendarEvent(
+            id: "acme-tentative-1", calendar: fixtures.workReference, title: "Tentative Invitation",
+            start: Date(timeIntervalSince1970: 19_000), end: Date(timeIntervalSince1970: 20_000), availability: .busy,
+            currentUserParticipantStatus: .tentative)
         let store = FakeCalendarStore(
             calendars: [fixtures.hubCalendar, fixtures.workCalendar],
             eventsByCalendarID: [
-                fixtures.hubCalendar.id: [], fixtures.workCalendar.id: [fixtures.workEvent, excludedWorkEvent]
+                fixtures.hubCalendar.id: [],
+                fixtures.workCalendar.id: [fixtures.workEvent, excludedWorkEvent, acceptedWorkEvent, tentativeWorkEvent]
             ])
         let useCase = reconciliationUseCase(store: store)
 
         let explanation = try await useCase.explain(settings: fixtures.settings, now: fixtures.now)
 
         try expect(
-            explanation.candidates.contains { $0.event.title == fixtures.workEvent.title && $0.inclusion == .included },
-            "Explain should report included events with the included reason")
+            explanation.candidates.contains {
+                $0.event.title == fixtures.workEvent.title && $0.eligibility == .noCurrentUserAttendeeIncluded(.busy)
+            }, "Explain should report included events with the included reason")
         try expect(
             explanation.candidates.contains {
-                $0.event.title == "AI QA Learning path sync" && $0.inclusion == .unsupportedAvailability(.free)
+                $0.event.title == "AI QA Learning path sync" && $0.eligibility == .noCurrentUserAttendeeExcluded(.free)
             }, "Explain should report excluded events with their exclusion reason")
+        try expect(
+            explanation.candidates.contains {
+                $0.event.identity == acceptedWorkEvent.identity && $0.eligibility == .currentUserAccepted
+            }, "Explain should report accepted current-user attendee eligibility")
+        try expect(
+            explanation.candidates.contains {
+                $0.event.identity == tentativeWorkEvent.identity
+                    && $0.eligibility == .currentUserNonAccepted(.tentative)
+            }, "Explain should report non-accepted current-user attendee eligibility")
         try expect((await store.createdEvents()).isEmpty, "Explain should never mutate the calendar store")
         try expect((await store.deletedEvents()).isEmpty, "Explain should never mutate the calendar store")
+    }
+
+    private static func testExplanationClassifiesEveryInputDimensionAndReportsWindow() async throws {
+        let fixture = explanationClassificationFixture()
+        let explanation = try await ReconcileCalendarsUseCase(
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: fixture.store,
+            calendar: utcCalendar()
+        ).explain(settings: fixture.base.settings, now: fixture.base.now)
+
+        let expectedWindow = OrdinaryReconciliationWindow.calculate(
+            referenceDate: fixture.base.now, calendar: utcCalendar(),
+            syncWindowDays: fixture.base.settings.syncWindowDays)
+        try expect(explanation.window == expectedWindow, "Explanation should report the shared effective window")
+        try expect(
+            explanation.syncWindowDays == fixture.base.settings.syncWindowDays,
+            "Explanation should report the configured forward horizon")
+        try expectCandidateClassifications(fixture, explanation: explanation)
+        try expectActionReasons(fixture, explanation: explanation)
+    }
+
+    private static func testExplanationUsesSharedOrderedActionsAndCreateCausality() async throws {
+        let fixtures = applicationFixtures()
+        let staleHubProjection = calendarEvent(
+            id: "hub-stale-1", calendar: fixtures.hubReference, title: "[ACME] Old Planning",
+            start: fixtures.workEvent.start, end: fixtures.workEvent.end)
+        let duplicateCausalWorkEvent = calendarEvent(
+            id: "acme-source-2", calendar: fixtures.workReference, title: fixtures.workEvent.title,
+            start: fixtures.workEvent.start, end: fixtures.workEvent.end)
+        let store = FakeCalendarStore(
+            calendars: [fixtures.hubCalendar, fixtures.workCalendar],
+            eventsByCalendarID: [
+                fixtures.hubCalendar.id: [staleHubProjection],
+                fixtures.workCalendar.id: [fixtures.workEvent, duplicateCausalWorkEvent]
+            ])
+        let useCase = reconciliationUseCase(store: store)
+
+        let dryRun = try await useCase.dryRunResult(settings: fixtures.settings, now: fixtures.now)
+        let explanation = try await useCase.explain(settings: fixtures.settings, now: fixtures.now)
+
+        try expect(
+            explanation.actions.map(\.action) == dryRun.actions,
+            "Explanation should use the shared ordered executable actions")
+        guard
+            let create = explanation.actions.first(where: {
+                $0.action == .create(role: .hub, event: fixtures.expectedHubProjection)
+            })
+        else { throw ContractTestFailure("Expected explained hub create") }
+        try expect(
+            create.reason == .missingExpectedProjection,
+            "A planned create should identify the missing expected projection reason")
+        try expect(
+            create.causalEvents == [fixtures.workEvent.identity, duplicateCausalWorkEvent.identity],
+            "A planned create should retain every causal source event identity")
+        guard
+            let deletion = explanation.actions.first(where: {
+                $0.action == .delete(role: .hub, event: staleHubProjection)
+            })
+        else { throw ContractTestFailure("Expected explained hub delete") }
+        try expect(
+            deletion.causalEvents == [staleHubProjection.identity],
+            "A planned delete should retain its exact input occurrence identity")
+        try expect((await store.createdEvents()).isEmpty, "Explain should not create events")
+        try expect((await store.deletedEvents()).isEmpty, "Explain should not delete events")
     }
 
     private static func testFormatsEventExplanations() throws {
         let calendar = CalendarIdentity(id: "acme-1", title: "ACME Work", sourceTitle: "Google")
         let output = EventExplanationFormatter.format(
-            ReconciliationExplanation(candidates: [
-                CandidateEventExplanation(
-                    event: calendarEvent(
-                        calendar: calendar, title: "Client Planning", start: Date(timeIntervalSince1970: 1_000),
-                        end: Date(timeIntervalSince1970: 2_000), availability: .busy, status: .confirmed),
-                    inclusion: .included),
-                CandidateEventExplanation(
-                    event: calendarEvent(
-                        calendar: calendar, title: "AI QA Learning path sync",
-                        start: Date(timeIntervalSince1970: 3_000), end: Date(timeIntervalSince1970: 4_000),
-                        availability: .free, status: .confirmed), inclusion: .unsupportedAvailability(.free))
-            ]))
+            ReconciliationExplanation(
+                window: explanationWindow(), syncWindowDays: 10,
+                candidates: [
+                    CandidateEventExplanation(
+                        event: calendarEvent(
+                            calendar: calendar, title: "Client Planning", start: Date(timeIntervalSince1970: 1_000),
+                            end: Date(timeIntervalSince1970: 2_000), availability: .busy, status: .confirmed),
+                        eligibility: .noCurrentUserAttendeeIncluded(.busy), routing: .workToHubSource,
+                        expectation: .noMatchingExpectation, disposition: .preservedUnmanagedOrNonLocal),
+                    CandidateEventExplanation(
+                        event: calendarEvent(
+                            calendar: calendar, title: "AI QA Learning path sync",
+                            start: Date(timeIntervalSince1970: 3_000), end: Date(timeIntervalSince1970: 4_000),
+                            availability: .free, status: .confirmed),
+                        eligibility: .noCurrentUserAttendeeExcluded(.free), routing: .workToHubSource,
+                        expectation: .noMatchingExpectation, disposition: .preservedUnmanagedOrNonLocal)
+                ]))
 
         try expect(output.contains("Google / ACME Work"), "Explanation output should include calendar selector")
         try expect(output.contains("Client Planning"), "Explanation output should include event title")
-        try expect(output.contains("-> included"), "Explanation output should show the included reason")
+        try expect(
+            output.contains("included (no current-user attendee; availability: busy)"),
+            "Explanation output should show the no-attendee inclusion reason")
         try expect(
             output.contains("AI QA Learning path sync"), "Explanation output should include excluded event title")
         try expect(
-            output.contains("excluded (unsupported availability: free)"),
+            output.contains("excluded (no current-user attendee; availability: free)"),
             "Explanation output should explain the exclusion reason")
         try expect(!output.contains("EventExplanation("), "Explanation output should not expose Swift debug dumps")
     }
 
     private static func testFormatsEmptyEventExplanations() throws {
-        let output = EventExplanationFormatter.format(ReconciliationExplanation(candidates: []))
+        let output = EventExplanationFormatter.format(
+            ReconciliationExplanation(window: explanationWindow(), syncWindowDays: 10, candidates: []))
 
         try expect(
             output.contains("No candidate events found in the sync window."),
@@ -1066,11 +1340,11 @@ enum CalRelayContractTests {
         calendar: CalendarIdentity = CalendarIdentity(id: "calendar-1", title: "ACME Work", sourceTitle: "Google"),
         title: String = "Client Planning", start: Date = Date(timeIntervalSince1970: 1_000),
         end: Date = Date(timeIntervalSince1970: 2_000), isAllDay: Bool = false, availability: EventAvailability = .busy,
-        status: EventStatus = .confirmed
+        status: EventStatus = .confirmed, currentUserParticipantStatus: CurrentUserParticipantStatus? = nil
     ) -> CalendarEvent {
         CalendarEvent(
             id: id, calendar: calendar, title: title, start: start, end: end, isAllDay: isAllDay,
-            availability: availability, status: status)
+            availability: availability, status: status, currentUserParticipantStatus: currentUserParticipantStatus)
     }
 
     private static func calendarEventProjection(
@@ -1174,6 +1448,155 @@ enum CalRelayContractTests {
         ReconcileCalendarsUseCase(authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store)
     }
 
+    private static func explanationClassificationFixture() -> ExplanationClassificationFixture {
+        let base = applicationFixtures()
+        let reviewSource = calendarEvent(
+            id: "acme-source-2", calendar: base.workReference, title: "Review",
+            start: Date(timeIntervalSince1970: 15_000), end: Date(timeIntervalSince1970: 16_000))
+        let retainedHubProjection = calendarEvent(
+            id: "hub-retained", calendar: base.hubReference, title: base.expectedHubProjection.title,
+            start: base.workEvent.start, end: base.workEvent.end)
+        let cancelledHubProjection = calendarEvent(
+            id: "hub-cancelled", calendar: base.hubReference, title: base.expectedHubProjection.title,
+            start: base.workEvent.start, end: base.workEvent.end, status: .cancelled)
+        let duplicateOne = calendarEvent(
+            id: "hub-duplicate-1", calendar: base.hubReference, title: "[ACME] Review", start: reviewSource.start,
+            end: reviewSource.end)
+        let duplicateTwo = calendarEvent(
+            id: "hub-duplicate-2", calendar: base.hubReference, title: "[ACME] Review", start: reviewSource.start,
+            end: reviewSource.end)
+        let personalHubSource = calendarEvent(
+            id: "hub-personal", calendar: base.hubReference, title: "Dentist",
+            start: Date(timeIntervalSince1970: 17_000), end: Date(timeIntervalSince1970: 18_000))
+        let remoteHubSource = calendarEvent(
+            id: "hub-remote", calendar: base.hubReference, title: "[REMOTE] Partner Planning",
+            start: Date(timeIntervalSince1970: 19_000), end: Date(timeIntervalSince1970: 20_000), availability: .free)
+        let cancelledRemoteHubSource = calendarEvent(
+            id: "hub-remote-cancelled", calendar: base.hubReference, title: "[REMOTE] Cancelled",
+            start: Date(timeIntervalSince1970: 21_000), end: Date(timeIntervalSince1970: 22_000), status: .cancelled)
+        let invalidHubSource = calendarEvent(
+            id: "hub-invalid", calendar: base.hubReference, title: "[ACME]Planning",
+            start: Date(timeIntervalSince1970: 23_000), end: Date(timeIntervalSince1970: 24_000), availability: .free)
+        let staleWorkProjection = calendarEvent(
+            id: "work-stale", calendar: base.workReference, title: "[REMOTE] Stale",
+            start: Date(timeIntervalSince1970: 25_000), end: Date(timeIntervalSince1970: 26_000))
+        let store = FakeCalendarStore(
+            calendars: [base.hubCalendar, base.workCalendar],
+            eventsByCalendarID: [
+                base.hubCalendar.id: [
+                    retainedHubProjection, cancelledHubProjection, duplicateOne, duplicateTwo, personalHubSource,
+                    remoteHubSource, cancelledRemoteHubSource, invalidHubSource
+                ], base.workCalendar.id: [base.workEvent, reviewSource, staleWorkProjection]
+            ])
+        return ExplanationClassificationFixture(
+            base: base, reviewSource: reviewSource, retainedHubProjection: retainedHubProjection,
+            cancelledHubProjection: cancelledHubProjection, duplicateOne: duplicateOne, duplicateTwo: duplicateTwo,
+            personalHubSource: personalHubSource, remoteHubSource: remoteHubSource,
+            cancelledRemoteHubSource: cancelledRemoteHubSource, invalidHubSource: invalidHubSource,
+            staleWorkProjection: staleWorkProjection, store: store)
+    }
+
+    private static func expectCandidateClassifications(
+        _ fixture: ExplanationClassificationFixture, explanation: ReconciliationExplanation
+    ) throws {
+        let localMarker = CandidateClassificationExpectation(
+            eligibility: .markedHubEligibilityBypass,
+            routing: .exactLocalMarkerHubSource(role: .work(name: "ACME", declarationIndex: 0)),
+            expectation: .matchesExpectedProjection, disposition: .retained)
+        try expectCandidate(fixture.retainedHubProjection, in: explanation, expected: localMarker)
+        try expectCandidate(
+            fixture.cancelledHubProjection, in: explanation,
+            expected: CandidateClassificationExpectation(
+                eligibility: .reliableCancellation, routing: .cancelledMarkedHubPreservation,
+                expectation: .matchesExpectedProjection, disposition: .selectedCancelledManagedDeletion))
+        try expectCandidate(
+            fixture.duplicateOne, in: explanation, expected: localMarker.withDisposition(.selectedDuplicateSetDeletion))
+        try expectCandidate(
+            fixture.duplicateTwo, in: explanation, expected: localMarker.withDisposition(.selectedDuplicateSetDeletion))
+        try expectPreservedSourceClassifications(fixture, explanation: explanation)
+    }
+
+    private static func expectPreservedSourceClassifications(
+        _ fixture: ExplanationClassificationFixture, explanation: ReconciliationExplanation
+    ) throws {
+        try expectCandidate(
+            fixture.personalHubSource, in: explanation,
+            expected: CandidateClassificationExpectation(
+                eligibility: .noCurrentUserAttendeeIncluded(.busy), routing: .hubPersonalSource,
+                expectation: .noMatchingExpectation, disposition: .preservedUnmanagedOrNonLocal))
+        try expectCandidate(
+            fixture.remoteHubSource, in: explanation,
+            expected: CandidateClassificationExpectation(
+                eligibility: .markedHubEligibilityBypass, routing: .nonLocalValidMarkerHubSource,
+                expectation: .noMatchingExpectation, disposition: .preservedUnmanagedOrNonLocal))
+        try expectCandidate(
+            fixture.cancelledRemoteHubSource, in: explanation,
+            expected: CandidateClassificationExpectation(
+                eligibility: .reliableCancellation, routing: .cancelledMarkedHubPreservation,
+                expectation: .noMatchingExpectation, disposition: .preservedUnmanagedOrNonLocal))
+        try expectCandidate(
+            fixture.invalidHubSource, in: explanation,
+            expected: CandidateClassificationExpectation(
+                eligibility: .noCurrentUserAttendeeExcluded(.free), routing: .invalidOrUnmarkedHubSource,
+                expectation: .noMatchingExpectation, disposition: .preservedUnmanagedOrNonLocal))
+        try expectCandidate(
+            fixture.base.workEvent, in: explanation,
+            expected: CandidateClassificationExpectation(
+                eligibility: .noCurrentUserAttendeeIncluded(.busy), routing: .workToHubSource,
+                expectation: .noMatchingExpectation, disposition: .preservedUnmanagedOrNonLocal))
+        try expectCandidate(
+            fixture.staleWorkProjection, in: explanation,
+            expected: CandidateClassificationExpectation(
+                eligibility: .noCurrentUserAttendeeIncluded(.busy), routing: .feedbackSuppressedMarkedWorkProjection,
+                expectation: .noMatchingExpectation, disposition: .selectedStaleManagedDeletion))
+    }
+
+    private static func expectActionReasons(
+        _ fixture: ExplanationClassificationFixture, explanation: ReconciliationExplanation
+    ) throws {
+        try expectActionReason(
+            .cancelledManagedProjection, forDeletedEvent: fixture.cancelledHubProjection, in: explanation)
+        try expectActionReason(.replaceAllManagedDuplicate, forDeletedEvent: fixture.duplicateOne, in: explanation)
+        try expectActionReason(.replaceAllManagedDuplicate, forDeletedEvent: fixture.duplicateTwo, in: explanation)
+        try expectActionReason(.staleManagedProjection, forDeletedEvent: fixture.staleWorkProjection, in: explanation)
+        try expect(
+            explanation.actions.contains { $0.reason == .missingExpectedProjection },
+            "Explanation should classify planned missing-projection creates")
+    }
+
+    private static func expectCandidate(
+        _ event: CalendarEvent, in explanation: ReconciliationExplanation, expected: CandidateClassificationExpectation
+    ) throws {
+        guard let candidate = explanation.candidates.first(where: { $0.event.identity == event.identity }) else {
+            throw ContractTestFailure("Missing candidate explanation for \(event.title)")
+        }
+        try expect(candidate.eligibility == expected.eligibility, "Unexpected eligibility for \(event.title)")
+        try expect(candidate.routing == expected.routing, "Unexpected routing treatment for \(event.title)")
+        try expect(candidate.expectation == expected.expectation, "Unexpected expectation match for \(event.title)")
+        try expect(candidate.disposition == expected.disposition, "Unexpected disposition for \(event.title)")
+    }
+
+    private static func expectActionReason(
+        _ reason: PlannedActionExplanationReason, forDeletedEvent event: CalendarEvent,
+        in explanation: ReconciliationExplanation
+    ) throws {
+        try expect(
+            explanation.actions.contains { explainedAction in
+                guard case .delete(_, let deletedEvent) = explainedAction.action else { return false }
+                return deletedEvent.identity == event.identity && explainedAction.reason == reason
+            }, "Missing \(reason) explanation for \(event.title)")
+    }
+
+    private static func utcCalendar() -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
+
+    private static func explanationWindow() -> CalendarAccessWindow {
+        CalendarAccessWindow(start: Date(timeIntervalSince1970: 1_000), end: Date(timeIntervalSince1970: 100_000))
+    }
+
     private static func expectReconciliationError(
         _ expectedError: ReconcileCalendarsError, from operation: () async throws -> ReconciliationPlan
     ) async throws {
@@ -1199,6 +1622,32 @@ private struct ApplicationFixtures {
     let workReference: CalendarIdentity
     let workEvent: CalendarEvent
     let expectedHubProjection: CalendarEventProjection
+}
+
+private struct ExplanationClassificationFixture {
+    let base: ApplicationFixtures
+    let reviewSource: CalendarEvent
+    let retainedHubProjection: CalendarEvent
+    let cancelledHubProjection: CalendarEvent
+    let duplicateOne: CalendarEvent
+    let duplicateTwo: CalendarEvent
+    let personalHubSource: CalendarEvent
+    let remoteHubSource: CalendarEvent
+    let cancelledRemoteHubSource: CalendarEvent
+    let invalidHubSource: CalendarEvent
+    let staleWorkProjection: CalendarEvent
+    let store: FakeCalendarStore
+}
+
+private struct CandidateClassificationExpectation {
+    let eligibility: CandidateEventEligibilityExplanation
+    let routing: CandidateEventRoutingExplanation
+    let expectation: CandidateEventExpectationExplanation
+    let disposition: CandidateEventDispositionExplanation
+
+    func withDisposition(_ disposition: CandidateEventDispositionExplanation) -> Self {
+        Self(eligibility: eligibility, routing: routing, expectation: expectation, disposition: disposition)
+    }
 }
 
 private actor FakeCalendarStore: CalendarStorePort {

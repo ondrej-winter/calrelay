@@ -67,13 +67,13 @@ The following checks belong to macOS App Specification Revision 6 but the corres
    swift run calrelay reconcile --config calrelay.yml
    ```
 
-4. The accepted full explanation check remains pending reconciliation-slice work. The current command is non-mutating and reports candidate inclusion diagnostics, but it does not yet provide the complete effective-window, input-classification, causal-link, and ordered-action audit:
+4. Run the non-mutating full explanation:
 
    ```sh
    swift run calrelay reconcile --config calrelay.yml --explain
    ```
 
-   Record this check as pending rather than interpreting the current diagnostic output as a pass for the complete explanation contract.
+   Confirm it reports the same effective window and ordered executable actions as dry-run, including every input event's eligibility, routing/source treatment, and existing-state disposition. Confirm planned creates cite every causal source event ID, planned deletes identify the exact selected occurrence and reason, and IDs appear only on successful explanation output. Revoke access or use a failing configuration and confirm the command returns nonzero on standard error without a partial explanation or IDs on standard output.
 
 5. Run apply and confirm success is based on confirmation of every ordered mutation without a post-apply verification claim. After the provider exposes the confirmed mutations to a fresh read, run dry-run again and confirm it reports no changes. If an immediate read still exposes stale state, record the provider lag and allow later fresh reconciliation to converge rather than treating immediate no-change output as required:
 

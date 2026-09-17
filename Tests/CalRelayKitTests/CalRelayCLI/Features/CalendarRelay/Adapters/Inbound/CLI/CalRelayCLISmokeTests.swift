@@ -8,16 +8,20 @@ enum CalRelayCLISmokeTests {
         try testReconcileHelpListsSupportedOptions()
         try testInvalidApplyExplainCombinationFailsBeforeConfigurationAccess()
         try testInvalidCleanupExplainCombinationFailsBeforeConfigurationAccess()
+        try testExplanationFailureUsesStderrWithoutPartialOutput()
     }
 
     private static func testRootHelpListsCalendarRelaySubcommands() throws {
-        let output = try runCalRelayHelp(arguments: ["--help"])
+        let result = try runCalRelay(arguments: ["--help"])
 
-        try expect(output.contains("calendars"), "Root help should list the calendars subcommand")
-        try expect(output.contains("config"), "Root help should list the config subcommand")
-        try expect(output.contains("reconcile"), "Root help should list the reconcile subcommand")
+        try expect(result.status == 0, "Root help should exit successfully")
+        try expect(result.stderr.isEmpty, "Successful root help should not write to stderr")
+        try expect(result.stdout.contains("calendars"), "Root help should list the calendars subcommand")
+        try expect(result.stdout.contains("config"), "Root help should list the config subcommand")
+        try expect(result.stdout.contains("reconcile"), "Root help should list the reconcile subcommand")
         try expect(
-            output.contains("Relay Apple Calendar availability blockers"), "Root help should describe the CalRelay CLI")
+            result.stdout.contains("Relay Apple Calendar availability blockers"),
+            "Root help should describe the CalRelay CLI")
     }
 
     private static func testConfigCheckHelpDescribesReadinessCommand() throws {
@@ -42,6 +46,9 @@ enum CalRelayCLISmokeTests {
         try expect(output.contains("--config"), "Reconcile help should expose the config override option")
         try expect(output.contains("--apply"), "Reconcile help should expose apply mode")
         try expect(output.contains("--explain"), "Reconcile help should expose explain mode")
+        try expect(
+            output.contains("every input classification") && output.contains("planned action without mutation"),
+            "Reconcile help should describe the complete explanation mode")
         try expect(output.contains("--cleanup-legacy"), "Reconcile help should expose cleanup mode")
     }
 
@@ -71,6 +78,21 @@ enum CalRelayCLISmokeTests {
         try expect(
             !result.combinedOutput.contains("No CalRelay configuration file found"),
             "Validation should fail before configuration access")
+    }
+
+    private static func testExplanationFailureUsesStderrWithoutPartialOutput() throws {
+        let missingPath = "/definitely/missing/private-calendar-config.yaml"
+        let result = try runCalRelay(arguments: ["reconcile", "--explain", "--config", missingPath])
+
+        try expect(result.status != 0, "Failed explanation should return nonzero")
+        try expect(result.stdout.isEmpty, "Failed explanation should not emit partial success output")
+        try expect(
+            result.stderr.contains("No CalRelay configuration file found"), "Failure should be written to stderr")
+        try expect(result.stderr.contains(missingPath), "Failure should identify the selected configuration path")
+        try expect(!result.stderr.contains("Input events"), "Failure should not emit a partial input-event section")
+        try expect(!result.stderr.contains("Planned actions"), "Failure should not emit a partial action section")
+        try expect(!result.stderr.contains("event-id="), "Failure should not disclose EventKit event IDs")
+        try expect(!result.stderr.contains("calendar-id="), "Failure should not disclose EventKit calendar IDs")
     }
 
     private static func runCalRelayHelp(arguments: [String]) throws -> String {

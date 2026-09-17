@@ -10,9 +10,7 @@ struct ReconcileCommand: AsyncParsableCommand {
 
     @Flag(name: .long, help: "Apply planned changes. Without this flag, reconciliation is a dry-run.") var apply = false
 
-    @Flag(
-        name: .long,
-        help: "Explain inclusion/exclusion decisions for every candidate event instead of planning changes.")
+    @Flag(name: .long, help: "Explain every input classification and ordered planned action without mutation.")
     var explain = false
 
     @Flag(name: .long, help: "Run the explicit legacy-marker cleanup workflow instead of ordinary reconciliation.")
