@@ -39,6 +39,9 @@ import Foundation
         if filters.isEmpty || filters.contains("CalendarControlPanelStatusTests") {
             try await CalendarControlPanelStatusTests.runAll()
         }
+        if filters.isEmpty || filters.contains("CalendarManualDryRunTests") {
+            try await CalendarManualDryRunTests.runAll()
+        }
     }
 
     private static func runCommandSuites(filters: Set<String>) async throws {

@@ -4,7 +4,7 @@
 
 - **Requirements basis:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), revision 7, accepted September 16, 2026.
 - **Status:** Ready.
-- **Implementation progress:** Partial as of September 17, 2026. The reusable access, complete CLI, cleanup, app-status, opaque-reference, and ordinary explanation slices are implemented; D-05 app run workflows and manual EventKit validation remain open.
+- **Implementation progress:** Partial as of September 17, 2026. The reusable access, complete CLI, cleanup, app-status, app ordinary dry-run, opaque-reference, and ordinary explanation slices are implemented; D-05 manual apply, app cleanup, scheduling, persisted status, and manual EventKit validation remain open.
 - **Scope:** Calendar authorization ownership, inventory, ordinary and cleanup preflight, mutation-time access failure, privacy-safe diagnostics, and the EventKit boundary.
 - **Execution approach:** Thin, test-backed slices. Cross-capability behavior remains owned by the accepted configuration, projection/safety, reconciliation, CLI, and macOS app specifications.
 
@@ -115,7 +115,7 @@ Make the clearly labeled setup/recovery action the only prompt owner. Separate a
 
 **Dependencies:** CA-03 through CA-08 and D-05.
 
-**Evidence:** The access-owned app slice is complete: the normal Dock-visible app has no menu-bar item; only **Set Up or Recover Calendar Access** can request permission; ID-free inventory is separate; and a reusable status use case presents dependency-ordered configuration, authorization, complete readiness, and migration states without prompting. Deterministic status tests and the app target pass. The task remains open because D-05-owned reviewed manual sync, app cleanup, scheduled/automatic runs, standing authorization, and persisted operation status are not yet implemented.
+**Evidence:** The access-owned app slice is complete: the normal Dock-visible app has no menu-bar item; only **Set Up or Recover Calendar Access** can request permission; ID-free inventory is separate; and a reusable status use case presents dependency-ordered configuration, authorization, complete readiness, and migration states without prompting. **Dry Run Sync** reloads the canonical settings and current Calendar snapshot through a framework-free application use case, reuses the shared ordinary preflight and planner, remains unavailable while the displayed status is not ready, and performs no mutation. Deterministic status and manual-dry-run tests cover migration blocking before EventKit access and fresh settings loading on every invocation. The task remains open because D-05-owned confirmed manual apply, app cleanup, scheduled/automatic runs, standing authorization, and persisted operation status are not yet implemented.
 
 ### - [ ] CA-11 — Centralize privacy-safe diagnostics and presentation
 
@@ -123,7 +123,7 @@ Use stable failure/action categories rather than raw framework errors. Encode di
 
 **Dependencies:** CA-02 and every presentation-producing task.
 
-**Evidence:** Added purpose-specific inventory, readiness, cleanup-review, confirmation, partial-result, and cleanup-verification formatting. Failures expose only approved roles, selectors, counts, and categories; cleanup review omits IDs/selectors/calendar titles/marker values; app inventory omits IDs. Strict YAML validation rejects duplicate/unknown keys without echoing raw values. `CalendarAccessPrivacyTests` passes. The task remains open for D-05-owned persisted app operational status and app cleanup presentation.
+**Evidence:** Added purpose-specific inventory, readiness, ordinary app dry-run, cleanup-review, confirmation, partial-result, and cleanup-verification formatting. Failures expose only approved roles, selectors, counts, and categories; the app dry run exposes only aggregate delete/create counts; cleanup review omits IDs/selectors/calendar titles/marker values; app inventory omits IDs. Strict YAML validation rejects duplicate/unknown keys without echoing raw values. `CalendarAccessPrivacyTests` and the dry-run formatter checks pass. The task remains open for D-05-owned persisted app operational status and app cleanup presentation.
 
 ### - [ ] CA-12 — Complete deterministic acceptance coverage
 
@@ -131,7 +131,7 @@ Register focused authorization, inventory, preflight, cleanup, mutation, privacy
 
 **Dependencies:** incremental alongside CA-01 through CA-11.
 
-**Evidence:** Focused authorization, inventory, preflight, window, cleanup, mutation, privacy, control-panel status, handler, contract, and process-smoke suites are registered in the custom runner. Access checks independent of the absent D-05 app run workflows are covered. The task remains open for manual/automatic app operation and app-cleanup acceptance checks.
+**Evidence:** Focused authorization, inventory, preflight, window, cleanup, mutation, privacy, control-panel status, manual app dry-run, handler, contract, and process-smoke suites are registered in the custom runner. `CalendarManualDryRunTests` proves fresh settings loading, shared planning, migration blocking before Calendar access, non-mutation, and aggregate-only presentation. The task remains open for manual apply, automatic app operation, persisted-state, and app-cleanup acceptance checks.
 
 ### - [ ] CA-13 — Update operational documentation and validate
 
@@ -139,7 +139,7 @@ Update manual validation for permission recovery, no-prompt CLI behavior, invent
 
 **Dependencies:** all implementation tasks.
 
-**Evidence:** Updated `README.md`, `docs/configuration.md`, and `docs/manual-validation.md` for permission ownership, inventory/readiness separation, config check, complete ordinary explanation, cleanup, partial failure, and pending app workflows. `make format-check`, `make check`, `make app`, and `git diff HEAD --check` pass on September 17, 2026. The app-bundle target clears disallowed extended attributes before and after signing and runs `codesign --verify --deep --strict` before reporting success. On this file-provider-backed workspace, provenance metadata is reattached asynchronously, so a delayed standalone strict verification is not stable even though in-target verification passes. Formatter output contains only pre-existing warnings in untouched files. Explicit harmless EventKit permission, provider, successful live explanation, recurring-occurrence, and mutation validation was not run in this automated session, so the task remains open.
+**Evidence:** Updated `README.md`, `docs/configuration.md`, and `docs/manual-validation.md` for permission ownership, inventory/readiness separation, config check, complete ordinary explanation, cleanup, partial failure, app ordinary dry run, and pending app mutation/automation workflows. `CalendarManualDryRunTests`, `make format-check`, `make check`, `make app`, and `git diff HEAD --check` pass on September 17, 2026. The app-bundle target clears disallowed extended attributes before and after signing and runs `codesign --verify --deep --strict` before reporting success. On this file-provider-backed workspace, provenance metadata is reattached asynchronously, so a delayed standalone strict verification is not stable even though in-target verification passes. Formatter output contains only pre-existing warnings in untouched files. Explicit harmless EventKit permission, provider, successful live app dry run, successful live explanation, recurring-occurrence, and mutation validation was not run in this automated session, so the task remains open.
 
 ## Risks and mitigations
 
@@ -180,4 +180,4 @@ Real Calendar mutation is reserved for explicit harmless manual validation.
 
 ## Next action
 
-Perform the explicit harmless EventKit validation in `docs/manual-validation.md`, then execute the D-05 plan for reviewed app runs, app cleanup, scheduling, and privacy-safe persisted operational state before closing CA-10 through CA-13.
+Perform the explicit harmless EventKit validation in `docs/manual-validation.md`, then continue D-05 with exact-plan reviewed manual apply, app cleanup, standing authorization, scheduling, and privacy-safe persisted operational state before closing CA-10 through CA-13.

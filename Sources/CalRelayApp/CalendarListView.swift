@@ -10,6 +10,7 @@ struct CalendarListView: View {
             statusControls
             calendarAccessControls
             inventoryControls
+            syncControls
             calendarOutput
         }.padding().task { viewModel.refreshStatus() }
     }
@@ -18,7 +19,7 @@ struct CalendarListView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("CalRelay").font(.largeTitle)
             Text(
-                "Use this control panel to verify Calendar permission and EventKit-visible calendars for the app bundle."
+                "Use this control panel to verify Calendar access, inspect visible calendars, and review an ordinary sync dry run."
             ).foregroundStyle(.secondary)
         }
     }
@@ -61,6 +62,17 @@ struct CalendarListView: View {
 
             Text(
                 "Inventory requires pre-existing full access, never prompts, omits EventKit IDs, and does not verify configured readiness."
+            ).font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+
+    private var syncControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button(viewModel.isLoading ? "Planning…" : "Dry Run Sync") { viewModel.runDryRun() }.disabled(
+                viewModel.isLoading || !viewModel.canRunOrdinarySync)
+
+            Text(
+                "Loads fresh configuration and Calendar state, runs the complete ordinary readiness preflight, and shows only aggregate create/delete counts without mutation."
             ).font(.footnote).foregroundStyle(.secondary)
         }
     }

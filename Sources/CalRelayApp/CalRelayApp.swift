@@ -7,12 +7,15 @@ import SwiftUI
     init() {
         let authorization = EventKitCalendarAuthorizationStatus()
         let calendarStore = EventKitCalendarStore(authorizationStatus: authorization)
+        let settingsProvider = FileCalendarRelaySettingsProvider()
         let inventory = CalendarInventoryUseCase(authorizationStatus: authorization, calendarStore: calendarStore)
         let setup = CalendarAccessSetupUseCase(authorizationStatus: authorization, fullAccessRequester: authorization)
         let status = CalendarControlPanelStatusUseCase(
-            settingsProvider: FileCalendarRelaySettingsProvider(), authorizationStatus: authorization,
-            calendarStore: calendarStore)
-        viewModel = CalendarListViewModel(inventory: inventory, setup: setup, status: status)
+            settingsProvider: settingsProvider, authorizationStatus: authorization, calendarStore: calendarStore)
+        let manualDryRun = CalendarManualDryRunUseCase(
+            settingsProvider: settingsProvider, authorizationStatus: authorization, calendarStore: calendarStore)
+        viewModel = CalendarListViewModel(
+            inventory: inventory, setup: setup, status: status, manualDryRun: manualDryRun)
     }
 
     var body: some Scene {

@@ -27,15 +27,16 @@ Use **Set Up or Recover Calendar Access** to trigger the permission prompt for b
 8. Remove or invalidate `~/.config/calrelay/config.yaml`, click **Refresh Status**, and confirm configuration recovery is primary and no Calendar prompt appears.
 9. Restore a valid configuration and confirm readiness rejects missing, ambiguous, physically colliding, unreadable, or read-only roles. Create several simultaneous failures and confirm every safely determinable issue is shown without event details or EventKit IDs.
 10. Add a legacy marker and confirm a ready topology reports migration pending separately from readiness.
-11. Run CLI inventory, config check, ordinary dry-run, explanation, and cleanup while access is unavailable. Confirm every command fails nonzero with app recovery guidance and none triggers a permission prompt.
+11. With a ready non-migration configuration, click **Dry Run Sync** and confirm the app reloads current configuration and Calendar state, reports only aggregate planned delete/create counts, performs no mutation, and displays no event titles or EventKit IDs.
+12. Run CLI inventory, config check, ordinary dry-run, explanation, and cleanup while access is unavailable. Confirm every command fails nonzero with app recovery guidance and none triggers a permission prompt.
 
 Use only harmless dedicated calendars for steps that can mutate EventKit data.
 
-## Pending app automation milestone checks
+## Pending app mutation and automation milestone checks
 
-The following checks belong to macOS App Specification Revision 6 but the corresponding manual-sync, app-cleanup, scheduling, standing-authorization, and automation controls are not implemented yet. Record them as pending rather than interpreting absent controls as a pass.
+The following checks belong to macOS App Specification Revision 6 but the corresponding manual apply, app-cleanup, scheduling, standing-authorization, and automation controls are not implemented yet. Record them as pending rather than interpreting absent controls as a pass.
 
-1. Complete a successful app ordinary dry run, review its create/delete summary, and confirm scheduling cannot be enabled until explicit standing authorization is granted.
+1. Review a fresh app ordinary plan, confirm **Run Sync Now** requires confirmation for that exact ordered plan, and confirm scheduling cannot be enabled until explicit standing authorization is granted.
 2. Enable scheduling and validate launch-at-login, launch/wake runs, the fixed cadence, bounded retry, freshness, notifications, pause, and Quit warning.
 3. Validate exact-plan reconfirmation, topology/policy/configuration invalidation, trigger coalescing, and privacy-safe persisted operation status.
 

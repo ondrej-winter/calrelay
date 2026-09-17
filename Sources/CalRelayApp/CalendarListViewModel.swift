@@ -9,22 +9,26 @@ import SwiftUI
     @Published var readinessSummary = "Configured readiness has not been checked."
     @Published var migrationSummary = "Migration state has not been checked."
     @Published var isLoading = false
+    @Published var canRunOrdinarySync = false
 
     private let inventory: CalendarInventoryUseCase
     private let setup: CalendarAccessSetupUseCase
     private let status: CalendarControlPanelStatusUseCase
+    private let manualDryRun: CalendarManualDryRunUseCase
 
     init(
         inventory: CalendarInventoryUseCase, setup: CalendarAccessSetupUseCase,
-        status: CalendarControlPanelStatusUseCase
+        status: CalendarControlPanelStatusUseCase, manualDryRun: CalendarManualDryRunUseCase
     ) {
         self.inventory = inventory
         self.setup = setup
         self.status = status
+        self.manualDryRun = manualDryRun
     }
 
     func refreshStatus() {
         isLoading = true
+        canRunOrdinarySync = false
         output = "Refreshing configuration, Calendar access, and configured readiness…"
 
         Task {
@@ -33,6 +37,7 @@ import SwiftUI
                 output = "Status refresh completed without requesting Calendar access."
             } catch {
                 primaryStatus = "Status refresh failed."
+                canRunOrdinarySync = false
                 output = "Status could not be refreshed. Check the configuration and try again."
             }
 
@@ -42,6 +47,7 @@ import SwiftUI
 
     func setUpCalendarAccess() {
         isLoading = true
+        canRunOrdinarySync = false
         output = "Checking Calendar access…"
 
         Task {
@@ -55,7 +61,10 @@ import SwiftUI
                 do {
                     apply(try await status.run())
                     output = setupOutput + " Status was refreshed."
-                } catch { output = setupOutput + " Status refresh failed; use Refresh Status to try again." }
+                } catch {
+                    canRunOrdinarySync = false
+                    output = setupOutput + " Status refresh failed; use Refresh Status to try again."
+                }
             } catch {
                 authorizationSummary = "Calendar access setup failed."
                 output = Self.safeErrorMessage(error)
@@ -76,6 +85,7 @@ import SwiftUI
             status.isMigrationPending
             ? "Migration is pending. Ordinary sync remains blocked until explicit cleanup completes and legacyMarkers is removed manually."
             : "No legacy-marker migration is pending."
+        canRunOrdinarySync = status.primaryState == .ready
     }
 
     private static func primaryStatus(for state: CalendarControlPanelPrimaryState) -> String {
@@ -118,6 +128,20 @@ import SwiftUI
         }
     }
 
+    func runDryRun() {
+        isLoading = true
+        output = "Loading fresh configuration and Calendar state for a dry run…"
+
+        Task {
+            do { output = CalendarManualDryRunFormatter.format(try await manualDryRun.run()) } catch {
+                canRunOrdinarySync = false
+                output = Self.safeOperationErrorMessage(error)
+            }
+
+            isLoading = false
+        }
+    }
+
     private static func authorizationSummary(for state: CalendarAuthorizationState) -> String {
         switch state {
         case .notDetermined: "Calendar access is not determined. Use this setup action to request full access."
@@ -134,5 +158,17 @@ import SwiftUI
     private static func safeErrorMessage(_ error: Error) -> String {
         if let calendarAccessError = error as? CalendarAccessError { return calendarAccessError.description }
         return "Calendar access could not be completed. Try the setup or recovery action again."
+    }
+
+    private static func safeOperationErrorMessage(_ error: Error) -> String {
+        if let providerError = error as? CalendarRelaySettingsProviderError {
+            switch providerError {
+            case .missing: return "The canonical configuration file is missing. Create it, then refresh status."
+            case .invalid: return "The canonical configuration file is invalid. Fix it, then refresh status."
+            }
+        }
+        if let reconciliationError = error as? ReconcileCalendarsError { return reconciliationError.description }
+        if let calendarAccessError = error as? CalendarAccessError { return calendarAccessError.description }
+        return "The dry run could not be completed. Refresh status, resolve the reported prerequisite, and try again."
     }
 }
