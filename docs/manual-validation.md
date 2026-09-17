@@ -13,28 +13,31 @@ make app
 open .build/CalRelay.app
 ```
 
-Use the app's explicit Calendar access setup/recovery action to trigger the permission prompt for bundle identifier `dev.owinter.CalRelay`. After full access exists, use the separate all-calendar inventory to confirm visible calendars.
+Use **Set Up or Recover Calendar Access** to trigger the permission prompt for bundle identifier `dev.owinter.CalRelay`. It is the only CalRelay action allowed to prompt. After full access exists, use **Show Calendar Inventory** to confirm visible calendars without displaying EventKit IDs.
 
-## Accepted app automation milestone checks
-
-This section describes manual acceptance checks for macOS App Specification Revision 6. Until that revision is implemented, record the checks as pending rather than interpreting missing controls as a validation pass.
+## Implemented Calendar access and readiness checks
 
 1. Open `.build/CalRelay.app` and confirm CalRelay appears as a normal Dock-visible app with no CalRelay menu-bar item.
-2. Confirm the main window distinguishes all-calendar inventory, configuration validity, configured readiness, migration state, standing authorization, scheduling, and latest operation status.
-3. Complete a successful ordinary dry run, review its create/delete summary, and confirm scheduling cannot be enabled until explicit standing authorization is granted.
-4. Enable scheduling and confirm launch-at-login is enabled for the normal app. Confirm the fixed cadence is 15 minutes and is not user configurable.
-5. Log out and in with the app healthy. Confirm CalRelay launches without opening the main window and performs a gated ordinary run.
-6. Repeat login with setup or recovery requiring action. Confirm the main window opens and presents the first dependency-ordered recovery action plus any secondary issues.
-7. Wake the Mac and confirm one prompt gated run occurs regardless of the previous run time.
-8. Trigger timer, wake, and manual actions during an active run. Confirm app-owned triggers do not overlap and coalesce into at most one follow-up run using fresh configuration, preflight, snapshots, and planning. Confirm the app does not claim to serialize a separate CLI apply process.
-9. Cause a transient failure and confirm finite bounded-backoff retry state is visible. Confirm an actionable failure does not enter an aggressive retry loop.
-10. Confirm more than 60 minutes since the latest successful ordinary reconciliation is shown as overdue and generates a user notification when allowed.
-11. Deny user-notification permission and confirm scheduling remains available with persistent in-app degraded state plus a Dock badge or equivalent visible indicator.
-12. Pause scheduling and confirm the warning persists. Confirm launch-at-login remains enabled until changed separately.
-13. Disable launch-at-login while scheduling remains enabled and confirm automation is presented as degraded rather than healthy.
-14. Choose Quit and confirm the app warns that synchronization stops and availability may become stale until the next manual launch or login.
+2. Confirm the main window shows distinct configuration, Calendar access, configured-readiness, and migration states.
+3. With Calendar access not determined, click **Set Up or Recover Calendar Access** and confirm the macOS full-access prompt appears for `dev.owinter.CalRelay`.
+4. Deny or revoke access, refresh status, and confirm the app provides System Settings recovery guidance without prompting again. Repeat with write-only access if available and confirm it is treated as insufficient.
+5. With restricted access, confirm the app explains that the restriction must be resolved outside CalRelay.
+6. With full access, click the setup/recovery action again and confirm it verifies state without prompting.
+7. Click **Show Calendar Inventory** and confirm source/account, title, and writable/read-only state are shown without EventKit calendar IDs and without claiming configured readiness.
+8. Remove or invalidate `~/.config/calrelay/config.yaml`, click **Refresh Status**, and confirm configuration recovery is primary and no Calendar prompt appears.
+9. Restore a valid configuration and confirm readiness rejects missing, ambiguous, physically colliding, unreadable, or read-only roles. Create several simultaneous failures and confirm every safely determinable issue is shown without event details or EventKit IDs.
+10. Add a legacy marker and confirm a ready topology reports migration pending separately from readiness.
+11. Run CLI inventory, config check, ordinary dry-run, explanation, and cleanup while access is unavailable. Confirm every command fails nonzero with app recovery guidance and none triggers a permission prompt.
 
 Use only harmless dedicated calendars for steps that can mutate EventKit data.
+
+## Pending app automation milestone checks
+
+The following checks belong to macOS App Specification Revision 6 but the corresponding manual-sync, app-cleanup, scheduling, standing-authorization, and automation controls are not implemented yet. Record them as pending rather than interpreting absent controls as a pass.
+
+1. Complete a successful app ordinary dry run, review its create/delete summary, and confirm scheduling cannot be enabled until explicit standing authorization is granted.
+2. Enable scheduling and validate launch-at-login, launch/wake runs, the fixed cadence, bounded retry, freshness, notifications, pause, and Quit warning.
+3. Validate exact-plan reconfirmation, topology/policy/configuration invalidation, trigger coalescing, and privacy-safe persisted operation status.
 
 ## Configuration-change and confirmation checks
 
@@ -49,7 +52,7 @@ Use only harmless dedicated calendars for steps that can mutate EventKit data.
 
 ## Basic MVP checks
 
-1. Open `CalRelay.app`, click **List Calendars**, and confirm the hub/work calendars are visible and writable where needed.
+1. Open `CalRelay.app`, click **Refresh Status**, and confirm configuration validity, full Calendar access, and complete configured readiness are distinct. Click **Show Calendar Inventory** separately and confirm the hub/work calendars are visible and writable where needed without EventKit IDs.
 2. Check the selected configuration and complete configured-topology readiness:
 
    ```sh
@@ -64,11 +67,13 @@ Use only harmless dedicated calendars for steps that can mutate EventKit data.
    swift run calrelay reconcile --config calrelay.yml
    ```
 
-4. Run full explanation and confirm it reports the effective window, classifies every input event, and lists the same ordered executable-action sequence as dry-run with causal EventKit event and calendar IDs:
+4. The accepted full explanation check remains pending reconciliation-slice work. The current command is non-mutating and reports candidate inclusion diagnostics, but it does not yet provide the complete effective-window, input-classification, causal-link, and ordered-action audit:
 
    ```sh
    swift run calrelay reconcile --config calrelay.yml --explain
    ```
+
+   Record this check as pending rather than interpreting the current diagnostic output as a pass for the complete explanation contract.
 
 5. Run apply and confirm success is based on confirmation of every ordered mutation without a post-apply verification claim. After the provider exposes the confirmed mutations to a fresh read, run dry-run again and confirm it reports no changes. If an immediate read still exposes stale state, record the provider lag and allow later fresh reconciliation to converge rather than treating immediate no-change output as required:
 
@@ -146,7 +151,7 @@ Use only harmless, dedicated test calendars. Cleanup is a broad deletion workflo
 9. Create a historical malformed title shape that cannot satisfy the current exact marker grammar and confirm cleanup does not select it; remove it manually from the harmless test calendar.
 10. Remove `[RETIRED_TEST]` from `legacyMarkers`, run config check, and confirm ordinary readiness can succeed again.
 
-Repeat the migration with the accepted app cleanup surface:
+The accepted app cleanup surface remains pending. When implemented, validate it separately from the working CLI cleanup flow:
 
 1. Confirm migration pending blocks **Dry Run Sync**, **Run Sync Now**, and automatic reconciliation but exposes separate cleanup actions.
 2. Run app cleanup dry-run and confirm it shows the cleanup range, counts, and a transient execution-ordered row for each selected event containing title, configured role, and time or all-day range, while omitting IDs, selectors, calendar titles, and marker values.

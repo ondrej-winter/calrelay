@@ -2,16 +2,16 @@ import SwiftUI
 
 struct CalendarListView: View {
     @StateObject var viewModel: CalendarListViewModel
-    @AppStorage(AppSettingsKeys.showMenuBarItem) private var showMenuBarItem = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             header
             statusPanel
-            menuBarPreference
-            calendarListControls
+            statusControls
+            calendarAccessControls
+            inventoryControls
             calendarOutput
-        }.padding()
+        }.padding().task { viewModel.refreshStatus() }
     }
 
     private var header: some View {
@@ -26,25 +26,41 @@ struct CalendarListView: View {
     private var statusPanel: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Current app status").font(.headline)
-            Text(
-                "CalRelay.app is currently a normal Dock-visible macOS app. This window is the recovery surface for Calendar access and visible-calendar checks. Sync actions, background scheduling, and automatic reconciliation are not exposed here yet."
-            ).foregroundStyle(.secondary)
+            Text(viewModel.primaryStatus).font(.title3).fontWeight(.semibold)
+            StatusRow(label: "Configuration", value: viewModel.configurationSummary)
+            StatusRow(label: "Calendar access", value: viewModel.authorizationSummary)
+            StatusRow(label: "Configured readiness", value: viewModel.readinessSummary)
+            StatusRow(label: "Migration", value: viewModel.migrationSummary)
         }.frame(maxWidth: .infinity, alignment: .leading).padding().background(Color(nsColor: .controlBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
-    private var menuBarPreference: some View {
-        Toggle("Show CalRelay in the menu bar", isOn: $showMenuBarItem).help(
-            "The menu bar item is UI-only and contains Open CalRelay and Quit actions.")
+    private var statusControls: some View {
+        Button(viewModel.isLoading ? "Refreshing…" : "Refresh Status") { viewModel.refreshStatus() }.disabled(
+            viewModel.isLoading
+        ).help(
+            "Reload the canonical configuration and check Calendar access and configured readiness without prompting.")
     }
 
-    private var calendarListControls: some View {
+    private var calendarAccessControls: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Button(viewModel.isLoading ? "Loading…" : "List Calendars") { viewModel.listCalendars() }.disabled(
+            Button(viewModel.isLoading ? "Checking…" : "Set Up or Recover Calendar Access") {
+                viewModel.setUpCalendarAccess()
+            }.disabled(viewModel.isLoading)
+
+            Text("This is the only CalRelay action that may trigger the macOS Calendar permission prompt.").font(
+                .footnote
+            ).foregroundStyle(.secondary)
+        }
+    }
+
+    private var inventoryControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button(viewModel.isLoading ? "Loading…" : "Show Calendar Inventory") { viewModel.listCalendars() }.disabled(
                 viewModel.isLoading)
 
             Text(
-                "Listing calendars may trigger the macOS Calendar permission prompt for bundle identifier dev.owinter.CalRelay."
+                "Inventory requires pre-existing full access, never prompts, omits EventKit IDs, and does not verify configured readiness."
             ).font(.footnote).foregroundStyle(.secondary)
         }
     }
@@ -55,5 +71,17 @@ struct CalendarListView: View {
                 maxWidth: .infinity, alignment: .leading
             ).textSelection(.enabled).padding()
         }.background(Color(nsColor: .textBackgroundColor)).clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct StatusRow: View {
+    let label: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label).font(.caption).fontWeight(.semibold).foregroundStyle(.secondary)
+            Text(value).textSelection(.enabled)
+        }.accessibilityElement(children: .combine)
     }
 }

@@ -1,3 +1,5 @@
+import Foundation
+
 public struct RelayCalendar: Equatable, Identifiable, Sendable {
     public let id: String
     public let title: String
@@ -37,9 +39,18 @@ public struct CalendarSelector: Equatable, Sendable {
 public struct CalendarEventIdentity: Equatable, Sendable {
     public let id: String
     public let calendar: CalendarIdentity
+    public let occurrenceDate: Date?
+    public let lookupStart: Date?
+    public let lookupEnd: Date?
 
-    public init(id: String, calendar: CalendarIdentity) {
+    public init(
+        id: String, calendar: CalendarIdentity, occurrenceDate: Date? = nil, lookupStart: Date? = nil,
+        lookupEnd: Date? = nil
+    ) {
         self.id = id
         self.calendar = calendar
+        self.occurrenceDate = occurrenceDate
+        self.lookupStart = lookupStart
+        self.lookupEnd = lookupEnd
     }
 }

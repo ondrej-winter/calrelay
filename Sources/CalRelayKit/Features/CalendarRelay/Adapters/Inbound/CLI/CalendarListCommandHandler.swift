@@ -1,12 +1,7 @@
 public struct CalendarListCommandHandler: Sendable {
-    private let calendarStore: CalendarStorePort
+    private let inventory: CalendarInventoryUseCase
 
-    public init(calendarStore: CalendarStorePort = EventKitCalendarStore()) {
-        self.calendarStore = calendarStore
-    }
+    public init(inventory: CalendarInventoryUseCase) { self.inventory = inventory }
 
-    public func run() async throws -> String {
-        let calendars = try await calendarStore.listCalendars()
-        return CalendarListFormatter.format(calendars)
-    }
+    public func run() async throws -> String { CalendarListFormatter.formatForCLI(try await inventory.run()) }
 }

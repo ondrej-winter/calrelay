@@ -146,6 +146,16 @@ Two roles cannot use the same exact source-title/calendar-title selector tuple. 
 
 ## Ordinary commands
 
+Calendar access setup belongs to `CalRelay.app`. Its clearly labeled setup/recovery action is the only CalRelay action that may trigger the macOS Calendar permission prompt. The app separately shows:
+
+- canonical configuration validity;
+- full Calendar authorization state;
+- complete configured-topology readiness;
+- migration-pending state; and
+- the ID-free all-calendar inventory.
+
+The inventory is not a readiness check. CLI inventory, config check, reconciliation, explanation, and cleanup require pre-existing full access and never request it.
+
 Validate the selected configuration and the current readiness of every configured calendar without mutating calendars:
 
 ```sh
@@ -172,15 +182,19 @@ Apply only after reviewing the dry-run plan:
 swift run calrelay reconcile --apply
 ```
 
-Use `--explain` for a non-mutating, end-to-end account of the exact ordinary reconciliation plan. It reports the effective window, classifies every input event, and lists every planned action in execution order with causal EventKit IDs. It cannot be combined with `--apply` or `--cleanup-legacy`.
+`--explain` is non-mutating and cannot be combined with `--apply` or `--cleanup-legacy`:
 
 ```sh
 swift run calrelay reconcile --explain
 ```
 
+The current implementation reports candidate event inclusion diagnostics. The accepted complete explanation contract—effective boundaries, every input event's full classifications, and every planned action in execution order with causal EventKit ID correlation—remains pending reconciliation-slice work. Do not treat the current output as a complete explanation audit.
+
 ## macOS app scheduling contract
 
-The accepted macOS automation milestone uses the same canonical YAML and reusable reconciliation behavior as the CLI. The app reloads and validates the file for every status refresh and every manual or automatic run; it never continues mutating from a last-known-valid copy after the selected file becomes missing, invalid, or migration pending.
+The current app implements Calendar setup/recovery, ID-free inventory, canonical configuration status, complete configured readiness, and migration status. It reloads and validates the canonical file for every status refresh and does not use a last-known-valid configuration fallback.
+
+The remaining accepted automation milestone—reviewed manual sync, app cleanup, standing authorization, scheduling, launch-at-login, retry, freshness, and notifications—must use the same reusable preflight, plans, mutation executor, and cleanup verification behavior as the CLI. Those controls remain pending in the app surface.
 
 Before scheduling can be enabled for the first time, the app requires a successful ordinary dry run, presents its create/delete summary, and obtains explicit standing authorization for automatic ordinary apply runs. Enabling scheduling also enables launch-at-login for the normal Dock-visible app.
 
@@ -194,7 +208,7 @@ The app treats more than 60 minutes since the latest successful ordinary reconci
 
 Standing authorization is bound to the mutation-relevant validated settings, the current reconciliation-policy version, and an opaque identity for the physical calendars currently resolved to configured roles. Changing a configured calendar selector, current or personal marker, `syncWindowDays`, legacy-marker set, or `workCalendars` declaration order suspends automatic mutation until the app presents a successful dry run for the new settings and the user renews authorization. A product upgrade that can change planned actions, exact targets, or execution order, and any changed or unprovably continuous EventKit calendar identity, also requires renewed authorization. Comments, quoting, mapping-key order, and other representation-only YAML changes do not require reauthorization.
 
-These requirements are the accepted contract for the next app implementation milestone. CLI behavior and arguments remain unchanged.
+These requirements remain the accepted contract for the next app implementation milestone. The implemented CLI behavior and arguments are documented above.
 
 ## Changing or retiring a marker
 

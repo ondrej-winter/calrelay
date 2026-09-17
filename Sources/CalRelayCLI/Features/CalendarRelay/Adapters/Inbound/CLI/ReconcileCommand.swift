@@ -15,7 +15,21 @@ struct ReconcileCommand: AsyncParsableCommand {
         help: "Explain inclusion/exclusion decisions for every candidate event instead of planning changes.")
     var explain = false
 
+    @Flag(name: .long, help: "Run the explicit legacy-marker cleanup workflow instead of ordinary reconciliation.")
+    var cleanupLegacy = false
+
+    mutating func validate() throws {
+        if apply && explain { throw ValidationError("--apply and --explain cannot be used together.") }
+        if cleanupLegacy && explain { throw ValidationError("--cleanup-legacy and --explain cannot be used together.") }
+    }
+
     func run() async throws {
-        print(try await ReconcileCommandHandler().run(config: config, apply: apply, explain: explain))
+        let authorization = EventKitCalendarAuthorizationStatus()
+        let calendarStore = EventKitCalendarStore(authorizationStatus: authorization)
+        let result = try await ReconcileCommandHandler(authorizationStatus: authorization, calendarStore: calendarStore)
+            .run(
+                config: config, apply: apply, explain: explain, cleanupLegacy: cleanupLegacy,
+                onOutput: { line in print(line) })
+        print(result)
     }
 }

@@ -9,10 +9,14 @@ public struct CalendarEvent: Equatable, Identifiable, Sendable {
     public let isAllDay: Bool
     public let availability: EventAvailability
     public let status: EventStatus
+    public let occurrenceDate: Date?
+    public let occurrenceLookupStart: Date?
+    public let occurrenceLookupEnd: Date?
 
     public init(
         id: String, calendar: CalendarIdentity, title: String, start: Date, end: Date, isAllDay: Bool,
-        availability: EventAvailability, status: EventStatus
+        availability: EventAvailability, status: EventStatus, occurrenceDate: Date? = nil,
+        occurrenceLookupStart: Date? = nil, occurrenceLookupEnd: Date? = nil
     ) {
         self.id = id
         self.calendar = calendar
@@ -22,9 +26,16 @@ public struct CalendarEvent: Equatable, Identifiable, Sendable {
         self.isAllDay = isAllDay
         self.availability = availability
         self.status = status
+        self.occurrenceDate = occurrenceDate
+        self.occurrenceLookupStart = occurrenceLookupStart
+        self.occurrenceLookupEnd = occurrenceLookupEnd
     }
 
-    public var identity: CalendarEventIdentity { CalendarEventIdentity(id: id, calendar: calendar) }
+    public var identity: CalendarEventIdentity {
+        CalendarEventIdentity(
+            id: id, calendar: calendar, occurrenceDate: occurrenceDate, lookupStart: occurrenceLookupStart,
+            lookupEnd: occurrenceLookupEnd)
+    }
 }
 
 public struct CalendarEventProjection: Equatable, Sendable {

@@ -24,8 +24,11 @@ Everyday CLI reconciliation reads `~/.config/calrelay/config.yaml` by default an
 
 ```sh
 swift run calrelay calendars
+swift run calrelay config check
 swift run calrelay reconcile
 ```
+
+Use the app's explicit setup/recovery action when full Calendar access is unavailable. CLI commands inspect permission state and never trigger the macOS Calendar prompt.
 
 ## Documentation
 

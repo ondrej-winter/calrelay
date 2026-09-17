@@ -6,6 +6,9 @@ struct CalendarsCommand: AsyncParsableCommand {
         commandName: "calendars", abstract: "List visible calendars and their source/title selectors.")
 
     func run() async throws {
-        print(try await CalendarListCommandHandler().run())
+        let authorization = EventKitCalendarAuthorizationStatus()
+        let calendarStore = EventKitCalendarStore(authorizationStatus: authorization)
+        let inventory = CalendarInventoryUseCase(authorizationStatus: authorization, calendarStore: calendarStore)
+        print(try await CalendarListCommandHandler(inventory: inventory).run())
     }
 }

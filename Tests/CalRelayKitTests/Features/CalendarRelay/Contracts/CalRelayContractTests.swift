@@ -11,6 +11,7 @@ enum CalRelayContractTests {
         try Self.testRejectsNonPositiveSyncWindow()
         try Self.testRejectsDuplicateWorkPrefixes()
         try Self.testRejectsPersonalPrefixConflictingWithWorkPrefix()
+        try Self.testRejectsDuplicateCalendarSelectors()
         try Self.testIncludesTimedBusyEvents()
         try Self.testSkipsTimedTentativeEvents()
         try Self.testIncludesTimedEventsWhenAvailabilityIsNotSupported()
@@ -45,16 +46,22 @@ enum CalRelayContractTests {
         try Self.testParsesCanonicalYAMLSettings()
         try Self.testDefaultsSyncWindowDaysWhenOmitted()
         try Self.testReportsSafeYAMLShapeErrors()
+        try Self.testRejectsUnknownYAMLFields()
+        try Self.testRejectsDuplicateYAMLKeys()
         try Self.testReportsSettingsValidationErrorsFromYAML()
         try Self.testMapsCurrentUserTentativeParticipantStatusToTentative()
         try Self.testMapsCurrentUserDeclinedParticipantStatusToDeclined()
         try Self.testMapsAcceptedParticipantStatusFromOverallEventStatus()
         try await Self.testDryRunPlansChangesWithoutMutatingCalendarStore()
+        try await Self.testOrdinaryReconciliationRejectsMigrationBeforeCalendarAccess()
         try await Self.testReconciliationLoadsTwoDaysInThePast()
         try await Self.testRejectsMissingCalendarSelectorDuringReconciliation()
         try await Self.testRejectsAmbiguousCalendarSelectorDuringReconciliation()
+        try await Self.testDryRunRejectsReadOnlyConfiguredRoleBeforePlanning()
         try await Self.testApplyRejectsReadOnlyDestinationBeforeMutation()
         try await Self.testApplyCreatesAndDeletesPlannedChanges()
+        try await Self.testApplyExecutesDeleteBeforeCreate()
+        try await Self.testApplyStopsAfterFailureWithoutRollback()
         try await Self.testDoesNotReprojectManagedWorkProjectionsToHub()
         try await Self.testProjectsWorkSourceToOtherWorkCalendarsInSamePlan()
         try await Self.testDoesNotDoublePrefixRelayedWorkBlockers()
@@ -146,6 +153,15 @@ enum CalRelayContractTests {
                     name: "BETA", prefix: "[WORK]",
                     calendar: CalendarSelector(sourceTitle: "Exchange", calendarTitle: "BETA Work"))
             ]))
+    }
+
+    private static func testRejectsDuplicateCalendarSelectors() throws {
+        let selector = CalendarSelector(sourceTitle: "Google", calendarTitle: "Shared Work")
+        try expectValidationError(
+            .duplicateCalendarSelector(selector, roles: [.hub, .work(name: "ACME", declarationIndex: 0)]),
+            for: validSettings(
+                hubCalendar: HubCalendarSettings(calendar: selector),
+                workCalendars: [WorkCalendarSettings(name: "ACME", prefix: "[ACME]", calendar: selector)]))
     }
 
     private static func testRejectsPersonalPrefixConflictingWithWorkPrefix() throws {
@@ -459,7 +475,7 @@ enum CalRelayContractTests {
     private static func testDefaultsSyncWindowDaysWhenOmitted() throws {
         let settings = try YAMLCalendarRelaySettingsLoader.load(canonicalSettingsYAML(syncWindowDays: nil))
 
-        try expect(settings.syncWindowDays == 60, "Omitted syncWindowDays should default to 60")
+        try expect(settings.syncWindowDays == 100, "Omitted syncWindowDays should default to 100")
     }
 
     private static func testReportsSafeYAMLShapeErrors() throws {
@@ -473,6 +489,58 @@ enum CalRelayContractTests {
         } catch { throw ContractTestFailure("Expected YAMLCalendarRelaySettingsError, got \(error)") }
 
         throw ContractTestFailure("Expected invalid YAML shape error")
+    }
+
+    private static func testRejectsUnknownYAMLFields() throws {
+        let rootUnknown = canonicalSettingsYAML(syncWindowDays: 45) + "\nsecretField: private-value\n"
+        try expectInvalidConfiguration(rootUnknown, prohibitedText: "private-value")
+
+        let nestedUnknown = """
+            hubCalendar:
+              sourceTitle: "iCloud"
+              calendarTitle: "Personal Work"
+              privateField: "private-value"
+            personalPrefix: "[ME]"
+            workCalendars:
+              - name: "ACME"
+                prefix: "[ACME]"
+                calendar:
+                  sourceTitle: "Google"
+                  calendarTitle: "ACME Work"
+            """
+        try expectInvalidConfiguration(nestedUnknown, prohibitedText: "private-value")
+    }
+
+    private static func testRejectsDuplicateYAMLKeys() throws {
+        let duplicateRoot = """
+            hubCalendar:
+              sourceTitle: "iCloud"
+              calendarTitle: "Personal Work"
+            personalPrefix: "[ME]"
+            personalPrefix: "[PRIVATE]"
+            workCalendars:
+              - name: "ACME"
+                prefix: "[ACME]"
+                calendar:
+                  sourceTitle: "Google"
+                  calendarTitle: "ACME Work"
+            """
+        try expectInvalidConfiguration(duplicateRoot, prohibitedText: "[PRIVATE]")
+
+        let duplicateNested = """
+            hubCalendar:
+              sourceTitle: "iCloud"
+              sourceTitle: "Private Account"
+              calendarTitle: "Personal Work"
+            personalPrefix: "[ME]"
+            workCalendars:
+              - name: "ACME"
+                prefix: "[ACME]"
+                calendar:
+                  sourceTitle: "Google"
+                  calendarTitle: "ACME Work"
+            """
+        try expectInvalidConfiguration(duplicateNested, prohibitedText: "Private Account")
     }
 
     private static func testReportsSettingsValidationErrorsFromYAML() throws {
@@ -535,7 +603,7 @@ enum CalRelayContractTests {
         let store = FakeCalendarStore(
             calendars: [fixtures.hubCalendar, fixtures.workCalendar],
             eventsByCalendarID: [fixtures.workCalendar.id: [fixtures.workEvent]])
-        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+        let useCase = reconciliationUseCase(store: store)
 
         let plan = try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now)
         let createdEvents = await store.createdEvents()
@@ -547,30 +615,44 @@ enum CalRelayContractTests {
         try expect(deletedEvents.isEmpty, "Dry-run should not delete events")
     }
 
+    private static func testOrdinaryReconciliationRejectsMigrationBeforeCalendarAccess() async throws {
+        let fixtures = applicationFixtures()
+        let settings = CalendarRelaySettings(
+            hubCalendar: fixtures.settings.hubCalendar, personalPrefix: fixtures.settings.personalPrefix,
+            syncWindowDays: fixtures.settings.syncWindowDays, workCalendars: fixtures.settings.workCalendars,
+            legacyMarkers: ["[OLD]"])
+        let store = FakeCalendarStore(calendars: [fixtures.hubCalendar, fixtures.workCalendar])
+
+        try await expectReconciliationError(
+            .migrationPending,
+            from: { try await reconciliationUseCase(store: store).dryRun(settings: settings, now: fixtures.now) })
+        try expect((await store.eventRequests()).isEmpty, "Migration pending should block before event reads")
+    }
+
     private static func testReconciliationLoadsTwoDaysInThePast() async throws {
         let fixtures = applicationFixtures()
         let store = FakeCalendarStore(calendars: [fixtures.hubCalendar, fixtures.workCalendar])
-        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+        let useCase = reconciliationUseCase(store: store)
 
         _ = try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now)
 
         let requests = await store.eventRequests()
-        let expectedStart = fixtures.now.addingTimeInterval(-2 * 24 * 60 * 60)
-        let expectedEnd = fixtures.now.addingTimeInterval(Double(fixtures.settings.syncWindowDays) * 24 * 60 * 60)
+        let expectedWindow = OrdinaryReconciliationWindow.calculate(
+            referenceDate: fixtures.now, calendar: .current, syncWindowDays: fixtures.settings.syncWindowDays)
 
         try expect(requests.count == 2, "Reconciliation should load events for the hub and work calendars")
         try expect(
-            requests.allSatisfy { $0.start == expectedStart && $0.end == expectedEnd },
-            "Reconciliation should load two days in the past while preserving the configured future window")
+            requests.allSatisfy { $0.start == expectedWindow.start && $0.end == expectedWindow.end },
+            "Reconciliation should use the canonical whole-local-date window")
     }
 
     private static func testRejectsMissingCalendarSelectorDuringReconciliation() async throws {
         let fixtures = applicationFixtures()
         let store = FakeCalendarStore(calendars: [fixtures.workCalendar])
-        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+        let useCase = reconciliationUseCase(store: store)
 
         try await expectReconciliationError(
-            .calendarNotFound(fixtures.settings.hubCalendar.calendar),
+            .accessPreflightFailed([.calendarMissing(role: .hub, selector: fixtures.settings.hubCalendar.calendar)]),
             from: { try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now) })
     }
 
@@ -580,10 +662,10 @@ enum CalRelayContractTests {
             id: "hub-duplicate", title: fixtures.hubCalendar.title, sourceTitle: fixtures.hubCalendar.sourceTitle,
             isWritable: true)
         let store = FakeCalendarStore(calendars: [fixtures.hubCalendar, duplicateHub, fixtures.workCalendar])
-        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+        let useCase = reconciliationUseCase(store: store)
 
         try await expectReconciliationError(
-            .calendarAmbiguous(fixtures.settings.hubCalendar.calendar),
+            .accessPreflightFailed([.calendarAmbiguous(role: .hub, selector: fixtures.settings.hubCalendar.calendar)]),
             from: { try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now) })
     }
 
@@ -592,14 +674,28 @@ enum CalRelayContractTests {
         let store = FakeCalendarStore(
             calendars: [fixtures.hubCalendar, fixtures.workCalendar],
             eventsByCalendarID: [fixtures.workCalendar.id: [fixtures.workEvent]])
-        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+        let useCase = reconciliationUseCase(store: store)
 
         try await expectReconciliationError(
-            .calendarReadOnly(fixtures.hubReference),
+            .accessPreflightFailed([.calendarReadOnly(role: .hub, selector: fixtures.settings.hubCalendar.calendar)]),
             from: { try await useCase.apply(settings: fixtures.settings, now: fixtures.now) })
 
         try expect((await store.createdEvents()).isEmpty, "Read-only apply should not create events")
         try expect((await store.deletedEvents()).isEmpty, "Read-only apply should not delete events")
+    }
+
+    private static func testDryRunRejectsReadOnlyConfiguredRoleBeforePlanning() async throws {
+        let fixtures = applicationFixtures(hubIsWritable: false)
+        let store = FakeCalendarStore(calendars: [fixtures.hubCalendar, fixtures.workCalendar])
+        let useCase = reconciliationUseCase(store: store)
+
+        do { _ = try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now) } catch {
+            try expect((await store.createdEvents()).isEmpty, "Read-only dry-run should not create events")
+            try expect((await store.deletedEvents()).isEmpty, "Read-only dry-run should not delete events")
+            return
+        }
+
+        throw ContractTestFailure("Expected dry-run to reject a read-only configured role")
     }
 
     private static func testApplyCreatesAndDeletesPlannedChanges() async throws {
@@ -611,7 +707,7 @@ enum CalRelayContractTests {
             eventsByCalendarID: [
                 fixtures.hubCalendar.id: [staleHubProjection], fixtures.workCalendar.id: [fixtures.workEvent]
             ])
-        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+        let useCase = reconciliationUseCase(store: store)
 
         let plan = try await useCase.apply(settings: fixtures.settings, now: fixtures.now)
 
@@ -624,6 +720,58 @@ enum CalRelayContractTests {
             "Apply should delete stale managed projections by identity")
     }
 
+    private static func testApplyExecutesDeleteBeforeCreate() async throws {
+        let fixtures = applicationFixtures()
+        let staleHubProjection = calendarEvent(
+            id: "hub-stale-1", calendar: fixtures.hubReference, title: "[ACME] Old Planning")
+        let store = FakeCalendarStore(
+            calendars: [fixtures.hubCalendar, fixtures.workCalendar],
+            eventsByCalendarID: [
+                fixtures.hubCalendar.id: [staleHubProjection], fixtures.workCalendar.id: [fixtures.workEvent]
+            ])
+
+        _ = try await reconciliationUseCase(store: store).apply(settings: fixtures.settings, now: fixtures.now)
+
+        try expect(
+            await store.mutationAttempts() == ["delete:hub-stale-1", "create:hub-1"],
+            "Ordinary apply should execute hub deletes before hub creates")
+    }
+
+    private static func testApplyStopsAfterFailureWithoutRollback() async throws {
+        let fixtures = applicationFixtures()
+        let staleHubProjection = calendarEvent(
+            id: "hub-stale-1", calendar: fixtures.hubReference, title: "[ACME] Old Planning")
+        let store = FakeCalendarStore(
+            calendars: [fixtures.hubCalendar, fixtures.workCalendar],
+            eventsByCalendarID: [
+                fixtures.hubCalendar.id: [staleHubProjection], fixtures.workCalendar.id: [fixtures.workEvent]
+            ], failMutationNumber: 2)
+
+        do {
+            _ = try await reconciliationUseCase(store: store).apply(settings: fixtures.settings, now: fixtures.now)
+        } catch let error as CalendarMutationExecutionError {
+            guard case .partial(let partial) = error else {
+                throw ContractTestFailure("Expected partial mutation result")
+            }
+            try expect(
+                partial.confirmedCounts == [
+                    CalendarRoleMutationCounts(role: .hub, confirmedDeletes: 1, confirmedCreates: 0)
+                ], "Partial result should disclose only confirmed role counts")
+            try expect(partial.failedRole == .hub, "Partial result should identify the failed role")
+            try expect(partial.failureCategory == .createFailed, "Partial result should identify create failure")
+            try expect(
+                await store.deletedEvents() == [staleHubProjection.identity],
+                "Confirmed deletion should remain applied without rollback")
+            try expect((await store.createdEvents()).isEmpty, "Failed create should not be confirmed")
+            try expect(
+                await store.mutationAttempts() == ["delete:hub-stale-1", "create:hub-1"],
+                "No later action should run after failure")
+            return
+        }
+
+        throw ContractTestFailure("Expected ordinary apply failure")
+    }
+
     private static func testDoesNotReprojectManagedWorkProjectionsToHub() async throws {
         let fixtures = applicationFixtures()
         let managedWorkProjection = calendarEvent(
@@ -632,7 +780,7 @@ enum CalRelayContractTests {
         let store = FakeCalendarStore(
             calendars: [fixtures.hubCalendar, fixtures.workCalendar],
             eventsByCalendarID: [fixtures.hubCalendar.id: [], fixtures.workCalendar.id: [managedWorkProjection]])
-        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+        let useCase = reconciliationUseCase(store: store)
 
         let plan = try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now)
 
@@ -673,7 +821,7 @@ enum CalRelayContractTests {
             ])
         let store = FakeCalendarStore(
             calendars: [hubCalendar, acmeCalendar, betaCalendar], eventsByCalendarID: [acmeCalendar.id: [sourceEvent]])
-        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+        let useCase = reconciliationUseCase(store: store)
 
         let plan = try await useCase.dryRun(settings: settings, now: now)
 
@@ -715,7 +863,7 @@ enum CalRelayContractTests {
         let store = FakeCalendarStore(
             calendars: [hubCalendar, acmeCalendar, betaCalendar],
             eventsByCalendarID: [acmeCalendar.id: [sourceEvent], betaCalendar.id: [relayedWorkBlocker]])
-        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+        let useCase = reconciliationUseCase(store: store)
 
         let plan = try await useCase.dryRun(settings: settings, now: now)
 
@@ -737,7 +885,7 @@ enum CalRelayContractTests {
         let store = FakeCalendarStore(
             calendars: [fixtures.hubCalendar, fixtures.workCalendar],
             eventsByCalendarID: [fixtures.hubCalendar.id: [], fixtures.workCalendar.id: [remoteWorkProjection]])
-        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+        let useCase = reconciliationUseCase(store: store)
 
         let plan = try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now)
 
@@ -758,7 +906,7 @@ enum CalRelayContractTests {
         let store = FakeCalendarStore(
             calendars: [fixtures.hubCalendar, fixtures.workCalendar],
             eventsByCalendarID: [fixtures.hubCalendar.id: [remoteHubProjection], fixtures.workCalendar.id: []])
-        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+        let useCase = reconciliationUseCase(store: store)
 
         let plan = try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now)
 
@@ -768,7 +916,7 @@ enum CalRelayContractTests {
     private static func testReconciliationPropagatesCancellation() async throws {
         let fixtures = applicationFixtures()
         let store = FakeCalendarStore(calendars: [fixtures.hubCalendar, fixtures.workCalendar])
-        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+        let useCase = reconciliationUseCase(store: store)
 
         let task = Task { try await useCase.dryRun(settings: fixtures.settings, now: fixtures.now) }
         task.cancel()
@@ -830,7 +978,7 @@ enum CalRelayContractTests {
             eventsByCalendarID: [
                 fixtures.hubCalendar.id: [], fixtures.workCalendar.id: [fixtures.workEvent, excludedWorkEvent]
             ])
-        let useCase = ReconcileCalendarsUseCase(calendarStore: store)
+        let useCase = reconciliationUseCase(store: store)
 
         let explanation = try await useCase.explain(settings: fixtures.settings, now: fixtures.now)
 
@@ -847,18 +995,19 @@ enum CalRelayContractTests {
 
     private static func testFormatsEventExplanations() throws {
         let calendar = CalendarIdentity(id: "acme-1", title: "ACME Work", sourceTitle: "Google")
-        let output = EventExplanationFormatter.format(ReconciliationExplanation(candidates: [
-            CandidateEventExplanation(
-                event: calendarEvent(
-                    calendar: calendar, title: "Client Planning", start: Date(timeIntervalSince1970: 1_000),
-                    end: Date(timeIntervalSince1970: 2_000), availability: .busy, status: .confirmed),
-                inclusion: .included),
-            CandidateEventExplanation(
-                event: calendarEvent(
-                    calendar: calendar, title: "AI QA Learning path sync", start: Date(timeIntervalSince1970: 3_000),
-                    end: Date(timeIntervalSince1970: 4_000), availability: .free, status: .confirmed),
-                inclusion: .unsupportedAvailability(.free))
-        ]))
+        let output = EventExplanationFormatter.format(
+            ReconciliationExplanation(candidates: [
+                CandidateEventExplanation(
+                    event: calendarEvent(
+                        calendar: calendar, title: "Client Planning", start: Date(timeIntervalSince1970: 1_000),
+                        end: Date(timeIntervalSince1970: 2_000), availability: .busy, status: .confirmed),
+                    inclusion: .included),
+                CandidateEventExplanation(
+                    event: calendarEvent(
+                        calendar: calendar, title: "AI QA Learning path sync",
+                        start: Date(timeIntervalSince1970: 3_000), end: Date(timeIntervalSince1970: 4_000),
+                        availability: .free, status: .confirmed), inclusion: .unsupportedAvailability(.free))
+            ]))
 
         try expect(output.contains("Google / ACME Work"), "Explanation output should include calendar selector")
         try expect(output.contains("Client Planning"), "Explanation output should include event title")
@@ -1006,6 +1155,21 @@ enum CalRelayContractTests {
         throw ContractTestFailure("Expected validation error: \(expectedError)")
     }
 
+    private static func expectInvalidConfiguration(_ yaml: String, prohibitedText: String) throws {
+        do { _ = try YAMLCalendarRelaySettingsLoader.load(yaml) } catch let error as YAMLCalendarRelaySettingsError {
+            try expect(
+                error.description.contains("Invalid configuration"), "Strict YAML failure should remain actionable")
+            try expect(
+                !error.description.contains(prohibitedText), "Strict YAML failure must not echo sensitive values")
+            return
+        }
+        throw ContractTestFailure("Expected strict YAML validation failure")
+    }
+
+    private static func reconciliationUseCase(store: FakeCalendarStore) -> ReconcileCalendarsUseCase {
+        ReconcileCalendarsUseCase(authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store)
+    }
+
     private static func expectReconciliationError(
         _ expectedError: ReconcileCalendarsError, from operation: () async throws -> ReconciliationPlan
     ) async throws {
@@ -1036,13 +1200,18 @@ private struct ApplicationFixtures {
 private actor FakeCalendarStore: CalendarStorePort {
     private let calendars: [RelayCalendar]
     private let eventsByCalendarID: [String: [CalendarEvent]]
+    private let failMutationNumber: Int?
     private var recordedCreates: [CalendarEventProjection] = []
     private var recordedDeletes: [CalendarEventIdentity] = []
     private var recordedEventRequests: [(start: Date, end: Date)] = []
+    private var recordedMutationAttempts: [String] = []
 
-    init(calendars: [RelayCalendar], eventsByCalendarID: [String: [CalendarEvent]] = [:]) {
+    init(
+        calendars: [RelayCalendar], eventsByCalendarID: [String: [CalendarEvent]] = [:], failMutationNumber: Int? = nil
+    ) {
         self.calendars = calendars
         self.eventsByCalendarID = eventsByCalendarID
+        self.failMutationNumber = failMutationNumber
     }
 
     func listCalendars() async throws -> [RelayCalendar] { calendars }
@@ -1052,16 +1221,28 @@ private actor FakeCalendarStore: CalendarStorePort {
         return eventsByCalendarID[calendar.id, default: []]
     }
 
-    func createEvent(_ event: CalendarEventProjection) async throws { recordedCreates.append(event) }
+    func createEvent(_ event: CalendarEventProjection) async throws {
+        recordedMutationAttempts.append("create:\(event.destinationCalendar.id)")
+        if failMutationNumber == recordedMutationAttempts.count { throw FakeMutationFailure() }
+        recordedCreates.append(event)
+    }
 
-    func deleteEvent(_ event: CalendarEventIdentity) async throws { recordedDeletes.append(event) }
+    func deleteEvent(_ event: CalendarEventIdentity) async throws {
+        recordedMutationAttempts.append("delete:\(event.id)")
+        if failMutationNumber == recordedMutationAttempts.count { throw FakeMutationFailure() }
+        recordedDeletes.append(event)
+    }
 
     func createdEvents() -> [CalendarEventProjection] { recordedCreates }
 
     func deletedEvents() -> [CalendarEventIdentity] { recordedDeletes }
 
     func eventRequests() -> [(start: Date, end: Date)] { recordedEventRequests }
+
+    func mutationAttempts() -> [String] { recordedMutationAttempts }
 }
+
+private struct FakeMutationFailure: Error {}
 
 private struct ContractTestFailure: Error, CustomStringConvertible {
     let description: String

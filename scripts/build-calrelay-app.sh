@@ -22,7 +22,10 @@ cp "${BUILD_DIR}/${EXECUTABLE_NAME}" "${MACOS_DIR}/${EXECUTABLE_NAME}"
 cp "${ROOT_DIR}/Resources/CalRelayApp/Info.plist" "${CONTENTS_DIR}/Info.plist"
 chmod 755 "${MACOS_DIR}/${EXECUTABLE_NAME}"
 
+/usr/bin/xattr -cr "${APP_BUNDLE}"
 /usr/bin/codesign --force --sign - "${APP_BUNDLE}"
+/usr/bin/xattr -cr "${APP_BUNDLE}"
+/usr/bin/codesign --verify --deep --strict "${APP_BUNDLE}"
 
 echo "Built ${APP_BUNDLE}"
 echo "Open with: open '${APP_BUNDLE}'"
