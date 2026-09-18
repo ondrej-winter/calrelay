@@ -11,6 +11,7 @@ struct CalendarListView: View {
             calendarAccessControls
             inventoryControls
             syncControls
+            if viewModel.isMigrationPending { cleanupControls }
             calendarOutput
         }.padding().task { viewModel.refreshStatus() }.sheet(item: $viewModel.manualReview) { review in
             VStack(alignment: .leading, spacing: 16) {
@@ -29,6 +30,8 @@ struct CalendarListView: View {
                     }
                 }.disabled(viewModel.isLoading)
             }.padding(24).frame(width: 460).interactiveDismissDisabled()
+        }.sheet(item: $viewModel.cleanupReview) { review in
+            CalendarCleanupReviewView(viewModel: viewModel, review: review)
         }
     }
 
@@ -55,7 +58,7 @@ struct CalendarListView: View {
 
     private var statusControls: some View {
         Button(viewModel.isLoading ? "Refreshing…" : "Refresh Status") { viewModel.refreshStatus() }.disabled(
-            viewModel.isLoading
+            viewModel.isOperationBlocked
         ).help(
             "Reload the canonical configuration and check Calendar access and configured readiness without prompting.")
     }
@@ -64,7 +67,7 @@ struct CalendarListView: View {
         VStack(alignment: .leading, spacing: 8) {
             Button(viewModel.isLoading ? "Checking…" : "Set Up or Recover Calendar Access") {
                 viewModel.setUpCalendarAccess()
-            }.disabled(viewModel.isLoading)
+            }.disabled(viewModel.isOperationBlocked)
 
             Text("This is the only CalRelay action that may trigger the macOS Calendar permission prompt.").font(
                 .footnote
@@ -75,7 +78,7 @@ struct CalendarListView: View {
     private var inventoryControls: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button(viewModel.isLoading ? "Loading…" : "Show Calendar Inventory") { viewModel.listCalendars() }.disabled(
-                viewModel.isLoading)
+                viewModel.isOperationBlocked)
 
             Text(
                 "Inventory requires pre-existing full access, never prompts, omits EventKit IDs, and does not verify configured readiness."
@@ -86,13 +89,24 @@ struct CalendarListView: View {
     private var syncControls: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button(viewModel.isLoading ? "Planning…" : "Dry Run Sync") { viewModel.runDryRun() }.disabled(
-                viewModel.isLoading || !viewModel.canRunOrdinarySync)
+                viewModel.isOperationBlocked || !viewModel.canRunOrdinarySync)
             Button("Run Sync Now") { viewModel.reviewSync() }.disabled(
-                viewModel.isLoading || !viewModel.canRunOrdinarySync)
+                viewModel.isOperationBlocked || !viewModel.canRunOrdinarySync)
 
             Text(
                 "Loads fresh configuration and Calendar state, runs the complete ordinary readiness preflight, and shows only aggregate create/delete counts without mutation."
             ).font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+
+    private var cleanupControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Button("Dry Run Legacy Cleanup") { viewModel.reviewCleanup(forApply: false) }
+                Button("Run Legacy Cleanup…") { viewModel.reviewCleanup(forApply: true) }
+            }.disabled(viewModel.isOperationBlocked || !viewModel.canReviewCleanup)
+            Text("Separate full-range preflight and detailed review. Cleanup deletes only legacy-marker matches, requires explicit confirmation, and leaves configuration unchanged.")
+                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 

@@ -16,8 +16,11 @@ import SwiftUI
             settingsProvider: settingsProvider, authorizationStatus: authorization, calendarStore: calendarStore)
         let manualApply = CalendarManualApplyUseCase(
             settingsProvider: settingsProvider, authorizationStatus: authorization, calendarStore: calendarStore)
+        let manualCleanup = CalendarManualCleanupUseCase(
+            settingsProvider: settingsProvider, authorizationStatus: authorization, calendarStore: calendarStore)
         viewModel = CalendarListViewModel(
-            inventory: inventory, setup: setup, status: status, manualDryRun: manualDryRun, manualApply: manualApply)
+            inventory: inventory, setup: setup, status: status, manualDryRun: manualDryRun, manualApply: manualApply,
+            manualCleanup: manualCleanup)
     }
 
     var body: some Scene {

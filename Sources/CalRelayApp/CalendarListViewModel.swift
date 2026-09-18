@@ -12,6 +12,14 @@ import SwiftUI
     @Published var canRunOrdinarySync = false
     @Published var manualReview: CalendarManualApplyReview?
     @Published var reviewNotice = ""
+    @Published var isMigrationPending = false
+    @Published var canReviewCleanup = false
+    @Published var cleanupReview: CalendarManualCleanupReview?
+    @Published var cleanupNotice = ""
+    @Published var cleanupAllowsConfirmation = false
+
+    var isOperationBlocked: Bool { isLoading || manualReview != nil || cleanupReview != nil }
+    let manualCleanup: CalendarManualCleanupUseCase
 
     private let inventory: CalendarInventoryUseCase
     private let setup: CalendarAccessSetupUseCase
@@ -22,19 +30,22 @@ import SwiftUI
     init(
         inventory: CalendarInventoryUseCase, setup: CalendarAccessSetupUseCase,
         status: CalendarControlPanelStatusUseCase, manualDryRun: CalendarManualDryRunUseCase,
-        manualApply: CalendarManualApplyUseCase
+        manualApply: CalendarManualApplyUseCase, manualCleanup: CalendarManualCleanupUseCase
     ) {
         self.inventory = inventory
         self.setup = setup
         self.status = status
         self.manualDryRun = manualDryRun
         self.manualApply = manualApply
+        self.manualCleanup = manualCleanup
     }
 
     func refreshStatus() {
-        guard !isLoading, manualReview == nil else { return }
+        guard !isOperationBlocked else { return }
         isLoading = true
         canRunOrdinarySync = false
+        canReviewCleanup = false
+        isMigrationPending = false
         output = "Refreshing configuration, Calendar access, and configured readiness…"
 
         Task {
@@ -52,9 +63,10 @@ import SwiftUI
     }
 
     func setUpCalendarAccess() {
-        guard !isLoading, manualReview == nil else { return }
+        guard !isOperationBlocked else { return }
         isLoading = true
         canRunOrdinarySync = false
+        canReviewCleanup = false
         output = "Checking Calendar access…"
 
         Task {
@@ -93,6 +105,10 @@ import SwiftUI
             ? "Migration is pending. Ordinary sync remains blocked until explicit cleanup completes and legacyMarkers is removed manually."
             : "No legacy-marker migration is pending."
         canRunOrdinarySync = status.primaryState == .ready
+        isMigrationPending = status.isMigrationPending
+        // Ordinary-window readiness is not a cleanup preflight. The cleanup use case
+        // independently checks the entire topology over the complete cleanup range.
+        canReviewCleanup = status.isMigrationPending && status.authorizationState == .fullAccess
     }
 
     private static func primaryStatus(for state: CalendarControlPanelPrimaryState) -> String {
@@ -123,7 +139,7 @@ import SwiftUI
     }
 
     func listCalendars() {
-        guard !isLoading, manualReview == nil else { return }
+        guard !isOperationBlocked else { return }
         isLoading = true
         output = "Loading the non-prompting Calendar inventory…"
 
@@ -137,7 +153,7 @@ import SwiftUI
     }
 
     func runDryRun() {
-        guard !isLoading, manualReview == nil else { return }
+        guard !isOperationBlocked else { return }
         isLoading = true
         output = "Loading fresh configuration and Calendar state for a dry run…"
 
@@ -152,7 +168,7 @@ import SwiftUI
     }
 
     func reviewSync() {
-        guard !isLoading, manualReview == nil else { return }
+        guard !isOperationBlocked else { return }
         isLoading = true
         output = "Loading a fresh sync plan for review…"
         Task {
@@ -168,7 +184,7 @@ import SwiftUI
     }
 
     func cancelSyncReview() {
-        guard !isLoading else { return }
+        guard !isLoading, manualReview != nil, cleanupReview == nil else { return }
         isLoading = true
         Task {
             await manualApply.cancelReview()

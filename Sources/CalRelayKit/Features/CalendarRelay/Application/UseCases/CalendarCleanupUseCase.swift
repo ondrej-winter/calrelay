@@ -57,12 +57,16 @@ public struct CalendarCleanupUseCase: Sendable {
     public func apply(
         settings: CalendarRelaySettings, now: Date,
         onPlanReady: @escaping @Sendable (CalendarCleanupPlan) async -> Void = { _ in },
+        authorizePlan: @escaping @Sendable (CalendarCleanupPlan) async throws -> Void = { _ in },
         onConfirmation: @escaping @Sendable (CalendarMutationConfirmation) async -> Void = { _ in }
     ) async throws -> CalendarCleanupApplyResult {
         let snapshot = try await loadCleanupSnapshot(settings: settings, now: now, verification: false)
         let markers = Set(settings.legacyMarkers)
         let plan = CalendarCleanupPlanner.plan(snapshot: snapshot, legacyMarkers: markers)
         await onPlanReady(plan)
+        // App confirmation may veto this exact fresh plan. Do not replan after authorization.
+        try await authorizePlan(plan)
+        try Task.checkCancellation()
         let actions = plan.deletions.map { deletion in
             CalendarMutationAction.delete(role: deletion.role, event: deletion.event)
         }

@@ -205,6 +205,22 @@ and verification, and exact recurring-occurrence deletion. Do not treat denied
 access checks or fake-backed tests as evidence of these outcomes. Preserve the
 existing canonical configuration and do not mutate personal calendars.
 
+### - [ ] D05-05 — Deliver separately reviewed app legacy cleanup
+
+Implement APP-02 cleanup using the shared full-range preflight, deterministic
+delete-only plan, executor, and post-delete verification (ACCESS-04, RECON-04,
+CONFIG-08). Add a pre-mutation authorization gate, one-use app review tokens,
+fresh exact-action/configuration comparison, and transient execution-ordered
+review with no IDs, selectors, calendar names, or explicit marker values.
+Serialize current manual workflows; preserve confirmed counts after partial or
+verification failure. Never mutate YAML or combine cleanup with ordinary sync.
+
+**Dependencies:** D05-03, CA-07, CA-08. D05-04 live acceptance remains separate.
+**Validation:** deterministic custom-runner tests for reconfirmation, preflight,
+configuration races, cancellation, concurrency, partial failure, verification,
+and privacy; existing CLI regression suites; `make format-check`, `make check`,
+`make app`, and documentation/diff checks. In progress September 18, 2026.
+
 ## Risks and mitigations
 
 - **Recurring identifier ambiguity:** use the original occurrence date plus physical calendar and fail closed on zero or multiple matches.
@@ -245,6 +261,7 @@ Real Calendar mutation is reserved for explicit harmless manual validation.
 - [x] D05-02 — Exercise available non-mutating live checks
 - [x] D05-03 — Deliver reviewed manual ordinary apply and validation
 - [ ] D05-04 — Complete dedicated-calendar live acceptance
+- [ ] D05-05 — Deliver separately reviewed app legacy cleanup
 
 ## Next action
 
