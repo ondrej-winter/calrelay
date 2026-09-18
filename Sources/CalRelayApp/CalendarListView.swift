@@ -105,8 +105,9 @@ struct CalendarListView: View {
                 Button("Dry Run Legacy Cleanup") { viewModel.reviewCleanup(forApply: false) }
                 Button("Run Legacy Cleanup…") { viewModel.reviewCleanup(forApply: true) }
             }.disabled(viewModel.isOperationBlocked || !viewModel.canReviewCleanup)
-            Text("Separate full-range preflight and detailed review. Cleanup deletes only legacy-marker matches, requires explicit confirmation, and leaves configuration unchanged.")
-                .font(.footnote).foregroundStyle(.secondary)
+            Text(
+                "Separate full-range preflight and detailed review. Cleanup deletes only legacy-marker matches, requires explicit confirmation, and leaves configuration unchanged."
+            ).font(.footnote).foregroundStyle(.secondary)
         }
     }
 

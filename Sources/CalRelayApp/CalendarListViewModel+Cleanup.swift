@@ -39,7 +39,8 @@ extension CalendarListViewModel {
             do {
                 switch try await manualCleanup.confirm(reviewID: review.id) {
                 case .reviewRequired(let fresh):
-                    cleanupNotice = "The plan, range, or configuration changed. Nothing was deleted. Review this fresh ordered plan and confirm again."
+                    cleanupNotice =
+                        "The plan, range, or configuration changed. Nothing was deleted. Review this fresh ordered plan and confirm again."
                     cleanupReview = fresh
                 case .applied(let count):
                     cleanupReview = nil

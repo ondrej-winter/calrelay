@@ -43,9 +43,9 @@ Use only confirmed dedicated test calendars for these mutation checks. Do not re
 5. Cause a partial failure only on harmless test calendars. Confirm later actions stop, no rollback occurs, and recovery requires a new manual review. No per-event details are included in the partial result.
 6. Confirm repeated clicks cannot start overlapping manual operations, a consumed confirmation cannot be reused, and migration pending disables ordinary actions.
 
-## Pending app cleanup and automation milestone checks
+## Pending app automation milestone checks
 
-The following checks belong to macOS App Specification Revision 6 but app-cleanup, scheduling, standing-authorization, persisted history, and automation controls are not implemented yet. Record them as pending rather than interpreting absent controls as a pass.
+The following checks belong to macOS App Specification Revision 6 but scheduling, standing-authorization, persisted history, automatic configuration observation/status recovery, and trigger coalescing are not implemented yet. Record them as pending rather than interpreting absent controls as a pass. Implemented app cleanup has its own checks below.
 
 1. Confirm scheduling cannot be enabled until explicit standing authorization is granted.
 2. Enable scheduling and validate launch-at-login, launch/wake runs, the fixed cadence, bounded retry, freshness, notifications, pause, and Quit warning.
@@ -163,15 +163,19 @@ Use only harmless, dedicated test calendars. Cleanup is a broad deletion workflo
 9. Create a historical malformed title shape that cannot satisfy the current exact marker grammar and confirm cleanup does not select it; remove it manually from the harmless test calendar.
 10. Remove `[RETIRED_TEST]` from `legacyMarkers`, run config check, and confirm ordinary readiness can succeed again.
 
-The accepted app cleanup surface remains pending. When implemented, validate it separately from the working CLI cleanup flow:
+### Implemented app cleanup checks
+
+Validate this separate review/confirmation flow using confirmed dedicated test calendars and the canonical configuration. Do not replace an existing personal configuration merely to exercise the UI. Full-access live acceptance remains an explicit operator check; deterministic tests are not evidence of real EventKit deletion or provider convergence.
 
 1. Confirm migration pending blocks **Dry Run Sync**, **Run Sync Now**, and automatic reconciliation but exposes separate cleanup actions.
-2. Run app cleanup dry-run and confirm it shows the cleanup range, counts, and a transient execution-ordered row for each selected event containing title, configured role, and time or all-day range, while omitting IDs, selectors, calendar titles, and marker values.
-3. Confirm cleanup apply requires separate confirmation for the exact fresh detailed plan and is not authorized by scheduled-sync standing authorization.
-4. Change the cleanup snapshot before mutation and confirm a changed fresh plan invalidates the prior confirmation.
-5. Apply only against harmless test calendars and confirm success requires the complete post-mutation bounded-range verification snapshot.
-6. Relaunch the app and inspect persistent status and logs. Confirm cleanup titles, roles, time ranges, IDs, and other event details were not persisted.
-7. Confirm the app does not edit YAML; remove the tombstone manually only after the topology's migration is complete.
+2. Click **Dry Run Legacy Cleanup** and confirm it shows the cleanup range, deletion count, and a transient execution-ordered row for each selected event containing its title with the leading legacy marker omitted, configured role, and time or all-day range. IDs, selectors, calendar titles, and explicit marker values must be absent. The sheet offers only **Close**, never confirmation or mutation.
+3. Click **Run Legacy Cleanup…** and confirm it first runs a fresh dry run, then requires **Confirm Legacy Cleanup** for that detailed plan. **Cancel** discards authorization without mutation. Other app operations remain blocked during review and apply; repeated clicks must not overlap deletion.
+4. Change an exact target, occurrence, physical calendar, action order, cleanup range, or mutation-relevant configuration before confirmation. Confirm the old authorization performs no deletion and a fresh ordered review is required, even when counts match. Changes that leave the ordered executable actions and configuration identity unchanged do not require reconfirmation.
+5. Invalidate or remove the selected file after snapshot loading but before deletion. Confirm every deletion is prevented and the stale confirmation cannot be reused. A later attempt requires a fresh review.
+6. Apply only against harmless test calendars and confirm success requires the complete post-mutation bounded-range verification snapshot, including for an empty plan. Success remains local and point-in-time, not proof of global or historical retirement.
+7. Cause a partial deletion failure, verification read failure, or remaining verification match on harmless test calendars. Confirm the result is unsuccessful, preserves confirmed deletion counts, omits event details and raw errors, and never rolls back, retries automatically, or deletes newly found matches in that run. Recovery requires refresh and a new review/confirmation.
+8. Close or complete the review and confirm per-event rows disappear. Relaunch and confirm review content is not restored or logged. Persisted operational history and scheduled-sync authorization checks remain pending until automation is implemented.
+9. Confirm the app does not edit YAML or enable ordinary sync after cleanup; remove the tombstone manually only after the topology's migration is complete, then refresh status.
 
 ## Recurring-event capability check
 

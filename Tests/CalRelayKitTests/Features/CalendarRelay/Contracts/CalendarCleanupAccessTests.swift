@@ -20,13 +20,14 @@ enum CalendarCleanupAccessTests {
         let useCase = CalendarCleanupUseCase(
             authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, calendar: utcCalendar())
         do {
-            _ = try await useCase.apply(settings: settings(legacyMarkers: ["[OLD]"]), now: referenceDate(), authorizePlan: { _ in
-                throw CleanupStoreFailure()
-            })
+            _ = try await useCase.apply(
+                settings: settings(legacyMarkers: ["[OLD]"]), now: referenceDate(),
+                authorizePlan: { _ in throw CleanupStoreFailure() })
             throw TestFailure("Authorization must be able to veto even an empty fresh plan")
         } catch is CleanupStoreFailure {}
         try expect(await store.mutationCount() == 0, "Rejected authorization must prevent every mutation")
-        try expect(await store.listCalendarsCallCount() == 1, "Gate runs after fresh complete preflight, before verification")
+        try expect(
+            await store.listCalendarsCallCount() == 1, "Gate runs after fresh complete preflight, before verification")
     }
 
     private static func testSettingsDefaultLegacyMarkersAndForwardWindow() throws {

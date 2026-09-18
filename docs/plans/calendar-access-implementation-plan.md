@@ -4,7 +4,7 @@
 
 - **Requirements basis:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), revision 7, accepted September 16, 2026.
 - **Status:** Ready.
-- **Implementation progress:** Partial as of September 17, 2026. The reusable access, complete CLI, cleanup, app-status, app ordinary dry-run and reviewed manual apply, opaque-reference, and ordinary explanation slices are implemented. Live app launch/status refresh and CLI unavailable-access checks have been exercised; full-access dedicated-calendar validation, D-05 app cleanup, scheduling, and persisted status remain open.
+- **Implementation progress:** Partial as of September 18, 2026. The reusable access, complete CLI, cleanup, app-status, app ordinary dry-run and reviewed manual apply, separately reviewed app legacy cleanup, opaque-reference, and ordinary explanation slices are implemented. Live app launch/status refresh and CLI unavailable-access checks have been exercised; full-access dedicated-calendar validation, configuration observation/status recovery, scheduling, standing authorization, and persisted status remain open.
 - **Scope:** Calendar authorization ownership, inventory, ordinary and cleanup preflight, mutation-time access failure, privacy-safe diagnostics, and the EventKit boundary.
 - **Execution approach:** Thin, test-backed slices. Cross-capability behavior remains owned by the accepted configuration, projection/safety, reconciliation, CLI, and macOS app specifications.
 
@@ -115,7 +115,7 @@ Make the clearly labeled setup/recovery action the only prompt owner. Separate a
 
 **Dependencies:** CA-03 through CA-08 and D-05.
 
-**Evidence:** The access-owned app slice is complete: the normal Dock-visible app has no menu-bar item; only **Set Up or Recover Calendar Access** can request permission; ID-free inventory is separate; and a reusable status use case presents dependency-ordered configuration, authorization, complete readiness, and migration states without prompting. **Dry Run Sync** reloads the canonical settings and current Calendar snapshot, uses shared preflight/planning, and performs no mutation. **Run Sync Now** now provides exact-plan reviewed manual apply with fresh preflight and pre-mutation configuration validation; see D05-03. The task remains open for app cleanup, scheduled/automatic runs, standing authorization, configuration observation/status recovery, and persisted operation status.
+**Evidence:** The access-owned app slice is complete: the normal Dock-visible app has no menu-bar item; only **Set Up or Recover Calendar Access** can request permission; ID-free inventory is separate; and a reusable status use case presents dependency-ordered configuration, authorization, complete readiness, and migration states without prompting. **Dry Run Sync** reloads the canonical settings and current Calendar snapshot, uses shared preflight/planning, and performs no mutation. **Run Sync Now** provides exact-plan reviewed manual apply; D05-05 adds separately reviewed app legacy cleanup with fresh full-range preflight and verification. Both check configuration immediately before mutation and have no permission-request capability. The task remains open for scheduled/automatic runs, standing authorization, configuration observation/status recovery, and persisted operation status.
 
 ### - [ ] CA-11 — Centralize privacy-safe diagnostics and presentation
 
@@ -123,7 +123,7 @@ Use stable failure/action categories rather than raw framework errors. Encode di
 
 **Dependencies:** CA-02 and every presentation-producing task.
 
-**Evidence:** Added purpose-specific inventory, readiness, ordinary app dry-run, cleanup-review, confirmation, partial-result, and cleanup-verification formatting. Failures expose only approved roles, selectors, counts, and categories; the app dry run exposes only aggregate delete/create counts; cleanup review omits IDs/selectors/calendar titles/marker values; app inventory omits IDs. Strict YAML validation rejects duplicate/unknown keys without echoing raw values. `CalendarAccessPrivacyTests` and the dry-run formatter checks pass. The task remains open for D-05-owned persisted app operational status and app cleanup presentation.
+**Evidence:** Added purpose-specific inventory, readiness, ordinary app dry-run, cleanup-review, confirmation, partial-result, and cleanup-verification formatting. The app cleanup review uses transient execution-ordered titles with leading legacy markers omitted, configured roles, and time ranges; its DTO excludes provider identities and selectors. Completion/failure presentation retains only aggregate confirmed counts and safe categories, including when verification fails. Privacy-negative tests cover IDs, calendar names, selectors, markers, raw errors, and review details in completion/failure output. Strict YAML validation rejects duplicate/unknown keys without echoing raw values. The task remains open for D-05-owned persisted app operational status.
 
 ### - [ ] CA-12 — Complete deterministic acceptance coverage
 
@@ -131,7 +131,7 @@ Register focused authorization, inventory, preflight, cleanup, mutation, privacy
 
 **Dependencies:** incremental alongside CA-01 through CA-11.
 
-**Evidence:** Focused authorization, inventory, preflight, window, cleanup, mutation, privacy, control-panel status, manual app dry-run/apply, handler, contract, and process-smoke suites are registered in the custom runner. `CalendarManualDryRunTests` proves fresh settings loading, shared planning, migration blocking before Calendar access, non-mutation, and aggregate-only presentation. `CalendarReviewedActionTests` and `CalendarManualApplyTests` cover reviewed executable identities, fresh snapshots/configuration, stale confirmation, cancellation, empty plans, partial failure, and reentrant confirmation. The task remains open for automatic app operation, persisted-state, and app-cleanup acceptance checks.
+**Evidence:** Focused authorization, inventory, preflight, window, cleanup, mutation, privacy, control-panel status, manual app dry-run/apply, handler, contract, and process-smoke suites are registered in the custom runner. `CalendarManualDryRunTests` proves fresh settings loading, shared planning, migration blocking before Calendar access, non-mutation, and aggregate-only presentation. `CalendarReviewedActionTests` and `CalendarManualApplyTests` cover reviewed executable identities, fresh snapshots/configuration, stale confirmation, cancellation, empty plans, partial failure, and reentrant confirmation. `CalendarManualCleanupTests` adds separate cleanup authorization, same-count target/order changes, fresh lookup data, complete verification, configuration races, confirmed failure counts, privacy, and concurrency coverage. The task remains open for automatic app operation and persisted-state acceptance checks; dedicated-calendar acceptance remains under D05-04.
 
 ### - [ ] CA-13 — Update operational documentation and validate
 
@@ -205,7 +205,7 @@ and verification, and exact recurring-occurrence deletion. Do not treat denied
 access checks or fake-backed tests as evidence of these outcomes. Preserve the
 existing canonical configuration and do not mutate personal calendars.
 
-### - [ ] D05-05 — Deliver separately reviewed app legacy cleanup
+### - [x] D05-05 — Deliver separately reviewed app legacy cleanup
 
 Implement APP-02 cleanup using the shared full-range preflight, deterministic
 delete-only plan, executor, and post-delete verification (ACCESS-04, RECON-04,
@@ -216,10 +216,38 @@ Serialize current manual workflows; preserve confirmed counts after partial or
 verification failure. Never mutate YAML or combine cleanup with ordinary sync.
 
 **Dependencies:** D05-03, CA-07, CA-08. D05-04 live acceptance remains separate.
-**Validation:** deterministic custom-runner tests for reconfirmation, preflight,
-configuration races, cancellation, concurrency, partial failure, verification,
-and privacy; existing CLI regression suites; `make format-check`, `make check`,
-`make app`, and documentation/diff checks. In progress September 18, 2026.
+**Evidence:** Added a throwing authorization gate to the shared cleanup operation
+without changing the CLI's plan-review callback. The app captures a cleanup-run
+reference instant/calendar, computes a fresh full-range plan, and binds one-use
+confirmation to ordered executable identities, semantic configuration, and the
+reviewed range. Confirmation repeats full preflight/planning and reloads validated
+configuration immediately before deletion; changed plans return a new detailed
+review. Dry-run sheets offer Close only, while the separate apply flow requires
+explicit confirmation. Current manual workflows reject overlap. Cleanup never
+creates events, edits YAML, or clears migration state.
+
+The shared full-range verification remains mandatory, including for empty plans.
+Confirmed deletion counts survive partial mutation, cancellation, verification
+read failure, and remaining-match failure. Failures discard detailed review and
+require a fresh manual review; they never roll back, retry automatically, or
+delete newly discovered verification matches. Review DTOs omit provider IDs and
+selectors; transient titles omit their leading legacy marker. Completion and
+failure output contain no event review details or raw framework errors.
+
+**Validation:** On September 18, 2026, focused cleanup, CLI, and privacy suites and
+the complete `make format-check`, `make check`, and `make app` gate passed.
+SwiftLint reported zero violations in 177 files; existing formatting warnings in
+untouched files and toolchain search-path warnings remain. A fake-backed harness
+compiled with the actual app view models verified dry-run-only review, cancelled
+review, blocked competing operations, repeated confirmation, and continued
+migration blocking after verified cleanup. This was an additional local check,
+not a registered test suite. Property-list validation and delayed strict bundle
+signature verification passed. The rebuilt app launched and completed a
+non-prompting status refresh with access not determined and ordinary actions
+disabled. No permission request, personal configuration change, or live calendar
+mutation was performed; the live cleanup review/deletion flow remains D05-04.
+Usage/manual-validation docs were updated, local documentation links checked,
+and `git diff HEAD --check` passed.
 
 ## Risks and mitigations
 
@@ -261,12 +289,13 @@ Real Calendar mutation is reserved for explicit harmless manual validation.
 - [x] D05-02 — Exercise available non-mutating live checks
 - [x] D05-03 — Deliver reviewed manual ordinary apply and validation
 - [ ] D05-04 — Complete dedicated-calendar live acceptance
-- [ ] D05-05 — Deliver separately reviewed app legacy cleanup
+- [x] D05-05 — Deliver separately reviewed app legacy cleanup
 
 ## Next action
 
-Finish dedicated-calendar live acceptance with the operator and continue D-05
-with separately confirmed app cleanup, configuration observation and status
-recovery, standing authorization, serialized
-trigger coalescing, scheduling, and privacy-safe persisted operational state.
+Finish dedicated-calendar live acceptance with the operator. The next bounded
+implementation slice is configuration observation and status recovery, including
+safe invalidation while a review or operation is in progress. Then continue D-05
+with standing authorization, serialized trigger coalescing, scheduling, and
+privacy-safe persisted operational state.
 Keep CA-10 through CA-13 open until those remaining requirements have evidence.

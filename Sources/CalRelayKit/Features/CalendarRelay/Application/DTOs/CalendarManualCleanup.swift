@@ -15,7 +15,8 @@ public struct CalendarManualCleanupReview: Equatable, Identifiable, Sendable {
             let event = deletion.event
             let marker = MarkedEventTitle.marker(in: event.title)
             let title = marker.map { String(event.title.dropFirst($0.count + 1)) } ?? event.title
-            return CalendarCleanupReviewRow(title: title, role: deletion.role, start: event.start, end: event.end, isAllDay: event.isAllDay)
+            return CalendarCleanupReviewRow(
+                title: title, role: deletion.role, start: event.start, end: event.end, isAllDay: event.isAllDay)
         }
     }
 }

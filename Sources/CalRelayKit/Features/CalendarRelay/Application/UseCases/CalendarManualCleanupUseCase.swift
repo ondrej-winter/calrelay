@@ -11,7 +11,8 @@ public actor CalendarManualCleanupUseCase {
     private var isRunning = false
     private var confirmedDeletions = 0
 
-    public init(settingsProvider: any CalendarRelaySettingsProvider, authorizationStatus: any CalendarAuthorizationStatusPort,
+    public init(
+        settingsProvider: any CalendarRelaySettingsProvider, authorizationStatus: any CalendarAuthorizationStatusPort,
         calendarStore: any CalendarStorePort, now: @escaping @Sendable () -> Date = Date.init,
         calendar: @escaping @Sendable () -> Calendar = { .current }
     ) {
@@ -45,7 +46,9 @@ public actor CalendarManualCleanupUseCase {
 
     public func confirm(reviewID: UUID) async throws -> CalendarManualCleanupOutcome {
         guard !isRunning else { throw CalendarManualCleanupError.operationInProgress }
-        guard let reviewed = pending, reviewed.review.id == reviewID else { throw CalendarManualCleanupError.reviewRequired }
+        guard let reviewed = pending, reviewed.review.id == reviewID else {
+            throw CalendarManualCleanupError.reviewRequired
+        }
         isRunning = true
         pending = nil
         confirmedDeletions = 0
@@ -54,24 +57,30 @@ public actor CalendarManualCleanupUseCase {
         let calendar = calendar()
         do {
             let settings = try await settingsProvider.loadSettings().settings
-            let result = try await cleanup(calendar: calendar).apply(settings: settings, now: reference,
+            let result = try await cleanup(calendar: calendar).apply(
+                settings: settings, now: reference,
                 authorizePlan: { plan in
-                    try await self.authorize(plan, reviewed: reviewed, settings: settings, reference: reference, calendar: calendar)
+                    try await self.authorize(
+                        plan, reviewed: reviewed, settings: settings, reference: reference, calendar: calendar)
                 }, onConfirmation: { _ in await self.recordDeletion() })
             return .applied(confirmedDeletions: result.confirmedDeletionCount)
-        } catch let changed as CleanupReconfirmation {
-            return .reviewRequired(changed.review)
-        } catch { throw safeFailure(error) }
+        } catch let changed as CleanupReconfirmation { return .reviewRequired(changed.review) } catch {
+            throw safeFailure(error)
+        }
     }
 
-    private func authorize(_ plan: CalendarCleanupPlan, reviewed: PendingCleanupReview, settings: CalendarRelaySettings,
-        reference: Date, calendar: Calendar
+    private func authorize(
+        _ plan: CalendarCleanupPlan, reviewed: PendingCleanupReview, settings: CalendarRelaySettings, reference: Date,
+        calendar: Calendar
     ) async throws {
         try Task.checkCancellation()
         guard reviewed.identities == identities(plan),
             reviewed.configuration == OrdinaryConfigurationMutationIdentity(settings),
             reviewed.review.window == LegacyCleanupWindow.calculate(referenceDate: reference, calendar: calendar)
-        else { throw CleanupReconfirmation(review: remember(plan, settings: settings, reference: reference, calendar: calendar)) }
+        else {
+            throw CleanupReconfirmation(
+                review: remember(plan, settings: settings, reference: reference, calendar: calendar))
+        }
         let current = try await settingsProvider.loadSettings().settings
         try SettingsValidator.validate(current)
         guard !current.legacyMarkers.isEmpty,
@@ -81,12 +90,19 @@ public actor CalendarManualCleanupUseCase {
     }
 
     private func cleanup(calendar: Calendar) -> CalendarCleanupUseCase {
-        CalendarCleanupUseCase(authorizationStatus: authorizationStatus, calendarStore: calendarStore, calendar: calendar)
+        CalendarCleanupUseCase(
+            authorizationStatus: authorizationStatus, calendarStore: calendarStore, calendar: calendar)
     }
 
-    private func remember(_ plan: CalendarCleanupPlan, settings: CalendarRelaySettings, reference: Date, calendar: Calendar) -> CalendarManualCleanupReview {
-        let review = CalendarManualCleanupReview(plan: plan, window: LegacyCleanupWindow.calculate(referenceDate: reference, calendar: calendar), calendar: calendar)
-        pending = PendingCleanupReview(review: review, identities: identities(plan), configuration: OrdinaryConfigurationMutationIdentity(settings))
+    private func remember(
+        _ plan: CalendarCleanupPlan, settings: CalendarRelaySettings, reference: Date, calendar: Calendar
+    ) -> CalendarManualCleanupReview {
+        let review = CalendarManualCleanupReview(
+            plan: plan, window: LegacyCleanupWindow.calculate(referenceDate: reference, calendar: calendar),
+            calendar: calendar)
+        pending = PendingCleanupReview(
+            review: review, identities: identities(plan), configuration: OrdinaryConfigurationMutationIdentity(settings)
+        )
         return review
     }
 
@@ -99,23 +115,29 @@ public actor CalendarManualCleanupUseCase {
     private func safeFailure(_ error: Error) -> CalendarManualCleanupError {
         if let error = error as? CalendarManualCleanupError { return error }
         let category: CalendarManualCleanupFailure
-        if error is CalendarRelaySettingsProviderError || error is SettingsValidationError { category = .configurationUnavailable }
-        else if error is CancellationError { category = .cancelled }
-        else if let error = error as? CalendarCleanupError {
-            switch error {
-            case .invalidSettings: category = .configurationUnavailable
-            case .legacyMarkersRequired: category = .legacyMarkersRequired
-            case .preflightFailed(let issues):
-                if let state = issues.compactMap({ issue -> CalendarAuthorizationState? in
-                    if case .authorizationUnavailable(let state) = issue { return state }
-                    return nil
-                }).first { category = .authorizationUnavailable(state) } else { category = .preflightFailed }
-            case .mutationFailed: category = .deletionFailed
-            case .verificationFailed: category = .verificationReadFailed
-            case .verificationFoundRemainingMatches(let count): category = .remainingMatches(count)
-            }
-        } else { category = .unexpected }
+        if error is CalendarRelaySettingsProviderError || error is SettingsValidationError {
+            category = .configurationUnavailable
+        } else if error is CancellationError {
+            category = .cancelled
+        } else if let error = error as? CalendarCleanupError {
+            category = cleanupFailureCategory(error)
+        } else {
+            category = .unexpected
+        }
         return .failed(confirmedDeletions: confirmedDeletions, category: category)
+    }
+
+    private func cleanupFailureCategory(_ error: CalendarCleanupError) -> CalendarManualCleanupFailure {
+        switch error {
+        case .invalidSettings: return .configurationUnavailable
+        case .legacyMarkersRequired: return .legacyMarkersRequired
+        case .preflightFailed(let issues):
+            for case .authorizationUnavailable(let state) in issues { return .authorizationUnavailable(state) }
+            return .preflightFailed
+        case .mutationFailed: return .deletionFailed
+        case .verificationFailed: return .verificationReadFailed
+        case .verificationFoundRemainingMatches(let count): return .remainingMatches(count)
+        }
     }
 }
 
@@ -125,6 +147,4 @@ private struct PendingCleanupReview: Sendable {
     let configuration: OrdinaryConfigurationMutationIdentity
 }
 
-private struct CleanupReconfirmation: Error {
-    let review: CalendarManualCleanupReview
-}
+private struct CleanupReconfirmation: Error { let review: CalendarManualCleanupReview }

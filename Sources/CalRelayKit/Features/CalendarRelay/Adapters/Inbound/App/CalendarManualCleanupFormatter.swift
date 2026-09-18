@@ -14,7 +14,9 @@ public enum CalendarManualCleanupFormatter {
         for row in review.rows {
             formatter.dateFormat = row.isAllDay ? "yyyy-MM-dd" : "yyyy-MM-dd HH:mm zzz"
             let kind = row.isAllDay ? "all-day dates; end exclusive" : "time range"
-            lines.append("- \(row.role.description): \(row.title) [\(kind): \(formatter.string(from: row.start)) → \(formatter.string(from: row.end))]")
+            lines.append(
+                "- \(row.role.description): \(row.title) [\(kind): \(formatter.string(from: row.start)) → \(formatter.string(from: row.end))]"
+            )
         }
         return lines.joined(separator: "\n")
     }
@@ -32,7 +34,8 @@ public enum CalendarManualCleanupFormatter {
         switch error {
         case .operationInProgress: return "An operation is already in progress. Wait for it to finish."
         case .reviewRequired: return "Cleanup confirmation is no longer valid. Review a fresh cleanup plan."
-        case .configurationChanged: return "Configuration changed before deletion. Nothing was deleted. Review a fresh cleanup plan."
+        case .configurationChanged:
+            return "Configuration changed before deletion. Nothing was deleted. Review a fresh cleanup plan."
         case .failed(let count, let category):
             return "Cleanup unsuccessful. Confirmed deletions: \(count). \(message(category)) "
                 + "Confirmed deletions remain applied; no rollback was attempted. Refresh status, resolve the issue, then review and confirm a fresh cleanup plan."

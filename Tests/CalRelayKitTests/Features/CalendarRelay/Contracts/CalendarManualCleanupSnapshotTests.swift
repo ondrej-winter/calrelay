@@ -6,7 +6,8 @@ extension CalendarManualCleanupTests {
         for change in [CleanupSnapshotChange.calendar, .event, .occurrence, .order] {
             let fixture = ManualCleanupFixture()
             let store = ChangingCleanupSnapshotStore(fixture: fixture, change: change)
-            let useCase = fixture.useCase(provider: ManualApplySettingsProvider(settings: fixture.settings), store: store)
+            let useCase = fixture.useCase(
+                provider: ManualApplySettingsProvider(settings: fixture.settings), store: store)
             let review = try await useCase.review()
             guard case .reviewRequired(let fresh) = try await useCase.confirm(reviewID: review.id) else {
                 throw TestFailure("Same-count cleanup target/order changes must require new review")
@@ -29,7 +30,9 @@ extension CalendarManualCleanupTests {
         guard case .applied = try await useCase.confirm(reviewID: review.id) else {
             throw TestFailure("Diagnostic changes must not invalidate unchanged executable actions")
         }
-        try expect(await store.deletions().first?.lookupStart == fixture.now.addingTimeInterval(-200), "Deletion must use fresh lookup data")
+        try expect(
+            await store.deletions().first?.lookupStart == fixture.now.addingTimeInterval(-200),
+            "Deletion must use fresh lookup data")
     }
 }
 
@@ -48,7 +51,9 @@ private actor ChangingCleanupSnapshotStore: CalendarStorePort {
 
     func listCalendars() async throws -> [RelayCalendar] {
         snapshots += 1
-        let hub = RelayCalendar(id: snapshots > 1 && change == .calendar ? "replacement-hub" : "test-hub", title: fixture.hub.title, sourceTitle: fixture.hub.sourceTitle, isWritable: true)
+        let hub = RelayCalendar(
+            id: snapshots > 1 && change == .calendar ? "replacement-hub" : "test-hub", title: fixture.hub.title,
+            sourceTitle: fixture.hub.sourceTitle, isWritable: true)
         return [hub, fixture.work]
     }
 
@@ -56,8 +61,8 @@ private actor ChangingCleanupSnapshotStore: CalendarStorePort {
         guard calendar.id != fixture.work.id, deleted.isEmpty else { return [] }
         let changed = snapshots > 1
         let first = CalendarEvent(
-            id: changed && change == .event ? "replacement-event" : "first", calendar: calendar,
-            title: "[OLD] Example", start: fixture.now.addingTimeInterval(changed && change == .order ? 300 : 0),
+            id: changed && change == .event ? "replacement-event" : "first", calendar: calendar, title: "[OLD] Example",
+            start: fixture.now.addingTimeInterval(changed && change == .order ? 300 : 0),
             end: fixture.now.addingTimeInterval(changed && change == .order ? 400 : 100), isAllDay: false,
             availability: .busy, status: changed && change == .rationale ? .cancelled : .confirmed,
             occurrenceDate: fixture.now.addingTimeInterval(changed && change == .occurrence ? 1 : 0),

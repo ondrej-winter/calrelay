@@ -12,20 +12,28 @@ extension CalendarManualCleanupTests {
         let fixture = ManualCleanupFixture()
         for scenario in CleanupFailureScenario.allCases {
             let store = FailingManualCleanupStore(fixture: fixture, scenario: scenario)
-            let useCase = fixture.useCase(provider: ManualApplySettingsProvider(settings: fixture.settings), store: store)
+            let useCase = fixture.useCase(
+                provider: ManualApplySettingsProvider(settings: fixture.settings), store: store)
             let review = try await useCase.review()
             do {
                 _ = try await useCase.confirm(reviewID: review.id)
                 throw TestFailure("Cleanup failure must not be reported as success")
             } catch let error as CalendarManualCleanupError {
-                try expect(error == scenario.expectedError, "Cleanup must retain confirmed counts and safe failure category")
+                try expect(
+                    error == scenario.expectedError, "Cleanup must retain confirmed counts and safe failure category")
                 let output = CalendarManualCleanupFormatter.formatFailure(error)
-                try expect(output.contains("no rollback") && output.contains("fresh cleanup plan"), "Report explicit manual recovery")
+                try expect(
+                    output.contains("no rollback") && output.contains("fresh cleanup plan"),
+                    "Report explicit manual recovery")
                 for forbidden in ["secret", "Example", "Test Source", "Test Hub", "test-hub", "test-legacy", "[OLD]"] {
-                    try expect(!output.contains(forbidden), "Failure presentation must not leak review, selector or framework content")
+                    try expect(
+                        !output.contains(forbidden),
+                        "Failure presentation must not leak review, selector or framework content")
                 }
             }
-            try expect(await store.attemptedDeletes() == scenario.attempts, "Never retry, verify or continue after mutation failure")
+            try expect(
+                await store.attemptedDeletes() == scenario.attempts,
+                "Never retry, verify or continue after mutation failure")
             do {
                 _ = try await useCase.confirm(reviewID: review.id)
                 throw TestFailure("Failure must consume confirmation")
@@ -35,17 +43,23 @@ extension CalendarManualCleanupTests {
 
     private static func testConfigurationRaceVetoesAllDeletion() async throws {
         let fixture = ManualCleanupFixture()
-        for last in [Result.success(fixture.settings(markers: ["[OTHER]"])), .success(fixture.settings(markers: [])),
-            .failure(CalendarRelaySettingsProviderError.missing(displayPath: "secret")), .failure(.invalid(displayPath: "secret"))] {
-            let provider = CleanupSequenceSettingsProvider(loads: [.success(fixture.settings), .success(fixture.settings), last])
+        for last in [
+            Result.success(fixture.settings(markers: ["[OTHER]"])), .success(fixture.settings(markers: [])),
+            .failure(CalendarRelaySettingsProviderError.missing(displayPath: "secret")),
+            .failure(.invalid(displayPath: "secret"))
+        ] {
+            let provider = CleanupSequenceSettingsProvider(loads: [
+                .success(fixture.settings), .success(fixture.settings), last
+            ])
             let store = fixture.store()
             let useCase = fixture.useCase(provider: provider, store: store)
             let review = try await useCase.review()
             do {
                 _ = try await useCase.confirm(reviewID: review.id)
                 throw TestFailure("Configuration change after snapshot must prevent deletion")
-            } catch CalendarManualCleanupError.configurationChanged {
-            } catch CalendarManualCleanupError.failed(confirmedDeletions: 0, category: .configurationUnavailable) {}
+            } catch CalendarManualCleanupError.configurationChanged {} catch CalendarManualCleanupError.failed(
+                confirmedDeletions: 0, category: .configurationUnavailable)
+            {}
             try expect(await store.deletedEvents().isEmpty, "Never mutate with stale or invalid configuration")
         }
     }
@@ -67,12 +81,17 @@ extension CalendarManualCleanupTests {
             throw TestFailure("Cleanup requires migration tombstones")
         } catch CalendarManualCleanupError.failed(confirmedDeletions: 0, category: .legacyMarkersRequired) {}
         await provider.replace(fixture.settings)
-        let denied = CalendarManualCleanupUseCase(settingsProvider: provider, authorizationStatus: TestCalendarAuthorizationStatus(state: .denied), calendarStore: store)
+        let denied = CalendarManualCleanupUseCase(
+            settingsProvider: provider, authorizationStatus: TestCalendarAuthorizationStatus(state: .denied),
+            calendarStore: store)
         do {
             _ = try await denied.review()
             throw TestFailure("Denied access must block cleanup")
-        } catch CalendarManualCleanupError.failed(confirmedDeletions: 0, category: .authorizationUnavailable(.denied)) {}
-        try expect(await store.listCalendarsCallCount() == 1, "Invalid configuration and denied access must fail before inventory")
+        } catch CalendarManualCleanupError.failed(confirmedDeletions: 0, category: .authorizationUnavailable(.denied)) {
+        }
+        try expect(
+            await store.listCalendarsCallCount() == 1,
+            "Invalid configuration and denied access must fail before inventory")
         try expect(await store.deletedEvents().isEmpty, "Cancelled or unauthorized operations must not mutate")
     }
 }
@@ -114,11 +133,14 @@ private actor FailingManualCleanupStore: CalendarStorePort {
     }
     func events(in calendar: CalendarIdentity, from start: Date, to end: Date) async throws -> [CalendarEvent] {
         if calendar.id == fixture.work.id,
-            (snapshots == 2 && scenario == .preflight) || (snapshots == 3 && scenario == .verificationRead) {
+            (snapshots == 2 && scenario == .preflight) || (snapshots == 3 && scenario == .verificationRead)
+        {
             throw TestFailure("secret read error")
         }
         guard calendar.id == fixture.hub.id else { return [] }
-        return (0..<3).map { fixture.event(id: "test-legacy-\($0)", start: fixture.now.addingTimeInterval(Double($0) * 200)) }
+        return (0..<3).map {
+            fixture.event(id: "test-legacy-\($0)", start: fixture.now.addingTimeInterval(Double($0) * 200))
+        }
     }
     func deleteEvent(_ event: CalendarEventIdentity) async throws {
         attempts += 1

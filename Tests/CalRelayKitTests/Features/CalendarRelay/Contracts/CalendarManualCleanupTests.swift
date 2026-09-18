@@ -7,6 +7,7 @@ enum CalendarManualCleanupTests {
         try await testChangedConfigurationRequiresFreshReview()
         try await runSnapshotTests()
         try await runFailureTests()
+        try await runReviewTests()
     }
 
     private static func testReviewApplyAndOneUseConfirmation() async throws {
@@ -15,13 +16,18 @@ enum CalendarManualCleanupTests {
         let provider = ManualApplySettingsProvider(settings: fixture.settings)
         let useCase = fixture.useCase(provider: provider, store: store)
         let review = try await useCase.review()
-        try expect(review.rows.count == 1 && review.rows[0].title == "Example", "Review must strip the marker and show each deletion")
+        try expect(
+            review.rows.count == 1 && review.rows[0].title == "Example",
+            "Review must strip the marker and show each deletion")
         try expect(await store.deletedEvents().isEmpty, "Review never mutates")
         guard case .applied(let count) = try await useCase.confirm(reviewID: review.id) else {
             throw TestFailure("Matching plan should apply and verify")
         }
         try expect(count == 1, "Report confirmed deletes")
-        try expect(await store.eventRequestCalendarIDs() == [fixture.hub.id, fixture.work.id, fixture.hub.id, fixture.work.id, fixture.hub.id, fixture.work.id], "Review, confirm and verification read the whole topology in order")
+        try expect(
+            await store.eventRequestCalendarIDs() == [
+                fixture.hub.id, fixture.work.id, fixture.hub.id, fixture.work.id, fixture.hub.id, fixture.work.id
+            ], "Review, confirm and verification read the whole topology in order")
         try expect(await provider.callCount() == 3, "Reload before planning and immediately before deletion")
         try expect(await store.createdEvents().isEmpty, "Cleanup cannot create events")
         do {
@@ -40,9 +46,13 @@ enum CalendarManualCleanupTests {
         guard case .reviewRequired(let fresh) = try await useCase.confirm(reviewID: first.id) else {
             throw TestFailure("Changed configuration requires fresh review with equal counts")
         }
-        try expect(fresh.id != first.id && fresh.rows == first.rows, "Replace the confirmation token even when review rows match")
+        try expect(
+            fresh.id != first.id && fresh.rows == first.rows,
+            "Replace the confirmation token even when review rows match")
         try expect(await store.deletedEvents().isEmpty, "No deletion before fresh confirmation")
-        guard case .applied = try await useCase.confirm(reviewID: fresh.id) else { throw TestFailure("Fresh confirmation should succeed") }
+        guard case .applied = try await useCase.confirm(reviewID: fresh.id) else {
+            throw TestFailure("Fresh confirmation should succeed")
+        }
     }
 
     static func expect(_ condition: Bool, _ message: String) throws {
@@ -61,13 +71,27 @@ struct ManualCleanupFixture {
         value.timeZone = TimeZone(secondsFromGMT: 0)!
         return value
     }
-    func settings(markers: [String]) -> CalendarRelaySettings { base.settingsWith(prefix: "[WORK]", legacyMarkers: markers) }
-    func event(id: String = "test-legacy", calendar: RelayCalendar? = nil, title: String = "[OLD] Example", start: Date? = nil, occurrence: Date? = nil) -> CalendarEvent {
-        let target = calendar ?? hub
-        return CalendarEvent(id: id, calendar: CalendarIdentity(id: target.id, title: target.title, sourceTitle: target.sourceTitle), title: title, start: start ?? now, end: (start ?? now).addingTimeInterval(100), isAllDay: false, availability: .busy, status: .confirmed, occurrenceDate: occurrence)
+    func settings(markers: [String]) -> CalendarRelaySettings {
+        base.settingsWith(prefix: "[WORK]", legacyMarkers: markers)
     }
-    func store() -> CommandHandlerCalendarStore { CommandHandlerCalendarStore(calendars: [hub, work], eventsByCalendarID: [hub.id: [event()]]) }
-    func useCase(provider: any CalendarRelaySettingsProvider, store: any CalendarStorePort) -> CalendarManualCleanupUseCase {
-        CalendarManualCleanupUseCase(settingsProvider: provider, authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { now }, calendar: { calendar })
+    func event(
+        id: String = "test-legacy", calendar: RelayCalendar? = nil, title: String = "[OLD] Example", start: Date? = nil,
+        occurrence: Date? = nil
+    ) -> CalendarEvent {
+        let target = calendar ?? hub
+        return CalendarEvent(
+            id: id, calendar: CalendarIdentity(id: target.id, title: target.title, sourceTitle: target.sourceTitle),
+            title: title, start: start ?? now, end: (start ?? now).addingTimeInterval(100), isAllDay: false,
+            availability: .busy, status: .confirmed, occurrenceDate: occurrence)
+    }
+    func store() -> CommandHandlerCalendarStore {
+        CommandHandlerCalendarStore(calendars: [hub, work], eventsByCalendarID: [hub.id: [event()]])
+    }
+    func useCase(provider: any CalendarRelaySettingsProvider, store: any CalendarStorePort)
+        -> CalendarManualCleanupUseCase
+    {
+        CalendarManualCleanupUseCase(
+            settingsProvider: provider, authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store,
+            now: { now }, calendar: { calendar })
     }
 }
