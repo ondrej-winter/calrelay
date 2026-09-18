@@ -13,7 +13,7 @@ struct CalendarListView: View {
             syncControls
             if viewModel.isMigrationPending { cleanupControls }
             calendarOutput
-        }.padding().task { viewModel.refreshStatus() }.sheet(item: $viewModel.manualReview) { review in
+        }.padding().task { viewModel.start() }.sheet(item: $viewModel.manualReview) { review in
             VStack(alignment: .leading, spacing: 16) {
                 Text("Review Sync Plan").font(.title2)
                 Text(viewModel.reviewNotice)

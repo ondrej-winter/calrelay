@@ -4,7 +4,7 @@
 
 - **Requirements basis:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), revision 7, accepted September 16, 2026.
 - **Status:** Ready.
-- **Implementation progress:** Partial as of September 18, 2026. The reusable access, complete CLI, cleanup, app-status, app ordinary dry-run and reviewed manual apply, separately reviewed app legacy cleanup, opaque-reference, and ordinary explanation slices are implemented. Live app launch/status refresh and CLI unavailable-access checks have been exercised; full-access dedicated-calendar validation, configuration observation/status recovery, scheduling, standing authorization, and persisted status remain open.
+- **Implementation progress:** Partial as of September 18, 2026. The reusable access, complete CLI, cleanup, app-status, app ordinary dry-run and reviewed manual apply, separately reviewed app legacy cleanup, configuration observation/status recovery, opaque-reference, and ordinary explanation slices are implemented. Live app launch/status refresh and CLI unavailable-access checks have been exercised; full-access dedicated-calendar validation, scheduling, standing authorization, automatic-run trigger coalescing, and persisted status remain open.
 - **Scope:** Calendar authorization ownership, inventory, ordinary and cleanup preflight, mutation-time access failure, privacy-safe diagnostics, and the EventKit boundary.
 - **Execution approach:** Thin, test-backed slices. Cross-capability behavior remains owned by the accepted configuration, projection/safety, reconciliation, CLI, and macOS app specifications.
 
@@ -115,7 +115,7 @@ Make the clearly labeled setup/recovery action the only prompt owner. Separate a
 
 **Dependencies:** CA-03 through CA-08 and D-05.
 
-**Evidence:** The access-owned app slice is complete: the normal Dock-visible app has no menu-bar item; only **Set Up or Recover Calendar Access** can request permission; ID-free inventory is separate; and a reusable status use case presents dependency-ordered configuration, authorization, complete readiness, and migration states without prompting. **Dry Run Sync** reloads the canonical settings and current Calendar snapshot, uses shared preflight/planning, and performs no mutation. **Run Sync Now** provides exact-plan reviewed manual apply; D05-05 adds separately reviewed app legacy cleanup with fresh full-range preflight and verification. Both check configuration immediately before mutation and have no permission-request capability. The task remains open for scheduled/automatic runs, standing authorization, configuration observation/status recovery, and persisted operation status.
+**Evidence:** The access-owned app slice is complete: the normal Dock-visible app has no menu-bar item; only **Set Up or Recover Calendar Access** can request permission; ID-free inventory is separate; and a reusable status use case presents dependency-ordered configuration, authorization, complete readiness, and migration states without prompting. **Dry Run Sync** reloads the canonical settings and current Calendar snapshot, uses shared preflight/planning, and performs no mutation. **Run Sync Now** provides exact-plan reviewed manual apply; D05-05 adds separately reviewed app legacy cleanup with fresh full-range preflight and verification. Both check configuration immediately before mutation and have no permission-request capability. The app now observes canonical-file creation, replacement, edit, and removal as invalidation signals, disables configuration-dependent actions immediately, invalidates open review tokens, and coalesces changes during an active operation into one fresh follow-up status load without interrupting a possibly partial mutation. Observation never supplies cached settings; every refresh and run still loads the selected file afresh. The task remains open for scheduled/automatic runs, standing authorization, automatic-run trigger coalescing, and persisted operation status.
 
 ### - [ ] CA-11 — Centralize privacy-safe diagnostics and presentation
 
@@ -131,7 +131,7 @@ Register focused authorization, inventory, preflight, cleanup, mutation, privacy
 
 **Dependencies:** incremental alongside CA-01 through CA-11.
 
-**Evidence:** Focused authorization, inventory, preflight, window, cleanup, mutation, privacy, control-panel status, manual app dry-run/apply, handler, contract, and process-smoke suites are registered in the custom runner. `CalendarManualDryRunTests` proves fresh settings loading, shared planning, migration blocking before Calendar access, non-mutation, and aggregate-only presentation. `CalendarReviewedActionTests` and `CalendarManualApplyTests` cover reviewed executable identities, fresh snapshots/configuration, stale confirmation, cancellation, empty plans, partial failure, and reentrant confirmation. `CalendarManualCleanupTests` adds separate cleanup authorization, same-count target/order changes, fresh lookup data, complete verification, configuration races, confirmed failure counts, privacy, and concurrency coverage. The task remains open for automatic app operation and persisted-state acceptance checks; dedicated-calendar acceptance remains under D05-04.
+**Evidence:** Focused authorization, inventory, preflight, window, cleanup, mutation, privacy, control-panel status, manual app dry-run/apply, handler, contract, and process-smoke suites are registered in the custom runner. `CalendarManualDryRunTests` proves fresh settings loading, shared planning, migration blocking before Calendar access, non-mutation, and aggregate-only presentation. `CalendarReviewedActionTests` and `CalendarManualApplyTests` cover reviewed executable identities, fresh snapshots/configuration, stale confirmation, cancellation, empty plans, partial failure, and reentrant confirmation. `CalendarManualCleanupTests` adds separate cleanup authorization, same-count target/order changes, fresh lookup data, complete verification, configuration races, confirmed failure counts, privacy, and concurrency coverage. `CalendarConfigurationObservationTests` covers immediate versus deferred refresh coordination, one-follow-up coalescing, review-token invalidation, and selected-file creation, in-place edit, atomic replacement, and removal without EventKit. The task remains open for automatic app operation and persisted-state acceptance checks; dedicated-calendar acceptance remains under D05-04.
 
 ### - [ ] CA-13 — Update operational documentation and validate
 
@@ -140,6 +140,7 @@ Update manual validation for permission recovery, no-prompt CLI behavior, invent
 **Dependencies:** all implementation tasks.
 
 **Earlier evidence:** Updated `README.md`, `docs/configuration.md`, and `docs/manual-validation.md` for permission ownership, inventory/readiness separation, config check, complete ordinary explanation, cleanup, partial failure, and app ordinary dry run. The earlier September 17 gate passed but delayed bundle verification was unstable in the file-provider workspace. D05-01 through D05-03 below supersede that packaging limitation and record the subsequent manual-apply implementation, final gate, and non-mutating live evidence. Full-access permission, provider, successful live dry run/explanation, recurring-occurrence, and mutation validation remain unresolved under D05-04, so CA-13 remains open.
+ The September 18 configuration-observation slice passed focused observation, manual-apply, and manual-cleanup suites plus `make format-check`, `make check`, and `make app`; no real EventKit access or calendar mutation was used.
 
 ## September 17 manual verification and D-05 continuation
 
@@ -294,8 +295,7 @@ Real Calendar mutation is reserved for explicit harmless manual validation.
 ## Next action
 
 Finish dedicated-calendar live acceptance with the operator. The next bounded
-implementation slice is configuration observation and status recovery, including
-safe invalidation while a review or operation is in progress. Then continue D-05
-with standing authorization, serialized trigger coalescing, scheduling, and
-privacy-safe persisted operational state.
+implementation slice is standing authorization bound to configuration, policy,
+and resolved-topology identity. Then continue D-05 with serialized automatic-run
+trigger coalescing, scheduling, and privacy-safe persisted operational state.
 Keep CA-10 through CA-13 open until those remaining requirements have evidence.

@@ -24,11 +24,12 @@ Use **Set Up or Recover Calendar Access** to trigger the permission prompt for b
 5. With restricted access, confirm the app explains that the restriction must be resolved outside CalRelay.
 6. With full access, click the setup/recovery action again and confirm it verifies state without prompting.
 7. Click **Show Calendar Inventory** and confirm source/account, title, and writable/read-only state are shown without EventKit calendar IDs and without claiming configured readiness.
-8. Remove or invalidate `~/.config/calrelay/config.yaml`, click **Refresh Status**, and confirm configuration recovery is primary and no Calendar prompt appears.
-9. Restore a valid configuration and confirm readiness rejects missing, ambiguous, physically colliding, unreadable, or read-only roles. Create several simultaneous failures and confirm every safely determinable issue is shown without event details or EventKit IDs.
-10. Add a legacy marker and confirm a ready topology reports migration pending separately from readiness.
-11. With a ready non-migration configuration, click **Dry Run Sync** and confirm the app reloads current configuration and Calendar state, reports only aggregate planned delete/create counts, performs no mutation, and displays no event titles or EventKit IDs.
-12. Run CLI inventory, config check, ordinary dry-run, explanation, and cleanup while access is unavailable. Confirm every command fails nonzero with app recovery guidance and none triggers a permission prompt.
+8. Remove or invalidate `~/.config/calrelay/config.yaml` while the app is open. Confirm the status refreshes automatically, configuration recovery becomes primary, configuration-dependent actions remain disabled, and no Calendar prompt appears.
+9. Restore or atomically replace the file with a valid configuration. Confirm the app automatically reloads current status rather than requiring a manual refresh or using the prior settings.
+10. Confirm readiness rejects missing, ambiguous, physically colliding, unreadable, or read-only roles. Create several simultaneous failures and confirm every safely determinable issue is shown without event details or EventKit IDs.
+11. Add a legacy marker and confirm a ready topology reports migration pending separately from readiness.
+12. With a ready non-migration configuration, click **Dry Run Sync** and confirm the app reloads current configuration and Calendar state, reports only aggregate planned delete/create counts, performs no mutation, and displays no event titles or EventKit IDs.
+13. Run CLI inventory, config check, ordinary dry-run, explanation, and cleanup while access is unavailable. Confirm every command fails nonzero with app recovery guidance and none triggers a permission prompt.
 
 Use only harmless dedicated calendars for steps that can mutate EventKit data.
 
@@ -45,7 +46,7 @@ Use only confirmed dedicated test calendars for these mutation checks. Do not re
 
 ## Pending app automation milestone checks
 
-The following checks belong to macOS App Specification Revision 6 but scheduling, standing-authorization, persisted history, automatic configuration observation/status recovery, and trigger coalescing are not implemented yet. Record them as pending rather than interpreting absent controls as a pass. Implemented app cleanup has its own checks below.
+The following checks belong to macOS App Specification Revision 6 but scheduling, standing authorization, persisted history, and automatic-run trigger coalescing are not implemented yet. Record them as pending rather than interpreting absent controls as a pass. Implemented configuration observation/status recovery and app cleanup have their own checks below.
 
 1. Confirm scheduling cannot be enabled until explicit standing authorization is granted.
 2. Enable scheduling and validate launch-at-login, launch/wake runs, the fixed cadence, bounded retry, freshness, notifications, pause, and Quit warning.
@@ -53,14 +54,16 @@ The following checks belong to macOS App Specification Revision 6 but scheduling
 
 ## Configuration-change and confirmation checks
 
-1. With scheduling authorized, make a YAML-only formatting change that preserves validated mutation semantics. Confirm status refreshes without requiring renewed authorization.
-2. Change a configured selector, current or personal marker, `syncWindowDays`, legacy-marker set, or `workCalendars` declaration order. Confirm automatic mutation stops and a new dry run plus renewed standing authorization is required.
+1. Open an ordinary or cleanup review, then edit, atomically replace, remove, or recreate the selected YAML file. Confirm the review closes, its confirmation can no longer be used, configuration-dependent controls become stale immediately, and status reloads from the current file without prompting for Calendar access.
+2. Change the file while a dry run, review load, confirmation, or cleanup operation is active. Confirm the active operation is not interrupted mid-mutation, repeated file events coalesce, and exactly one fresh status recovery follows completion. Confirm any newly returned review is invalidated before it can be confirmed.
 3. Make the YAML missing, invalid, or migration pending. Confirm the app never continues with the last valid in-memory settings.
-4. Change the selected file after an automatic run loads it but before its first mutation. Confirm the run aborts without mutation and refreshes status.
-5. Start a manual ordinary apply from a reviewed plan, change an executable action, exact target, or action order before confirmation completes, and confirm the changed fresh plan invalidates confirmation even when create/delete counts remain equal. Change only causal links or reason classifications while keeping the ordered executable actions identical and confirm that rationale-only change does not invalidate confirmation.
-6. Replace or recreate one configured test calendar so the same source/title selector resolves to a different EventKit calendar identity. Confirm automatic mutation stops and renewed dry-run review and standing authorization are required even though the selector text is unchanged.
-7. Simulate an app upgrade whose reconciliation-policy version changes. Confirm standing authorization granted under the previous policy is not reused.
-8. Confirm a large but valid deterministic plan is not blocked solely by a mutation-count threshold.
+4. Start a manual ordinary apply from a reviewed plan, change an executable action, exact target, or action order before confirmation completes, and confirm the changed fresh plan invalidates confirmation even when create/delete counts remain equal. Change only causal links or reason classifications while keeping the ordered executable actions identical and confirm that rationale-only change does not invalidate confirmation.
+5. After scheduling is implemented, make a YAML-only formatting change that preserves validated mutation semantics. Confirm status refreshes without requiring renewed authorization.
+6. After scheduling is implemented, change a configured selector, current or personal marker, `syncWindowDays`, legacy-marker set, or `workCalendars` declaration order. Confirm automatic mutation stops and a new dry run plus renewed standing authorization is required.
+7. After scheduling is implemented, change the selected file after an automatic run loads it but before its first mutation. Confirm the run aborts without mutation and refreshes status.
+8. Replace or recreate one configured test calendar so the same source/title selector resolves to a different EventKit calendar identity. Confirm automatic mutation stops and renewed dry-run review and standing authorization are required even though the selector text is unchanged.
+9. Simulate an app upgrade whose reconciliation-policy version changes. Confirm standing authorization granted under the previous policy is not reused.
+10. Confirm a large but valid deterministic plan is not blocked solely by a mutation-count threshold.
 
 ## Basic MVP checks
 

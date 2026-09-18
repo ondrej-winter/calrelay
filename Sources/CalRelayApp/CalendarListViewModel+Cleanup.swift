@@ -6,7 +6,7 @@ extension CalendarListViewModel {
         isLoading = true
         output = "Loading a fresh cleanup plan over the complete cleanup range…"
         Task {
-            defer { isLoading = false }
+            defer { finishOperation() }
             do {
                 let review = try await manualCleanup.review()
                 cleanupNotice = "Successful fresh cleanup dry run. Nothing has been deleted."
@@ -27,7 +27,7 @@ extension CalendarListViewModel {
             cleanupReview = nil
             cleanupAllowsConfirmation = false
             output = "Cleanup review closed. No calendar mutations were performed."
-            isLoading = false
+            finishOperation()
         }
     }
 
@@ -35,7 +35,7 @@ extension CalendarListViewModel {
         guard !isLoading, cleanupAllowsConfirmation, let review = cleanupReview else { return }
         isLoading = true
         Task {
-            defer { isLoading = false }
+            defer { finishOperation() }
             do {
                 switch try await manualCleanup.confirm(reviewID: review.id) {
                 case .reviewRequired(let fresh):

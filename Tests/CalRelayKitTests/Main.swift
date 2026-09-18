@@ -7,6 +7,9 @@ import Foundation
         if filters.isEmpty || filters.contains("CalendarReviewedActionTests") {
             try CalendarReviewedActionTests.runAll()
         }
+        if filters.isEmpty || filters.contains("CalendarConfigurationObservationTests") {
+            try await CalendarConfigurationObservationTests.runAll()
+        }
         try await runAccessSuites(filters: filters)
         if filters.isEmpty || filters.contains("CalendarManualCleanupTests") {
             try await CalendarManualCleanupTests.runAll()

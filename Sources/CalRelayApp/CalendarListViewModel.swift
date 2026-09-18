@@ -26,11 +26,15 @@ import SwiftUI
     private let status: CalendarControlPanelStatusUseCase
     private let manualDryRun: CalendarManualDryRunUseCase
     private let manualApply: CalendarManualApplyUseCase
+    private let configurationObserver: ConfigurationFileObserver
+    private var configurationChanges = CalendarConfigurationChangeCoordinator()
+    private var didStart = false
 
     init(
         inventory: CalendarInventoryUseCase, setup: CalendarAccessSetupUseCase,
         status: CalendarControlPanelStatusUseCase, manualDryRun: CalendarManualDryRunUseCase,
-        manualApply: CalendarManualApplyUseCase, manualCleanup: CalendarManualCleanupUseCase
+        manualApply: CalendarManualApplyUseCase, manualCleanup: CalendarManualCleanupUseCase,
+        configurationObserver: ConfigurationFileObserver
     ) {
         self.inventory = inventory
         self.setup = setup
@@ -38,6 +42,14 @@ import SwiftUI
         self.manualDryRun = manualDryRun
         self.manualApply = manualApply
         self.manualCleanup = manualCleanup
+        self.configurationObserver = configurationObserver
+    }
+
+    func start() {
+        guard !didStart else { return }
+        didStart = true
+        configurationObserver.start { [weak self] in Task { @MainActor in self?.configurationDidChange() } }
+        refreshStatus()
     }
 
     func refreshStatus() {
@@ -58,7 +70,7 @@ import SwiftUI
                 output = "Status could not be refreshed. Check the configuration and try again."
             }
 
-            isLoading = false
+            finishOperation()
         }
     }
 
@@ -89,7 +101,7 @@ import SwiftUI
                 output = Self.safeErrorMessage(error)
             }
 
-            isLoading = false
+            finishOperation()
         }
     }
 
@@ -148,7 +160,7 @@ import SwiftUI
                 output = Self.safeErrorMessage(error)
             }
 
-            isLoading = false
+            finishOperation()
         }
     }
 
@@ -163,7 +175,7 @@ import SwiftUI
                 output = Self.safeOperationErrorMessage(error)
             }
 
-            isLoading = false
+            finishOperation()
         }
     }
 
@@ -172,7 +184,7 @@ import SwiftUI
         isLoading = true
         output = "Loading a fresh sync plan for review…"
         Task {
-            defer { isLoading = false }
+            defer { finishOperation() }
             do {
                 manualReview = try await manualApply.review()
                 reviewNotice = "No calendar mutations have been performed."
@@ -190,7 +202,7 @@ import SwiftUI
             await manualApply.cancelReview()
             manualReview = nil
             output = "Sync review cancelled. No calendar mutations were performed."
-            isLoading = false
+            finishOperation()
         }
     }
 
@@ -198,7 +210,7 @@ import SwiftUI
         guard !isLoading, let review = manualReview else { return }
         isLoading = true
         Task {
-            defer { isLoading = false }
+            defer { finishOperation() }
             do {
                 switch try await manualApply.confirm(reviewID: review.id) {
                 case .reviewRequired(let fresh):
@@ -215,6 +227,55 @@ import SwiftUI
                 output = CalendarManualApplyFormatter.formatFailure(error)
             }
         }
+    }
+
+    private func configurationDidChange() {
+        markConfigurationStatusStale()
+        if configurationChanges.configurationDidChange(isOperationInProgress: isLoading) {
+            recoverFromConfigurationChange(preservingOperationOutput: false)
+        }
+    }
+
+    private func markConfigurationStatusStale() {
+        canRunOrdinarySync = false
+        canReviewCleanup = false
+        configurationSummary = "Changed on disk. A fresh validation is pending."
+        readinessSummary = "Not checked after the observed configuration change."
+        migrationSummary = "Migration state will be checked from the current file."
+        primaryStatus = "Configuration changed. Refreshing current status."
+    }
+
+    private func recoverFromConfigurationChange(preservingOperationOutput: Bool) {
+        guard !isLoading else { return }
+        isLoading = true
+        manualReview = nil
+        cleanupReview = nil
+        cleanupAllowsConfirmation = false
+        let previousOutput = output
+        if !preservingOperationOutput {
+            output = "Configuration changed on disk. Invalidating prior reviews and refreshing status…"
+        }
+
+        Task {
+            await manualApply.cancelReview()
+            await manualCleanup.cancelReview()
+            do {
+                apply(try await status.run())
+                let recovery =
+                    "Configuration change detected. Status refreshed from the current file without prompting."
+                output = preservingOperationOutput ? previousOutput + "\n\n" + recovery : recovery
+            } catch {
+                primaryStatus = "Status refresh failed after a configuration change."
+                let recovery = "The changed configuration could not be checked. Fix the file and try Refresh Status."
+                output = preservingOperationOutput ? previousOutput + "\n\n" + recovery : recovery
+            }
+            finishOperation()
+        }
+    }
+
+    func finishOperation() {
+        isLoading = false
+        if configurationChanges.operationDidFinish() { recoverFromConfigurationChange(preservingOperationOutput: true) }
     }
 
     private static func authorizationSummary(for state: CalendarAuthorizationState) -> String {

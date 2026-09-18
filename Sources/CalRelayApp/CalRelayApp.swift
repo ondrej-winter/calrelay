@@ -7,7 +7,9 @@ import SwiftUI
     init() {
         let authorization = EventKitCalendarAuthorizationStatus()
         let calendarStore = EventKitCalendarStore(authorizationStatus: authorization)
-        let settingsProvider = FileCalendarRelaySettingsProvider()
+        let selectedFile = ConfigurationFileSelection.selectedFile(overridePath: nil)
+        let settingsProvider = FileCalendarRelaySettingsProvider(selectedFile: selectedFile)
+        let configurationObserver = ConfigurationFileObserver(selectedFile: selectedFile)
         let inventory = CalendarInventoryUseCase(authorizationStatus: authorization, calendarStore: calendarStore)
         let setup = CalendarAccessSetupUseCase(authorizationStatus: authorization, fullAccessRequester: authorization)
         let status = CalendarControlPanelStatusUseCase(
@@ -20,7 +22,7 @@ import SwiftUI
             settingsProvider: settingsProvider, authorizationStatus: authorization, calendarStore: calendarStore)
         viewModel = CalendarListViewModel(
             inventory: inventory, setup: setup, status: status, manualDryRun: manualDryRun, manualApply: manualApply,
-            manualCleanup: manualCleanup)
+            manualCleanup: manualCleanup, configurationObserver: configurationObserver)
     }
 
     var body: some Scene {
