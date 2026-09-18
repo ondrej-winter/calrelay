@@ -37,6 +37,17 @@ public struct ReconcileCalendarsUseCase: Sendable {
         try await plan(settings: settings, now: now)
     }
 
+    func standingAuthorizationDryRun(settings: CalendarRelaySettings, now: Date) async throws
+        -> CalendarStandingAuthorizationDryRun
+    {
+        let computation = try await compute(settings: settings, now: now)
+        let resolvedCalendars =
+            [computation.context.hubCalendar.reference.id]
+            + computation.context.workCalendars.map { $0.calendar.reference.id }
+        return CalendarStandingAuthorizationDryRun(
+            result: computation.result, topologyIdentity: ResolvedCalendarTopologyIdentity(resolvedCalendars))
+    }
+
     /// Explains every loaded input event and the ordered executable actions produced by the
     /// shared ordinary reconciliation computation.
     public func explain(settings: CalendarRelaySettings, now: Date) async throws -> ReconciliationExplanation {

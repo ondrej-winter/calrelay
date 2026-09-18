@@ -14,6 +14,22 @@ struct OrdinaryConfigurationMutationIdentity: Equatable, Sendable {
         legacyMarkers = Set(settings.legacyMarkers)
     }
 
+    var stableIdentityComponents: [String] {
+        var components = [
+            "hub", hub.sourceTitle, hub.calendarTitle, "personalMarker", personalMarker, "windowDays",
+            String(windowDays), "workCount", String(work.count)
+        ]
+        for workIdentity in work {
+            components.append(contentsOf: [
+                "work", workIdentity.selector.sourceTitle, workIdentity.selector.calendarTitle, workIdentity.marker
+            ])
+        }
+        let sortedLegacyMarkers = legacyMarkers.sorted()
+        components.append(contentsOf: ["legacyMarkerCount", String(sortedLegacyMarkers.count)])
+        for marker in sortedLegacyMarkers { components.append(contentsOf: ["legacyMarker", marker]) }
+        return components
+    }
+
     private struct WorkIdentity: Equatable, Sendable {
         let selector: CalendarSelector
         let marker: String

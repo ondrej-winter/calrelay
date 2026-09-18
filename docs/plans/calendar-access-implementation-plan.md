@@ -7,7 +7,7 @@
 - **Architecture decision:** [`../adr/0001-launch-normal-app-at-login-for-scheduled-sync.md`](../adr/0001-launch-normal-app-at-login-for-scheduled-sync.md).
 - **Readiness:** Ready. Required outcomes, sequencing, privacy constraints, and validation are specific enough to execute without an unresolved product decision.
 - **Progress date:** September 18, 2026.
-- **Implementation state:** Partial. The shared access boundary, non-prompting EventKit adapter, complete preflight, CLI/manual-app flows, cleanup, mutation-time failure handling, exact occurrence handling, and reusable privacy contracts are implemented. Standing authorization, scheduling, automatic-run coordination, privacy-safe persisted operational status, and the corresponding live lifecycle validation remain open.
+- **Implementation state:** Partial. The shared access boundary, non-prompting EventKit adapter, complete preflight, CLI/manual-app flows, cleanup, mutation-time failure handling, exact occurrence handling, reusable privacy contracts, allowlisted automation persistence, and application-only standing-authorization orchestration are implemented. App composition, scheduling, automatic-run coordination, operational presentation/relaunch recovery, and the corresponding live lifecycle validation remain open.
 - **Execution approach:** Close only the remaining gaps. Do not replace or duplicate behavior already implemented under the access slice or behavior owned by adjacent accepted specifications.
 
 ## Outcome
@@ -159,6 +159,8 @@ Integrate standing authorization and automatic ordinary execution using the exis
 - Invalidate authorization when configuration semantics, policy version, or resolved physical topology changes. Returning to an older identity must not silently reactivate an old grant.
 - Keep manual ordinary apply and cleanup authorization independent from standing authorization.
 
+**Progress:** The application use case, opaque binding derivation, fresh aggregate review/confirmation, mismatch invalidation, non-reactivation behavior, and deterministic contract suite are implemented. App composition and automatic-operation integration remain open, so this slice is not yet complete.
+
 #### - [ ] CA-10B — Add scheduled and automatic trigger coordination
 
 - Add one app-owned coordinator for manual ordinary work, cleanup, automatic runs, status refresh, and configuration-change recovery.
@@ -206,13 +208,15 @@ Persist only the latest minimal metadata needed for standing authorization and a
 
 **Likely targets:** application DTOs and ports under `Sources/CalRelayKit/Features/CalendarRelay/Application/`, concrete local persistence in app adapters/composition, `CalendarControlPanelStatus`, and the app view model/views.
 
-#### - [ ] CA-11A — Add allowlisted standing-authorization and status persistence
+#### - [x] CA-11A — Add allowlisted standing-authorization and status persistence
 
 - Define purpose-specific application DTOs and ports for scheduling preference, opaque standing-authorization binding, attempt/success timestamps, safe result/failure category, aggregate confirmed create/delete counts, retry state, and freshness metadata.
 - Use a deterministic versioned representation for persisted authorization identity. Do not use Swift's randomized `Hasher` or a reversible serialization of configuration/topology data.
 - Make prohibited data structurally unrepresentable in persistence DTOs rather than relying only on call-site redaction.
 - Add a concrete app persistence adapter with safe decoding, version handling, corruption recovery, and no implicit authorization reactivation.
 - Never serialize rich configuration, event, plan, preflight snapshot, cleanup review, framework error, or EventKit object types.
+
+**Evidence:** Purpose-specific application DTOs and the `CalendarAutomationStateStore` port are implemented with a versioned `UserDefaults` adapter. Deterministic tests cover round-trip behavior, opaque semantic binding, prohibited-value absence, unsupported-version recovery, corruption recovery, and authorization-safe reset.
 
 #### - [ ] CA-11B — Extend operational state and relaunch recovery
 
@@ -432,7 +436,7 @@ Calendar Access revision 7 is complete only when:
 ### Remaining automatic integration
 
 - [ ] CA-10 — Complete automatic app access integration
-- [ ] CA-10A — Implement standing-authorization orchestration
+- [ ] CA-10A — Complete app integration for the implemented standing-authorization orchestration
 - [ ] CA-10B — Add scheduled and automatic trigger coordination
 - [ ] CA-10C — Enforce fresh access gates for every attempt
 - [ ] CA-10D — Present denial, revocation, retry, and recovery state
@@ -443,7 +447,7 @@ Calendar Access revision 7 is complete only when:
 ### Remaining persistence and presentation
 
 - [ ] CA-11 — Complete privacy-safe persistence and operational presentation
-- [ ] CA-11A — Add allowlisted standing-authorization and status persistence
+- [x] CA-11A — Add allowlisted standing-authorization and status persistence
 - [ ] CA-11B — Extend operational state and relaunch recovery
 - [ ] CA-11-AC1 — Prove persisted disclosure compliance
 - [ ] CA-11-V1 — Pass persistence and presentation suites

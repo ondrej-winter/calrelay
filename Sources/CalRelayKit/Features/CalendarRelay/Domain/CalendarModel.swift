@@ -9,6 +9,7 @@ public struct PhysicalCalendarReference: Equatable, Hashable, Sendable, CustomSt
 
     var eventKitIdentifier: String { providerIdentifier }
     var diagnosticIdentifier: String { providerIdentifier }
+    var authorizationIdentityComponent: String { providerIdentifier }
 
     func syntheticEventReference(idPrefix: String, title: String, start: Date, end: Date) -> CalendarEventReference {
         CalendarEventReference(

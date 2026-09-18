@@ -51,6 +51,12 @@ import Foundation
         if filters.isEmpty || filters.contains("CalendarControlPanelStatusTests") {
             try await CalendarControlPanelStatusTests.runAll()
         }
+        if filters.isEmpty || filters.contains("CalendarAutomationPersistenceTests") {
+            try await CalendarAutomationPersistenceTests.runAll()
+        }
+        if filters.isEmpty || filters.contains("CalendarStandingAuthorizationTests") {
+            try await CalendarStandingAuthorizationTests.runAll()
+        }
         if filters.isEmpty || filters.contains("CalendarManualDryRunTests") {
             try await CalendarManualDryRunTests.runAll()
         }
