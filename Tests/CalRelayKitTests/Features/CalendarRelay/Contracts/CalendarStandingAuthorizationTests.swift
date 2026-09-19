@@ -9,6 +9,33 @@ enum CalendarStandingAuthorizationTests {
         try await testConfigurationTopologyAndPolicyChangesInvalidateWithoutReactivation()
         try await testUnavailableAccessSuspendsWithoutErasingMatchingAuthorization()
         try await testMigrationAndAccessFailuresCannotGrantAuthorization()
+        try await testObservedConfigurationChangeImmediatelyRevokesAuthorization()
+    }
+
+    private static func testObservedConfigurationChangeImmediatelyRevokesAuthorization() async throws {
+        let fixture = StandingAuthorizationFixture()
+        let provider = StandingSettingsProvider(settings: fixture.settings())
+        let store = fixture.store()
+        let binding = CalendarStandingAuthorizationBinding.derive(
+            settings: fixture.settings(),
+            resolvedCalendars: [
+                PhysicalCalendarReference(providerIdentifier: "hub"),
+                PhysicalCalendarReference(providerIdentifier: "work")
+            ], policyVersion: .current)
+        let stateStore = StandingStateStore()
+        await stateStore.replace(
+            CalendarAutomationPersistentState(
+                schedulingPreference: .enabled, standingAuthorization: binding, operationalStatus: .empty))
+        let useCase = fixture.useCase(provider: provider, calendarStore: store, stateStore: stateStore)
+
+        try await useCase.invalidateAuthorizationForObservedConfigurationChange()
+
+        let persisted = await stateStore.currentState()
+        try expect(
+            persisted.standingAuthorization == nil,
+            "An observed file change should immediately revoke standing authorization")
+        try expect(persisted.schedulingPreference == .enabled, "Revocation should preserve the scheduling preference")
+        try expect(await store.listCalendarsCallCount() == 0, "Immediate revocation should not inspect Calendar state")
     }
 
     private static func testGrantRequiresFreshSuccessfulReviewAndExplicitConfirmation() async throws {
@@ -271,6 +298,12 @@ private actor StandingStateStore: CalendarAutomationStateStore {
 
     func loadState() async -> CalendarAutomationPersistentState { state }
     func saveState(_ state: CalendarAutomationPersistentState) async throws { self.state = state }
+    func updateState(
+        _ transform: @Sendable (CalendarAutomationPersistentState) -> CalendarAutomationPersistentState
+    ) async throws -> CalendarAutomationPersistentState {
+        state = transform(state)
+        return state
+    }
     func currentState() -> CalendarAutomationPersistentState { state }
     func replace(_ state: CalendarAutomationPersistentState) { self.state = state }
 }

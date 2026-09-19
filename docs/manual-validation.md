@@ -44,13 +44,21 @@ Use only confirmed dedicated test calendars for these mutation checks. Do not re
 5. Cause a partial failure only on harmless test calendars. Confirm later actions stop, no rollback occurs, and recovery requires a new manual review. No per-event details are included in the partial result.
 6. Confirm repeated clicks cannot start overlapping manual operations, a consumed confirmation cannot be reused, and migration pending disables ordinary actions.
 
-## Pending app automation milestone checks
+## Implemented app automation checks
 
-The following checks belong to macOS App Specification Revision 6 but scheduling, standing authorization, persisted history, and automatic-run trigger coalescing are not implemented yet. Record them as pending rather than interpreting absent controls as a pass. Implemented configuration observation/status recovery and app cleanup have their own checks below.
+Use harmless dedicated calendars for all checks that can reach automatic mutation. The deterministic test gate covers orchestration and policy; these checks exercise macOS lifecycle, Login Items, notifications, Dock state, and the built app bundle.
 
-1. Confirm scheduling cannot be enabled until explicit standing authorization is granted.
-2. Enable scheduling and validate launch-at-login, launch/wake runs, the fixed cadence, bounded retry, freshness, notifications, pause, and Quit warning.
-3. Validate exact-plan reconfirmation, topology/policy/configuration invalidation, trigger coalescing, and privacy-safe persisted operation status.
+1. Confirm scheduling cannot be enabled until a successful fresh ordinary dry run is reviewed and explicit standing authorization is granted. Confirm setup itself performs no mutation.
+2. Grant standing authorization. Confirm CalRelay requests user-notification permission, enables launch-at-login for the normal Dock-visible app, queues a fresh launch attempt, and shows scheduling, login-item, authorization, attempt/success, outcome/count, next-run, retry, and freshness state separately.
+3. Deny user-notification permission. Confirm scheduling remains enabled and actionable recovery or overdue freshness remains visible in the control panel and through the Dock badge. Grant permission separately and confirm only actionable recovery or overdue freshness—not every failed attempt—produces a notification.
+4. With scheduling enabled, validate a fresh attempt at every app launch and Mac wake, the fixed 15-minute timer cadence, and fresh bounded retries after 1, 5, and 15 minutes for transient failures or partial automatic mutation. Confirm repeated triggers during active work produce at most one later fresh attempt and never overlap manual or cleanup work.
+5. Pause scheduling. Confirm timers/retries stop, launch-at-login remains unchanged, no automatic launch attempt runs, and the paused/degraded attention state remains visible. Resume with valid standing authorization and confirm a fresh automatic attempt is queued; invalidate authorization and confirm resume is rejected until a new review.
+6. Disable or require approval for CalRelay in **System Settings > General > Login Items** while scheduling remains enabled. Click **Refresh Status** and confirm the login-item row, primary recovery state, and Dock attention update together. Use **Enable Launch at Login** and confirm all three surfaces refresh again.
+7. With scheduling enabled, choose **Quit** and confirm the warning explains that synchronization stops while the normal app is not running. Cancel once, then quit and confirm scheduling and launch-at-login preferences remain persisted. Confirm no warning appears when scheduling is paused or disabled.
+8. Relaunch after prior operation history. Confirm only privacy-safe timestamps, categories, aggregate counts, retry, scheduling, and freshness metadata return; no event details, raw configuration, selectors, marker values, calendar names, EventKit IDs, or transient review data reappear.
+9. Confirm topology, policy, mutation-relevant configuration, or unproven physical-calendar identity changes revoke standing authorization and prevent automatic mutation. Confirm representation-only YAML changes refresh status without requiring renewed authorization.
+
+Healthy login-launch window suppression remains an open validation checkpoint. The app currently cannot reliably distinguish a login-item launch from an ordinary default user launch, so do not treat the control-panel window appearing at login as a pass for the unobtrusive-launch requirement. Do not validate a workaround that hides the window for every default launch.
 
 ## Configuration-change and confirmation checks
 
@@ -58,9 +66,9 @@ The following checks belong to macOS App Specification Revision 6 but scheduling
 2. Change the file while a dry run, review load, confirmation, or cleanup operation is active. Confirm the active operation is not interrupted mid-mutation, repeated file events coalesce, and exactly one fresh status recovery follows completion. Confirm any newly returned review is invalidated before it can be confirmed.
 3. Make the YAML missing, invalid, or migration pending. Confirm the app never continues with the last valid in-memory settings.
 4. Start a manual ordinary apply from a reviewed plan, change an executable action, exact target, or action order before confirmation completes, and confirm the changed fresh plan invalidates confirmation even when create/delete counts remain equal. Change only causal links or reason classifications while keeping the ordered executable actions identical and confirm that rationale-only change does not invalidate confirmation.
-5. After scheduling is implemented, make a YAML-only formatting change that preserves validated mutation semantics. Confirm status refreshes without requiring renewed authorization.
-6. After scheduling is implemented, change a configured selector, current or personal marker, `syncWindowDays`, legacy-marker set, or `workCalendars` declaration order. Confirm automatic mutation stops and a new dry run plus renewed standing authorization is required.
-7. After scheduling is implemented, change the selected file after an automatic run loads it but before its first mutation. Confirm the run aborts without mutation and refreshes status.
+5. Make a YAML-only formatting change that preserves validated mutation semantics. Confirm status refreshes without requiring renewed authorization.
+6. Change a configured selector, current or personal marker, `syncWindowDays`, legacy-marker set, or `workCalendars` declaration order. Confirm automatic mutation stops and a new dry run plus renewed standing authorization is required.
+7. Change the selected file after an automatic run loads it but before its first mutation. Confirm the run aborts without mutation and refreshes status.
 8. Replace or recreate one configured test calendar so the same source/title selector resolves to a different EventKit calendar identity. Confirm automatic mutation stops and renewed dry-run review and standing authorization are required even though the selector text is unchanged.
 9. Simulate an app upgrade whose reconciliation-policy version changes. Confirm standing authorization granted under the previous policy is not reused.
 10. Confirm a large but valid deterministic plan is not blocked solely by a mutation-count threshold.

@@ -17,8 +17,20 @@ import SwiftUI
     @Published var cleanupReview: CalendarManualCleanupReview?
     @Published var cleanupNotice = ""
     @Published var cleanupAllowsConfirmation = false
+    @Published var standingAuthorizationSummary = "Scheduled sync standing authorization has not been checked."
+    @Published var canReviewStandingAuthorization = false
+    @Published var standingAuthorizationReview: CalendarStandingAuthorizationReview?
+    @Published var standingAuthorizationNotice = ""
+    @Published var schedulingPreference = CalendarSchedulingPreference.disabled
+    @Published var schedulingSummary = "Scheduled sync has not been checked."
+    @Published var launchAtLoginSummary = "Launch at login has not been checked."
+    @Published var automaticOperationSummary = "No automatic operation status has been loaded."
+    @Published var automationAttentionSummary = "Automation attention state has not been checked."
+    @Published var notificationSummary = "Notification permission has not been checked."
 
-    var isOperationBlocked: Bool { isLoading || manualReview != nil || cleanupReview != nil }
+    var isOperationBlocked: Bool {
+        isLoading || manualReview != nil || cleanupReview != nil || standingAuthorizationReview != nil
+    }
     let manualCleanup: CalendarManualCleanupUseCase
 
     private let inventory: CalendarInventoryUseCase
@@ -26,15 +38,31 @@ import SwiftUI
     private let status: CalendarControlPanelStatusUseCase
     private let manualDryRun: CalendarManualDryRunUseCase
     private let manualApply: CalendarManualApplyUseCase
+    let standingAuthorization: CalendarStandingAuthorizationUseCase
     private let configurationObserver: ConfigurationFileObserver
-    private var configurationChanges = CalendarConfigurationChangeCoordinator()
+    let automaticReconciliation: CalendarAutomaticReconciliationUseCase
+    let automationState: CalendarAutomationStateUseCase
+    let automationTriggers: CalendarAutomationTriggerSource
+    let launchAtLogin: CalendarLaunchAtLoginController
+    let automationAttention: CalendarAutomationAttentionController
+    var operationCoordinator = CalendarAppOperationCoordinator()
+    var pendingAutomaticKind: CalendarAutomaticAttemptKind?
+    var isAutomationTriggerSourceRunning = false
     private var didStart = false
+    private var didRestoreAutomationLifecycle = false
+    var controlPanelPrimaryState: CalendarControlPanelPrimaryState?
 
     init(
         inventory: CalendarInventoryUseCase, setup: CalendarAccessSetupUseCase,
         status: CalendarControlPanelStatusUseCase, manualDryRun: CalendarManualDryRunUseCase,
         manualApply: CalendarManualApplyUseCase, manualCleanup: CalendarManualCleanupUseCase,
-        configurationObserver: ConfigurationFileObserver
+        standingAuthorization: CalendarStandingAuthorizationUseCase,
+        automaticReconciliation: CalendarAutomaticReconciliationUseCase,
+        automationState: CalendarAutomationStateUseCase,
+        configurationObserver: ConfigurationFileObserver,
+        automationTriggers: CalendarAutomationTriggerSource,
+        launchAtLogin: CalendarLaunchAtLoginController,
+        automationAttention: CalendarAutomationAttentionController
     ) {
         self.inventory = inventory
         self.setup = setup
@@ -42,7 +70,13 @@ import SwiftUI
         self.manualDryRun = manualDryRun
         self.manualApply = manualApply
         self.manualCleanup = manualCleanup
+        self.standingAuthorization = standingAuthorization
+        self.automaticReconciliation = automaticReconciliation
+        self.automationState = automationState
         self.configurationObserver = configurationObserver
+        self.automationTriggers = automationTriggers
+        self.launchAtLogin = launchAtLogin
+        self.automationAttention = automationAttention
     }
 
     func start() {
@@ -53,8 +87,7 @@ import SwiftUI
     }
 
     func refreshStatus() {
-        guard !isOperationBlocked else { return }
-        isLoading = true
+        guard beginOperation(.statusRefresh) else { return }
         canRunOrdinarySync = false
         canReviewCleanup = false
         isMigrationPending = false
@@ -63,6 +96,8 @@ import SwiftUI
         Task {
             do {
                 apply(try await status.run())
+                await refreshStandingAuthorizationSummary()
+                await refreshAutomationPresentation()
                 output = "Status refresh completed without requesting Calendar access."
             } catch {
                 primaryStatus = "Status refresh failed."
@@ -70,13 +105,17 @@ import SwiftUI
                 output = "Status could not be refreshed. Check the configuration and try again."
             }
 
+            if !didRestoreAutomationLifecycle {
+                didRestoreAutomationLifecycle = true
+                await restoreAutomationLifecycle()
+            }
+
             finishOperation()
         }
     }
 
     func setUpCalendarAccess() {
-        guard !isOperationBlocked else { return }
-        isLoading = true
+        guard beginOperation(.calendarAccessSetup) else { return }
         canRunOrdinarySync = false
         canReviewCleanup = false
         output = "Checking Calendar access…"
@@ -91,6 +130,8 @@ import SwiftUI
                     : "Calendar access was checked without showing a permission prompt."
                 do {
                     apply(try await status.run())
+                    await refreshStandingAuthorizationSummary()
+                    await refreshAutomationPresentation()
                     output = setupOutput + " Status was refreshed."
                 } catch {
                     canRunOrdinarySync = false
@@ -106,6 +147,7 @@ import SwiftUI
     }
 
     private func apply(_ status: CalendarControlPanelStatus) {
+        controlPanelPrimaryState = status.primaryState
         primaryStatus = Self.primaryStatus(for: status.primaryState)
         configurationSummary = Self.configurationSummary(for: status.configurationState)
         authorizationSummary =
@@ -117,6 +159,7 @@ import SwiftUI
             ? "Migration is pending. Ordinary sync remains blocked until explicit cleanup completes and legacyMarkers is removed manually."
             : "No legacy-marker migration is pending."
         canRunOrdinarySync = status.primaryState == .ready
+        canReviewStandingAuthorization = status.primaryState == .ready
         isMigrationPending = status.isMigrationPending
         // Ordinary-window readiness is not a cleanup preflight. The cleanup use case
         // independently checks the entire topology over the complete cleanup range.
@@ -151,8 +194,7 @@ import SwiftUI
     }
 
     func listCalendars() {
-        guard !isOperationBlocked else { return }
-        isLoading = true
+        guard beginOperation(.inventory) else { return }
         output = "Loading the non-prompting Calendar inventory…"
 
         Task {
@@ -165,8 +207,7 @@ import SwiftUI
     }
 
     func runDryRun() {
-        guard !isOperationBlocked else { return }
-        isLoading = true
+        guard beginOperation(.manualDryRun) else { return }
         output = "Loading fresh configuration and Calendar state for a dry run…"
 
         Task {
@@ -180,18 +221,79 @@ import SwiftUI
     }
 
     func reviewSync() {
-        guard !isOperationBlocked else { return }
-        isLoading = true
+        guard beginOperation(.manualApply) else { return }
         output = "Loading a fresh sync plan for review…"
         Task {
-            defer { finishOperation() }
             do {
                 manualReview = try await manualApply.review()
                 reviewNotice = "No calendar mutations have been performed."
+                pauseOperationForReview()
             } catch {
                 canRunOrdinarySync = false
                 output = CalendarManualApplyFormatter.formatFailure(error)
+                finishOperation()
             }
+        }
+    }
+
+    func reviewStandingAuthorization() {
+        guard canReviewStandingAuthorization, beginOperation(.standingAuthorization) else { return }
+        output = "Loading a fresh ordinary plan for scheduled sync authorization…"
+        Task {
+            do {
+                let review = try await standingAuthorization.review()
+                standingAuthorizationNotice =
+                    "Nothing has been applied. Confirm to authorize future launch, wake, timer, and bounded-retry ordinary runs."
+                standingAuthorizationReview = review
+                pauseOperationForReview()
+            } catch {
+                canReviewStandingAuthorization = false
+                output = Self.safeStandingAuthorizationErrorMessage(error)
+                finishOperation()
+            }
+        }
+    }
+
+    func cancelStandingAuthorizationReview() {
+        guard !isLoading, standingAuthorizationReview != nil else { return }
+        isLoading = true
+        Task {
+            await standingAuthorization.cancelReview()
+            standingAuthorizationReview = nil
+            output = "Scheduled sync authorization review cancelled. No calendar mutations were performed."
+            finishOperation()
+        }
+    }
+
+    func confirmStandingAuthorization() {
+        guard !isLoading, let review = standingAuthorizationReview else { return }
+        isLoading = true
+        Task {
+            do {
+                switch try await standingAuthorization.confirm(reviewID: review.id) {
+                case .reviewRequired(let fresh):
+                    standingAuthorizationNotice =
+                        "The authorization binding or aggregate plan changed. Nothing was authorized. Review this fresh summary and confirm again."
+                    standingAuthorizationReview = fresh
+                    pauseOperationForReview()
+                    return
+                case .granted:
+                    standingAuthorizationReview = nil
+                    standingAuthorizationSummary =
+                        "Enabled for the current configuration, reconciliation policy, and resolved calendar topology."
+                    output =
+                        "Scheduled sync standing authorization granted. No calendar mutations were performed by setup."
+                    await automationAttention.requestAuthorization()
+                    enableLaunchAtLoginForScheduling()
+                    await refreshAutomationPresentation()
+                    await startAutomationTriggersIfNeeded(runLaunchAttempt: true)
+                }
+            } catch {
+                standingAuthorizationReview = nil
+                canReviewStandingAuthorization = false
+                output = Self.safeStandingAuthorizationErrorMessage(error)
+            }
+            finishOperation()
         }
     }
 
@@ -210,13 +312,14 @@ import SwiftUI
         guard !isLoading, let review = manualReview else { return }
         isLoading = true
         Task {
-            defer { finishOperation() }
             do {
                 switch try await manualApply.confirm(reviewID: review.id) {
                 case .reviewRequired(let fresh):
                     reviewNotice =
                         "The executable plan changed. Nothing was applied. Review and confirm this fresh plan, even if its counts look unchanged."
                     manualReview = fresh
+                    pauseOperationForReview()
+                    return
                 case .applied(let result):
                     manualReview = nil
                     output = CalendarManualApplyFormatter.format(result)
@@ -226,19 +329,34 @@ import SwiftUI
                 canRunOrdinarySync = false
                 output = CalendarManualApplyFormatter.formatFailure(error)
             }
+            finishOperation()
         }
     }
 
     private func configurationDidChange() {
         markConfigurationStatusStale()
-        if configurationChanges.configurationDidChange(isOperationInProgress: isLoading) {
-            recoverFromConfigurationChange(preservingOperationOutput: false)
+        Task {
+            do { try await standingAuthorization.invalidateAuthorizationForObservedConfigurationChange() } catch {
+                standingAuthorizationSummary =
+                    "The observed configuration change could not revoke scheduled sync authorization. Refresh status before continuing."
+            }
+            let hadOpenReview = manualReview != nil || cleanupReview != nil || standingAuthorizationReview != nil
+            let request = operationCoordinator.request(.configurationRecovery)
+            if hadOpenReview && !isLoading {
+                await cancelOpenReviewsForConfigurationChange()
+                finishOperation()
+            } else if request == .start {
+                recoverFromConfigurationChange(preservingOperationOutput: false)
+            }
         }
     }
 
     private func markConfigurationStatusStale() {
         canRunOrdinarySync = false
         canReviewCleanup = false
+        canReviewStandingAuthorization = false
+        standingAuthorizationSummary =
+            "Revoked after the observed configuration change. Review a fresh dry run to enable it again."
         configurationSummary = "Changed on disk. A fresh validation is pending."
         readinessSummary = "Not checked after the observed configuration change."
         migrationSummary = "Migration state will be checked from the current file."
@@ -246,11 +364,11 @@ import SwiftUI
     }
 
     private func recoverFromConfigurationChange(preservingOperationOutput: Bool) {
-        guard !isLoading else { return }
         isLoading = true
         manualReview = nil
         cleanupReview = nil
         cleanupAllowsConfirmation = false
+        standingAuthorizationReview = nil
         let previousOutput = output
         if !preservingOperationOutput {
             output = "Configuration changed on disk. Invalidating prior reviews and refreshing status…"
@@ -259,8 +377,11 @@ import SwiftUI
         Task {
             await manualApply.cancelReview()
             await manualCleanup.cancelReview()
+            await standingAuthorization.cancelReview()
             do {
                 apply(try await status.run())
+                await refreshStandingAuthorizationSummary()
+                await refreshAutomationPresentation()
                 let recovery =
                     "Configuration change detected. Status refreshed from the current file without prompting."
                 output = preservingOperationOutput ? previousOutput + "\n\n" + recovery : recovery
@@ -275,7 +396,50 @@ import SwiftUI
 
     func finishOperation() {
         isLoading = false
-        if configurationChanges.operationDidFinish() { recoverFromConfigurationChange(preservingOperationOutput: true) }
+        guard let next = operationCoordinator.finish() else { return }
+        switch next {
+        case .configurationRecovery:
+            recoverFromConfigurationChange(preservingOperationOutput: true)
+        case .automaticReconciliation:
+            runAutomaticAttempt(kind: takePendingAutomaticKind())
+        default:
+            break
+        }
+    }
+
+    func beginOperation(_ operation: CalendarAppOperation) -> Bool {
+        guard !isOperationBlocked, operationCoordinator.request(operation) == .start else { return false }
+        isLoading = true
+        return true
+    }
+
+    func pauseOperationForReview() { isLoading = false }
+
+    private func cancelOpenReviewsForConfigurationChange() async {
+        await manualApply.cancelReview()
+        await manualCleanup.cancelReview()
+        await standingAuthorization.cancelReview()
+        manualReview = nil
+        cleanupReview = nil
+        cleanupAllowsConfirmation = false
+        standingAuthorizationReview = nil
+    }
+
+    private func refreshStandingAuthorizationSummary() async {
+        do {
+            switch try await standingAuthorization.validateCurrentAuthorization() {
+            case .notGranted:
+                standingAuthorizationSummary = "Not enabled. Review a fresh dry run before authorizing scheduled sync."
+            case .valid:
+                standingAuthorizationSummary =
+                    "Enabled for the current configuration, reconciliation policy, and resolved calendar topology."
+            case .invalidated:
+                standingAuthorizationSummary = "Invalidated. Review a fresh dry run to enable scheduled sync again."
+            }
+        } catch {
+            standingAuthorizationSummary =
+                "Could not validate standing authorization. Resolve the earlier configuration, access, or readiness state."
+        }
     }
 
     private static func authorizationSummary(for state: CalendarAuthorizationState) -> String {
@@ -294,6 +458,25 @@ import SwiftUI
     private static func safeErrorMessage(_ error: Error) -> String {
         if let calendarAccessError = error as? CalendarAccessError { return calendarAccessError.description }
         return "Calendar access could not be completed. Try the setup or recovery action again."
+    }
+
+    private static func safeStandingAuthorizationErrorMessage(_ error: Error) -> String {
+        if let providerError = error as? CalendarRelaySettingsProviderError {
+            switch providerError {
+            case .missing:
+                return "The canonical configuration file is missing. Restore it before enabling scheduled sync."
+            case .invalid: return "The canonical configuration file is invalid. Fix it before enabling scheduled sync."
+            }
+        }
+        if let reconciliationError = error as? ReconcileCalendarsError { return reconciliationError.description }
+        if let calendarAccessError = error as? CalendarAccessError { return calendarAccessError.description }
+        if let standingError = error as? CalendarStandingAuthorizationError {
+            switch standingError {
+            case .operationInProgress: return "Another authorization operation is already in progress."
+            case .reviewRequired: return "The reviewed authorization is stale. Load and confirm a fresh review."
+            }
+        }
+        return "Scheduled sync authorization could not be completed. Refresh status and try again."
     }
 
     private static func safeOperationErrorMessage(_ error: Error) -> String {

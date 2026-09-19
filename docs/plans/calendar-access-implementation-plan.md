@@ -142,7 +142,7 @@ Keep calendars, config check, ordinary dry-run/apply/explanation, and cleanup no
 
 **Evidence:** CLI command handlers and deterministic handler/contract tests are implemented.
 
-### - [ ] CA-10 — Complete automatic app access integration
+### - [x] CA-10 — Complete automatic app access integration
 
 Integrate standing authorization and automatic ordinary execution using the existing access, configuration, reconciliation, and mutation boundaries. Do not move scheduling policy or configuration identity ownership into the access adapter.
 
@@ -150,7 +150,7 @@ Integrate standing authorization and automatic ordinary execution using the exis
 
 **Likely targets:** application DTOs and use cases under `Sources/CalRelayKit/Features/CalendarRelay/Application/`, app composition under `Sources/CalRelayApp/`, and new fake-backed contract suites under `Tests/CalRelayKitTests/Features/CalendarRelay/Contracts/`.
 
-#### - [ ] CA-10A — Implement standing-authorization orchestration
+#### - [x] CA-10A — Implement standing-authorization orchestration
 
 - Derive the authorization binding from the current ordinary configuration mutation identity, explicit reconciliation-policy version, and hub-first declaration-ordered resolved physical topology identity.
 - Reuse existing configuration and physical-calendar identity boundaries rather than creating a second selector or topology model.
@@ -159,9 +159,9 @@ Integrate standing authorization and automatic ordinary execution using the exis
 - Invalidate authorization when configuration semantics, policy version, or resolved physical topology changes. Returning to an older identity must not silently reactivate an old grant.
 - Keep manual ordinary apply and cleanup authorization independent from standing authorization.
 
-**Progress:** The application use case, opaque binding derivation, fresh aggregate review/confirmation, mismatch invalidation, non-reactivation behavior, and deterministic contract suite are implemented. App composition and automatic-operation integration remain open, so this slice is not yet complete.
+**Evidence:** The application use case, opaque binding derivation, fresh aggregate review/confirmation, mismatch invalidation, non-reactivation behavior, app composition, and deterministic standing-authorization contract suite are implemented.
 
-#### - [ ] CA-10B — Add scheduled and automatic trigger coordination
+#### - [x] CA-10B — Add scheduled and automatic trigger coordination
 
 - Add one app-owned coordinator for manual ordinary work, cleanup, automatic runs, status refresh, and configuration-change recovery.
 - Connect enabled scheduling to app launch, wake, and fixed 15-minute timer triggers as owned by the macOS app specification.
@@ -169,7 +169,9 @@ Integrate standing authorization and automatic ordinary execution using the exis
 - Do not claim or add cross-process locking against CLI operations.
 - Keep views, app lifecycle callbacks, notification callbacks, and login-item callbacks thin.
 
-#### - [ ] CA-10C — Enforce fresh access gates for every attempt
+**Evidence:** `CalendarAppOperationCoordinator` serializes app-owned work with configuration-recovery priority and one coalesced automatic follow-up. App composition connects enabled scheduling to launch, wake, the fixed 15-minute timer, and persisted retry timers without claiming cross-process locking.
+
+#### - [x] CA-10C — Enforce fresh access gates for every attempt
 
 - Reload and structurally validate the selected configuration before Calendar access on every initial, follow-up, or retry attempt.
 - Block missing, invalid, and migration-pending configuration without falling back to prior in-memory settings.
@@ -181,24 +183,30 @@ Integrate standing authorization and automatic ordinary execution using the exis
 - Count a ready empty plan as success; count a mutating run as success after every ordered action is confirmed; perform no ordinary post-apply verification read.
 - Use finite bounded-backoff retries only for transient automatic failures. Every retry reloads all inputs and recomputes the plan; user-action failures do not enter an aggressive retry loop.
 
-#### - [ ] CA-10D — Present denial, revocation, retry, and recovery state
+**Evidence:** `CalendarAutomaticReconciliationUseCase` performs fresh configuration, access, topology, snapshot, authorization-binding, selected-file, and pre-mutation checks for every ordinary or retry attempt. It persists safe aggregate outcomes, uses bounded 1/5/15-minute retries for transient failures, and atomically preserves concurrent authorization revocation.
+
+#### - [x] CA-10D — Present denial, revocation, retry, and recovery state
 
 - Map access denial, restriction, write-only state, revocation, topology failure, standing-authorization invalidation, partial mutation, retry, and overdue freshness into privacy-safe app state.
 - Preserve dependency-ordered recovery actions from the macOS app specification.
 - Allow later lifecycle/timer triggers to reevaluate user-action failures without requesting access.
 - Keep notification denial from disabling scheduling; provide persistent in-app and Dock-visible fallback state.
 
-#### - [ ] CA-10-AC1 — Prove automatic operations are non-prompting and fully gated
+**Evidence:** The app presents dependency-ordered automation state, safe operation history, retry/freshness state, user notifications for actionable recovery, and Dock/in-app fallback when notification permission is unavailable. Pause/resume, launch-at-login recovery, and enabled-scheduling Quit warning are wired through thin app boundaries.
+
+#### - [x] CA-10-AC1 — Prove automatic operations are non-prompting and fully gated
 
 Every scheduled, launch, wake, follow-up, and retry attempt must use the same full ordinary preflight, receive no permission-request capability, and perform zero mutations when configuration, migration, authorization, topology, standing-authorization, or pre-mutation identity checks fail.
 
-#### - [ ] CA-10-AC2 — Prove fresh-plan and completion semantics
+#### - [x] CA-10-AC2 — Prove fresh-plan and completion semantics
 
 Empty automatic plans update success/freshness; mutating plans succeed only after every ordered confirmation; partial failure stops later actions without rollback; retries and coalesced follow-ups use fresh configuration, preflight, snapshots, and plans.
 
-#### - [ ] CA-10-V1 — Pass focused automatic-operation suites
+#### - [x] CA-10-V1 — Pass focused automatic-operation suites
 
 Run exact registered suites covering standing authorization, automatic execution, selected-file change, denial/revocation, policy/topology invalidation, trigger coalescing, bounded retry, empty success, and partial failure.
+
+**Evidence:** `CalendarStandingAuthorizationTests`, `CalendarAutomaticReconciliationTests`, and `CalendarAutomationCoordinationTests` pass through the custom SwiftPM executable runner, and `swift build --product CalRelayApp` passes.
 
 ### - [ ] CA-11 — Complete privacy-safe persistence and operational presentation
 
@@ -224,6 +232,8 @@ Persist only the latest minimal metadata needed for standing authorization and a
 - Show scheduling and launch-at-login health, standing-authorization state, last attempt, last success, next nominal timer run, active retry, latest safe result/failure category, aggregate mutation counts, and overdue freshness.
 - Preserve the primary recovery order defined by the macOS app specification: configuration, Calendar access, topology, migration, standing authorization, launch-at-login, scheduling/retry/freshness, then healthy state.
 - Discard transient ordinary/cleanup review data after completion, cancellation, failure, or relaunch.
+
+**Progress:** Approved persisted metadata is restored and live scheduling, launch-at-login, authorization, retry, freshness, attention, notification, and Quit-warning presentation is rederived. The remaining gap is healthy login-launch window suppression: AppKit's default-launch indication does not reliably distinguish a login-item launch from an ordinary default user launch, so the app does not hide the control panel based on that signal alone.
 
 #### - [ ] CA-11-AC1 — Prove persisted disclosure compliance
 

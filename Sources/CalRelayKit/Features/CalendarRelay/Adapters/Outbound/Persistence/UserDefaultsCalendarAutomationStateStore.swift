@@ -16,6 +16,20 @@ public actor UserDefaultsCalendarAutomationStateStore: CalendarAutomationStateSt
     }
 
     public func loadState() async -> CalendarAutomationPersistentState {
+        loadCurrentState()
+    }
+
+    public func saveState(_ state: CalendarAutomationPersistentState) async throws { try saveCurrentState(state) }
+
+    public func updateState(
+        _ transform: @Sendable (CalendarAutomationPersistentState) -> CalendarAutomationPersistentState
+    ) async throws -> CalendarAutomationPersistentState {
+        let updated = transform(loadCurrentState())
+        try saveCurrentState(updated)
+        return updated
+    }
+
+    private func loadCurrentState() -> CalendarAutomationPersistentState {
         guard let data = defaults.data(forKey: key) else { return .empty }
         do {
             let decoder = JSONDecoder()
@@ -27,7 +41,7 @@ public actor UserDefaultsCalendarAutomationStateStore: CalendarAutomationStateSt
         } catch { return recoverFromInvalidState() }
     }
 
-    public func saveState(_ state: CalendarAutomationPersistentState) async throws {
+    private func saveCurrentState(_ state: CalendarAutomationPersistentState) throws {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .millisecondsSince1970
         encoder.outputFormatting = [.sortedKeys]

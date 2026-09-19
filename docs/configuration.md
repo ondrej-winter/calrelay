@@ -190,7 +190,7 @@ swift run calrelay reconcile --explain
 
 Successful explanation output reports the effective start/end boundaries and configured forward horizon, every loaded input event's eligibility, routing/source treatment, and existing-state disposition, and every planned create/delete in execution order with causal EventKit event and calendar ID correlation. Those IDs are diagnostic output for this explicit successful mode only; they do not become selectors, ownership markers, or reconciliation keys. Explanation performs no mutation.
 
-## macOS app scheduling contract
+## macOS app scheduling
 
 The current app implements Calendar setup/recovery, ID-free inventory, canonical configuration status, complete configured readiness, migration status, and non-mutating **Dry Run Sync**. It observes the canonical file as an invalidation signal: creation, replacement, edit, or removal promptly marks configuration-dependent controls stale and triggers a fresh status load. Changes invalidate open ordinary or cleanup reviews; changes detected during an active operation coalesce into one follow-up refresh after that operation finishes rather than interrupting a possibly partial mutation. Every status refresh and run still loads and validates the current file afresh, so observation never becomes a cached-settings fallback. Each dry run loads the current Calendar snapshot, uses the shared ordinary preflight and planner, and presents only aggregate planned delete/create counts without event titles or EventKit IDs.
 
@@ -198,21 +198,23 @@ The current app implements Calendar setup/recovery, ID-free inventory, canonical
 
 When migration is pending, the app exposes **Dry Run Legacy Cleanup** and **Run Legacy Cleanup…** separately from ordinary sync. Both load fresh configuration and perform complete cleanup-range preflight. The dry-run sheet is review-only; the apply sheet requires explicit confirmation and repeats preflight/planning before deletion. Changed executable targets, order, cleanup range, or mutation-relevant configuration require a fresh review, even when counts match. The selected configuration is checked again immediately before deletion. Neither flow edits YAML or enables ordinary sync while tombstones remain.
 
-The remaining accepted automation milestone—standing authorization, scheduling, launch-at-login, retry, freshness, and notifications—must use the same reusable preflight, plans, and mutation executor as the CLI. Those controls, automatic-run trigger coalescing, and persisted operational history remain pending in the app surface. Current manual workflows reject overlapping operations; automation must never authorize cleanup.
+Scheduled ordinary reconciliation uses the same reusable preflight, deterministic plans, and mutation executor as the CLI. One app-owned coordinator prevents overlap among manual ordinary work, cleanup, automatic runs, status refresh, and configuration recovery. Automatic triggers received during active work coalesce into at most one fresh follow-up attempt. This coordination is process-local and does not claim to lock out a separate CLI process. Automation never authorizes legacy cleanup.
 
-Before scheduling can be enabled for the first time, the app requires a successful ordinary dry run, presents its create/delete summary, and obtains explicit standing authorization for automatic ordinary apply runs. Enabling scheduling also enables launch-at-login for the normal Dock-visible app.
+Before scheduling can be enabled for the first time, the app requires a successful ordinary dry run, presents its create/delete summary, and obtains explicit standing authorization for automatic ordinary apply runs. Setup also requests user-notification permission and enables launch-at-login for the normal Dock-visible app. Notification denial does not disable scheduling; privacy-safe in-app state and a Dock badge remain the fallback surfaces.
 
 While the normal app is running and healthy, automatic reconciliation uses:
 
 - a fixed 15-minute cadence;
 - one prompt run at every app launch and Mac wake; and
-- bounded retries for transient failures.
+- bounded fresh retries after 1, 5, and 15 minutes for transient failures or partial automatic mutation.
 
-The app treats more than 60 minutes since the latest successful ordinary reconciliation as overdue freshness. Scheduling may be paused after setup, but the paused state remains visibly degraded because CalRelay is no longer maintaining freshness.
+Every automatic attempt reloads and validates the selected configuration, checks full Calendar access and configured topology, recomputes standing authorization, and revalidates configuration identity and access before its first mutation. Missing or invalid configuration, migration pending, insufficient access, topology failure, authorization invalidation, and selected-file changes suppress mutation without falling back to prior in-memory settings. A ready empty plan counts as a successful reconciliation; a mutating run succeeds after all ordered actions are confirmed, without a post-apply verification read.
+
+The control panel restores privacy-safe scheduling and operation metadata after relaunch and shows launch-at-login health, standing authorization, last attempt and success, latest safe outcome and aggregate counts, next nominal run, active retry, and freshness. More than 60 minutes since the latest successful ordinary reconciliation is overdue. Scheduling may be paused after setup, but the paused state remains visibly degraded because CalRelay is no longer maintaining freshness; pausing does not disable launch-at-login. Actionable recovery and overdue freshness can produce a user notification when authorized. Explicit Quit warns only while scheduling is enabled because reconciliation stops with the normal app process.
 
 Standing authorization is bound to the mutation-relevant validated settings, the current reconciliation-policy version, and an opaque identity for the physical calendars currently resolved to configured roles. Changing a configured calendar selector, current or personal marker, `syncWindowDays`, legacy-marker set, or `workCalendars` declaration order suspends automatic mutation until the app presents a successful dry run for the new settings and the user renews authorization. A product upgrade that can change planned actions, exact targets, or execution order, and any changed or unprovably continuous EventKit calendar identity, also requires renewed authorization. Comments, quoting, mapping-key order, and other representation-only YAML changes do not require reauthorization.
 
-These requirements remain the accepted contract for the next app implementation milestone. The implemented CLI behavior and arguments are documented above.
+Scheduled reconciliation runs only while the normal app is running; there is no helper, LaunchAgent, menu-bar item, or closed-app execution. One lifecycle limitation remains open: the app does not yet have a reliable launch-context signal that distinguishes a healthy login-item launch from an ordinary default user launch. It therefore does not suppress the control-panel window based only on AppKit's ambiguous default-launch indication. The accepted contract remains that a healthy login launch should be unobtrusive while actionable recovery opens the window.
 
 ## Changing or retiring a marker
 

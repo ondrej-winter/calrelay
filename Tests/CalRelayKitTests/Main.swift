@@ -11,6 +11,7 @@ import Foundation
             try await CalendarConfigurationObservationTests.runAll()
         }
         try await runAccessSuites(filters: filters)
+        try await runAutomationSuites(filters: filters)
         if filters.isEmpty || filters.contains("CalendarManualCleanupTests") {
             try await CalendarManualCleanupTests.runAll()
         }
@@ -51,14 +52,23 @@ import Foundation
         if filters.isEmpty || filters.contains("CalendarControlPanelStatusTests") {
             try await CalendarControlPanelStatusTests.runAll()
         }
+        if filters.isEmpty || filters.contains("CalendarManualDryRunTests") {
+            try await CalendarManualDryRunTests.runAll()
+        }
+    }
+
+    private static func runAutomationSuites(filters: Set<String>) async throws {
         if filters.isEmpty || filters.contains("CalendarAutomationPersistenceTests") {
             try await CalendarAutomationPersistenceTests.runAll()
         }
         if filters.isEmpty || filters.contains("CalendarStandingAuthorizationTests") {
             try await CalendarStandingAuthorizationTests.runAll()
         }
-        if filters.isEmpty || filters.contains("CalendarManualDryRunTests") {
-            try await CalendarManualDryRunTests.runAll()
+        if filters.isEmpty || filters.contains("CalendarAutomaticReconciliationTests") {
+            try await CalendarAutomaticReconciliationTests.runAll()
+        }
+        if filters.isEmpty || filters.contains("CalendarAutomationCoordinationTests") {
+            try await CalendarAutomationCoordinationTests.runAll()
         }
     }
 

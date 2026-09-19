@@ -11,6 +11,7 @@ struct CalendarListView: View {
             calendarAccessControls
             inventoryControls
             syncControls
+            schedulingControls
             if viewModel.isMigrationPending { cleanupControls }
             calendarOutput
         }.padding().task { viewModel.start() }.sheet(item: $viewModel.manualReview) { review in
@@ -32,6 +33,23 @@ struct CalendarListView: View {
             }.padding(24).frame(width: 460).interactiveDismissDisabled()
         }.sheet(item: $viewModel.cleanupReview) { review in
             CalendarCleanupReviewView(viewModel: viewModel, review: review)
+        }.sheet(item: $viewModel.standingAuthorizationReview) { review in
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Authorize Scheduled Sync").font(.title2)
+                Text(viewModel.standingAuthorizationNotice)
+                Text("Planned deletes in this fresh dry run: \(review.summary.plannedDeletes)")
+                Text("Planned creates in this fresh dry run: \(review.summary.plannedCreates)")
+                Text(
+                    "Authorization is bound to the current configuration, reconciliation policy, and resolved physical calendar topology. It does not authorize manual sync or legacy cleanup."
+                )
+                HStack {
+                    Button("Cancel") { viewModel.cancelStandingAuthorizationReview() }.keyboardShortcut(.cancelAction)
+                    Spacer()
+                    Button(viewModel.isLoading ? "Checking…" : "Enable Scheduled Sync") {
+                        viewModel.confirmStandingAuthorization()
+                    }
+                }.disabled(viewModel.isLoading)
+            }.padding(24).frame(width: 500).interactiveDismissDisabled()
         }
     }
 
@@ -52,6 +70,12 @@ struct CalendarListView: View {
             StatusRow(label: "Calendar access", value: viewModel.authorizationSummary)
             StatusRow(label: "Configured readiness", value: viewModel.readinessSummary)
             StatusRow(label: "Migration", value: viewModel.migrationSummary)
+            StatusRow(label: "Scheduled sync authorization", value: viewModel.standingAuthorizationSummary)
+            StatusRow(label: "Scheduling", value: viewModel.schedulingSummary)
+            StatusRow(label: "Launch at login", value: viewModel.launchAtLoginSummary)
+            StatusRow(label: "Automatic operation", value: viewModel.automaticOperationSummary)
+            StatusRow(label: "Automation attention", value: viewModel.automationAttentionSummary)
+            StatusRow(label: "User notifications", value: viewModel.notificationSummary)
         }.frame(maxWidth: .infinity, alignment: .leading).padding().background(Color(nsColor: .controlBackgroundColor))
             .clipShape(RoundedRectangle(cornerRadius: 10))
     }
@@ -95,6 +119,22 @@ struct CalendarListView: View {
 
             Text(
                 "Loads fresh configuration and Calendar state, runs the complete ordinary readiness preflight, and shows only aggregate create/delete counts without mutation."
+            ).font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+
+    private var schedulingControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button("Review and Enable Scheduled Sync…") { viewModel.reviewStandingAuthorization() }.disabled(
+                viewModel.isOperationBlocked || !viewModel.canReviewStandingAuthorization)
+            if viewModel.isSchedulingEnabled {
+                Button("Pause Scheduled Sync") { viewModel.pauseScheduling() }.disabled(viewModel.isOperationBlocked)
+            } else if viewModel.isSchedulingPaused {
+                Button("Resume Scheduled Sync") { viewModel.resumeScheduling() }.disabled(viewModel.isOperationBlocked)
+            }
+            Button("Enable Launch at Login") { viewModel.enableLaunchAtLogin() }.disabled(viewModel.isOperationBlocked)
+            Text(
+                "Runs a fresh non-mutating ordinary dry run, then asks for standing authorization covering launch, wake, the fixed 15-minute timer, and bounded retries."
             ).font(.footnote).foregroundStyle(.secondary)
         }
     }

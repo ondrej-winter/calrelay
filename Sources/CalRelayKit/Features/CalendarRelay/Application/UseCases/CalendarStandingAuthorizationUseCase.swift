@@ -6,6 +6,7 @@ public actor CalendarStandingAuthorizationUseCase {
     private let settingsProvider: any CalendarRelaySettingsProvider
     private let reconciliation: ReconcileCalendarsUseCase
     private let stateStore: any CalendarAutomationStateStore
+    private let configurationChanges: CalendarConfigurationChangeTracker
     private let policyVersion: CalendarReconciliationPolicyVersion
     private let now: @Sendable () -> Date
     private var pending: PendingStandingAuthorizationReview?
@@ -14,6 +15,7 @@ public actor CalendarStandingAuthorizationUseCase {
     public init(
         settingsProvider: any CalendarRelaySettingsProvider, authorizationStatus: any CalendarAuthorizationStatusPort,
         calendarStore: any CalendarStorePort, stateStore: any CalendarAutomationStateStore,
+        configurationChanges: CalendarConfigurationChangeTracker = CalendarConfigurationChangeTracker(),
         policyVersion: CalendarReconciliationPolicyVersion = .current, now: @escaping @Sendable () -> Date = Date.init,
         calendar: Calendar = .current
     ) {
@@ -21,6 +23,7 @@ public actor CalendarStandingAuthorizationUseCase {
         reconciliation = ReconcileCalendarsUseCase(
             authorizationStatus: authorizationStatus, calendarStore: calendarStore, calendar: calendar)
         self.stateStore = stateStore
+        self.configurationChanges = configurationChanges
         self.policyVersion = policyVersion
         self.now = now
     }
@@ -30,7 +33,12 @@ public actor CalendarStandingAuthorizationUseCase {
         isRunning = true
         pending = nil
         defer { isRunning = false }
+        let revision = await configurationChanges.currentRevision()
         let candidate = try await currentCandidate()
+        let currentRevision = await configurationChanges.currentRevision()
+        guard revision == currentRevision else {
+            throw CalendarStandingAuthorizationError.reviewRequired
+        }
         try await invalidateStoredAuthorization(ifDifferentFrom: candidate.binding)
         return remember(candidate)
     }
@@ -40,6 +48,14 @@ public actor CalendarStandingAuthorizationUseCase {
         pending = nil
     }
 
+    public func invalidateAuthorizationForObservedConfigurationChange() async throws {
+        await configurationChanges.recordObservedChange()
+        pending = nil
+        let state = await stateStore.loadState()
+        guard state.standingAuthorization != nil else { return }
+        try await removeAuthorization(from: state)
+    }
+
     public func confirm(reviewID: UUID) async throws -> CalendarStandingAuthorizationOutcome {
         guard !isRunning else { throw CalendarStandingAuthorizationError.operationInProgress }
         guard let reviewed = pending, reviewed.review.id == reviewID else {
@@ -47,21 +63,26 @@ public actor CalendarStandingAuthorizationUseCase {
         }
         isRunning = true
         pending = nil
+        let revision = await configurationChanges.currentRevision()
         defer { isRunning = false }
 
         let fresh = try await currentCandidate()
+        let currentRevision = await configurationChanges.currentRevision()
+        guard revision == currentRevision else {
+            throw CalendarStandingAuthorizationError.reviewRequired
+        }
         try await invalidateStoredAuthorization(ifDifferentFrom: fresh.binding)
         guard reviewed.binding == fresh.binding, reviewed.review.summary == fresh.summary else {
             return .reviewRequired(remember(fresh))
         }
 
-        let existing = await stateStore.loadState()
-        let schedulingPreference: CalendarSchedulingPreference =
-            existing.schedulingPreference == .disabled ? .enabled : existing.schedulingPreference
-        try await stateStore.saveState(
-            CalendarAutomationPersistentState(
+        _ = try await stateStore.updateState { existing in
+            let schedulingPreference: CalendarSchedulingPreference =
+                existing.schedulingPreference == .disabled ? .enabled : existing.schedulingPreference
+            return CalendarAutomationPersistentState(
                 schedulingPreference: schedulingPreference, standingAuthorization: fresh.binding,
-                operationalStatus: existing.operationalStatus))
+                operationalStatus: existing.operationalStatus)
+        }
         return .granted
     }
 
@@ -70,9 +91,12 @@ public actor CalendarStandingAuthorizationUseCase {
         let existing = await stateStore.loadState()
         guard let authorizedBinding = existing.standingAuthorization else { return .notGranted }
         isRunning = true
+        let revision = await configurationChanges.currentRevision()
         defer { isRunning = false }
 
         let current = try await currentCandidate()
+        let currentRevision = await configurationChanges.currentRevision()
+        guard revision == currentRevision else { return .invalidated }
         guard current.binding == authorizedBinding else {
             try await removeAuthorization(from: existing)
             return .invalidated
@@ -108,10 +132,11 @@ public actor CalendarStandingAuthorizationUseCase {
 
     private func removeAuthorization(from state: CalendarAutomationPersistentState) async throws {
         pending = nil
-        try await stateStore.saveState(
+        _ = try await stateStore.updateState { current in
             CalendarAutomationPersistentState(
-                schedulingPreference: state.schedulingPreference, standingAuthorization: nil,
-                operationalStatus: state.operationalStatus))
+                schedulingPreference: current.schedulingPreference, standingAuthorization: nil,
+                operationalStatus: current.operationalStatus)
+        }
     }
 }
 

@@ -2,6 +2,7 @@ import CalRelayKit
 import SwiftUI
 
 @main struct CalRelayApp: App {
+    @NSApplicationDelegateAdaptor(CalRelayAppDelegate.self) private var appDelegate
     private let viewModel: CalendarListViewModel
 
     init() {
@@ -10,6 +11,8 @@ import SwiftUI
         let selectedFile = ConfigurationFileSelection.selectedFile(overridePath: nil)
         let settingsProvider = FileCalendarRelaySettingsProvider(selectedFile: selectedFile)
         let configurationObserver = ConfigurationFileObserver(selectedFile: selectedFile)
+        let automationStateStore = UserDefaultsCalendarAutomationStateStore()
+        let configurationChanges = CalendarConfigurationChangeTracker()
         let inventory = CalendarInventoryUseCase(authorizationStatus: authorization, calendarStore: calendarStore)
         let setup = CalendarAccessSetupUseCase(authorizationStatus: authorization, fullAccessRequester: authorization)
         let status = CalendarControlPanelStatusUseCase(
@@ -20,9 +23,22 @@ import SwiftUI
             settingsProvider: settingsProvider, authorizationStatus: authorization, calendarStore: calendarStore)
         let manualCleanup = CalendarManualCleanupUseCase(
             settingsProvider: settingsProvider, authorizationStatus: authorization, calendarStore: calendarStore)
-        viewModel = CalendarListViewModel(
+        let standingAuthorization = CalendarStandingAuthorizationUseCase(
+            settingsProvider: settingsProvider, authorizationStatus: authorization, calendarStore: calendarStore,
+            stateStore: automationStateStore, configurationChanges: configurationChanges)
+        let automaticReconciliation = CalendarAutomaticReconciliationUseCase(
+            settingsProvider: settingsProvider, authorizationStatus: authorization, calendarStore: calendarStore,
+            stateStore: automationStateStore, configurationChanges: configurationChanges)
+        let automationState = CalendarAutomationStateUseCase(stateStore: automationStateStore)
+        let viewModel = CalendarListViewModel(
             inventory: inventory, setup: setup, status: status, manualDryRun: manualDryRun, manualApply: manualApply,
-            manualCleanup: manualCleanup, configurationObserver: configurationObserver)
+            manualCleanup: manualCleanup, standingAuthorization: standingAuthorization,
+            automaticReconciliation: automaticReconciliation, automationState: automationState,
+            configurationObserver: configurationObserver, automationTriggers: CalendarAutomationTriggerSource(),
+            launchAtLogin: CalendarLaunchAtLoginController(),
+            automationAttention: CalendarAutomationAttentionController())
+        self.viewModel = viewModel
+        appDelegate.shouldWarnBeforeQuit = { [weak viewModel] in viewModel?.isSchedulingEnabled == true }
     }
 
     var body: some Scene {
