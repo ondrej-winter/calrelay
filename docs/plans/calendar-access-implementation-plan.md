@@ -6,8 +6,8 @@
 - **Related accepted contracts:** [`../specs/configuration-spec.md`](../specs/configuration-spec.md), [`../specs/reconciliation-spec.md`](../specs/reconciliation-spec.md), [`../specs/projection-and-safety-spec.md`](../specs/projection-and-safety-spec.md), [`../specs/cli-spec.md`](../specs/cli-spec.md), and [`../specs/macos-app-spec.md`](../specs/macos-app-spec.md).
 - **Architecture decision:** [`../adr/0001-launch-normal-app-at-login-for-scheduled-sync.md`](../adr/0001-launch-normal-app-at-login-for-scheduled-sync.md).
 - **Readiness:** Ready. Required outcomes, sequencing, privacy constraints, and validation are specific enough to execute without an unresolved product decision.
-- **Progress date:** September 19, 2026.
-- **Implementation state:** Partial. The shared access boundary, non-prompting EventKit adapter, complete preflight, CLI/manual-app flows, cleanup, mutation-time failure handling, exact occurrence handling, reusable privacy contracts, allowlisted automation persistence, app scheduling and automatic-run coordination, and operational presentation/relaunch recovery are implemented. Remaining closure is deterministic acceptance mapping plus dedicated-calendar and live macOS lifecycle validation.
+- **Progress date:** September 20, 2026.
+- **Implementation state:** Partial. The shared access boundary, non-prompting EventKit adapter, complete preflight, CLI/manual-app flows, cleanup, mutation-time failure handling, exact occurrence handling, reusable privacy contracts, allowlisted automation persistence, app scheduling and automatic-run coordination, operational presentation/relaunch recovery, deterministic acceptance mapping, documentation reconciliation, and current repository gates are complete. Remaining closure is the explicit `CA-11-V1` evidence gap plus dedicated-calendar and live macOS lifecycle validation; the final handoff gates must be rerun after those remaining changes.
 - **Execution approach:** Close only the remaining gaps. Do not replace or duplicate behavior already implemented under the access slice or behavior owned by adjacent accepted specifications.
 
 ## Outcome
@@ -57,21 +57,43 @@ Complete Calendar Access Specification revision 7 by integrating the existing re
 
 | Acceptance check | Current state | Remaining closure |
 | --- | --- | --- |
-| `ACCESS-AC-01` | **Partial.** Setup/recovery prompt ownership and non-prompting inventory, CLI, manual ordinary, and cleanup paths are implemented and tested. | Prove that scheduling, automatic attempts, and retries also never prompt; validate denial, later grant, and revocation through the stable app bundle. Owned by `CA-10`, `CA-12`, and `D05-04`. |
+| `ACCESS-AC-01` | **Implemented deterministically.** Setup/recovery alone owns the request capability; ordinary automatic and retry attempts are tested across every authorization state without requesting access. | Validate first request, denial, later grant, and revocation through the stable app bundle under `D05-04A`. |
 | `ACCESS-AC-02` | **Implemented.** Configuration-independent inventory, empty-inventory success, CLI IDs, app ID omission, and readiness separation are present. | Retain regression coverage and live inventory checks under `D05-04`. |
-| `ACCESS-AC-03` | **Partial.** CLI and manual-app ordinary operations share complete preflight. | Route every automatic attempt through the same complete preflight and reject every topology/readability/writability failure before mutation. Owned by `CA-10` and `CA-12`. |
+| `ACCESS-AC-03` | **Implemented deterministically.** CLI, manual-app, and automatic-app ordinary operations use the complete preflight; automatic missing, ambiguous, colliding, unreadable, and read-only cases perform no mutation. | Retain dedicated-calendar topology validation under `D05-04B`. |
 | `ACCESS-AC-04` | **Implemented.** Migration-pending config check completes access preflight, aggregates failures, returns nonzero, and does not claim readiness. | Retain regression coverage. |
 | `ACCESS-AC-05` | **Implemented.** CLI and app cleanup use complete-range, all-role preflight and block all deletion on failure. | Complete dedicated-calendar validation under `D05-04`. |
-| `ACCESS-AC-06` | **Implemented.** Safely determinable failures aggregate and prevent mutation. | Retain regression coverage for automatic attempts. |
+| `ACCESS-AC-06` | **Implemented deterministically.** Safely determinable failures aggregate and prevent mutation in reusable, manual, CLI, cleanup, and automatic paths. | Retain live failure checks under `D05-04B`. |
 | `ACCESS-AC-07` | **Implemented.** Cleanup performs complete post-mutation verification and preserves no-rollback failure semantics. | Complete live cleanup verification under `D05-04`. |
-| `ACCESS-AC-08` | **Implemented.** Mutation-phase failure produces a privacy-safe partial result, stops later mutations, and performs no rollback. | Exercise the same executor semantics through automatic attempts and live validation. |
-| `ACCESS-AC-09` | **Partial.** CLI/app transient disclosure rules and reusable privacy tests are implemented. | Prove that persisted authorization/status, automatic failures, notifications, and relaunch state contain no prohibited Calendar or configuration payload. Owned by `CA-11` and `CA-12`. |
+| `ACCESS-AC-08` | **Implemented deterministically.** Reusable, manual, cleanup, and automatic mutation-phase failures preserve confirmed aggregate counts, stop later actions, and perform no rollback. | Exercise harmless live failure cases under `D05-04B`. |
+| `ACCESS-AC-09` | **Implemented deterministically.** CLI/app transient disclosure rules, persisted authorization/status, automatic results, and fixed reason-only notification copy have negative privacy coverage. | Spot-check live presentation without recording sensitive payload under `D05-04`. |
 | `ACCESS-AC-10` | **Implemented.** Deterministic core tests are fake-backed and domain/application APIs do not expose EventKit types. | Keep new automatic and persistence tests offline and fake-backed. |
-| `ACCESS-AC-11` | **Partial.** App cleanup presentation and reusable diagnostics follow the stricter disclosure contract. | Implement and test privacy-safe persisted operational status and automatic-run presentation. Owned by `CA-11` and `CA-12`. |
+| `ACCESS-AC-11` | **Implemented deterministically.** Cleanup presentation, persisted operational status, automatic results, attention state, and notifications use allowlisted privacy-safe values. | Validate OS-mediated presentation and notification fallback under `D05-04C`. |
 | `ACCESS-AC-12` | **Implemented.** Exact recurring-occurrence selection fails closed on missing or ambiguous matches and never substitutes another occurrence or series. | Complete harmless real-EventKit recurring validation under `D05-04`. |
-| `ACCESS-AC-13` | **Implemented.** Ordinary, cleanup, and cleanup-verification snapshots use hub-first declaration order and retain sequential non-atomic semantics. | Prove automatic attempts consume the same snapshot-loading boundary without adding notification restarts or double reads. |
-| `ACCESS-AC-14` | **Implemented at the access boundary.** Reviewed-action identity distinguishes physical destinations and exact delete occurrences without using EventKit IDs as selectors or ownership markers. | Consume the existing opaque physical identity in standing-authorization topology binding under `CA-10`; do not create a competing identity model. |
-| `ACCESS-AC-15` | **Implemented in reusable/manual flows.** Ready empty plans succeed, ordered actions require confirmation, ordinary work has no verification read, and cleanup retains complete verification. | Prove identical success semantics through automatic attempts and persisted freshness state. |
+| `ACCESS-AC-13` | **Implemented deterministically.** Ordinary, cleanup, cleanup-verification, and automatic snapshots use hub-first declaration order; automatic ordinary success adds no verification reread. | Retain live snapshot behavior checks under `D05-04`. |
+| `ACCESS-AC-14` | **Implemented.** Reviewed-action and standing-authorization identities distinguish physical destinations and exact delete occurrences without using EventKit IDs as selectors or ownership markers. | Retain exact-target live validation under `D05-04B`. |
+| `ACCESS-AC-15` | **Implemented deterministically.** Ready empty plans succeed, ordered actions require confirmation, ordinary work has no verification read, automatic success updates freshness, and cleanup retains complete verification. | Confirm harmless live ordinary and cleanup completion under `D05-04B` and `D05-04C`. |
+
+## Acceptance evidence map
+
+All deterministic suites below are registered in `Tests/CalRelayKitTests/Main.swift`, are fake-backed and offline, and passed through the custom executable runner on September 20, 2026. Manual entries remain pending and are not treated as completed evidence.
+
+| Acceptance check | Deterministic evidence | Explicitly pending manual evidence |
+| --- | --- | --- |
+| `ACCESS-AC-01` | `CalendarAuthorizationTests`, `CalendarAccessPreflightTests`, `CalendarCleanupAccessTests`, `CalendarManualApplyTests`, and `CalendarAutomaticReconciliationTests` cover request-capability ownership and non-prompting ordinary/retry behavior across authorization states. | Stable-bundle first request, denial, later grant, restriction/write-only where reproducible, revocation, and relaunch under `D05-04A`. |
+| `ACCESS-AC-02` | `CalendarAuthorizationTests` and `CalendarListCommandHandlerTests` cover configuration-independent inventory, empty success, CLI troubleshooting IDs, app ID omission, and no readiness claim. | Real EventKit inventory and empty/visible inventory observations under `D05-04A`. |
+| `ACCESS-AC-03` | `CalendarAccessPreflightTests`, `ReconcileCommandHandlerTests`, `CalendarManualDryRunTests`, `CalendarManualApplyTests`, and `CalendarAutomaticReconciliationTests` cover the shared complete ordinary preflight and every required topology/read/write failure class. | Dedicated-calendar topology and access failures under `D05-04B`. |
+| `ACCESS-AC-04` | `ConfigCheckCommandHandlerTests` and `CalendarControlPanelStatusTests` cover migration-pending readiness aggregation and precedence. | No additional manual-only contract beyond normal `D05-04` recovery observation. |
+| `ACCESS-AC-05` | `CalendarCleanupAccessTests`, `CalendarManualCleanupTests`, and `ReconcileCommandHandlerTests` cover complete-range all-role cleanup preflight and all-or-nothing deletion gating. | Dedicated-calendar cleanup preflight under `D05-04B`. |
+| `ACCESS-AC-06` | `CalendarAccessPreflightTests`, `CalendarCleanupAccessTests`, and `CalendarAutomaticReconciliationTests` cover aggregated safely determinable failures with zero mutation. | Harmless live multiple-failure observation under `D05-04B`. |
+| `ACCESS-AC-07` | `CalendarCleanupAccessTests` and `CalendarManualCleanupTests` cover complete verification rereads, remaining matches/read failures, progressive confirmations, and no rollback. | Real EventKit cleanup verification and failure behavior under `D05-04B`. |
+| `ACCESS-AC-08` | `CalendarMutationExecutorTests`, `CalRelayContractTests`, `CalendarManualCleanupTests`, and `CalendarAutomaticReconciliationTests` cover privacy-safe partial results, stop-on-first-failure, confirmed counts, and no rollback. | Harmless live partial mutation under `D05-04B`. |
+| `ACCESS-AC-09` | `CalendarAccessPrivacyTests`, CLI handler/contract suites, `CalendarAutomationPersistenceTests`, `CalendarAutomaticReconciliationTests`, and `CalendarAutomationCoordinationTests` cover allowed transient disclosure and prohibited persisted/result/notification content. | Privacy-safe live output/presentation spot checks under `D05-04`. |
+| `ACCESS-AC-10` | The complete `CalRelayKitTests` runner passes without EventKit access; source boundaries keep framework types out of domain/application APIs. | None; real EventKit checks intentionally remain outside deterministic tests. |
+| `ACCESS-AC-11` | `CalendarAccessPrivacyTests`, `CalendarAutomationPersistenceTests`, `CalendarManualCleanupTests`, `CalendarAutomaticReconciliationTests`, `CalendarAutomationCoordinationTests`, and `CalendarLoginLaunchPolicyTests` cover the stricter cleanup, persistence, result, notification, and relaunch-presentation disclosure boundaries. | OS notification denial/fallback and actual login-session presentation under `D05-04C`. |
+| `ACCESS-AC-12` | `CalendarAuthorizationTests`, `CalendarReviewedActionTests`, and cleanup/mutation contract suites cover exact occurrence identity plus missing/ambiguous fail-closed selection. | Exact recurring EventKit occurrence deletion under `D05-04B`. |
+| `ACCESS-AC-13` | `CalendarAccessPreflightTests`, `CalendarCleanupAccessTests`, `CalendarManualCleanupTests`, and `CalendarAutomaticReconciliationTests` cover hub-first declaration-ordered reads and absence of an ordinary verification reread. | Real EventKit snapshot sequencing observation where practical under `D05-04`. |
+| `ACCESS-AC-14` | `CalendarReviewedActionTests`, `CalendarAutomationPersistenceTests`, and `CalendarStandingAuthorizationTests` cover physical destination identity, exact delete occurrence identity, and opaque topology-bound authorization. | Exact physical-target continuity and mutation under `D05-04B`/`D05-04C`. |
+| `ACCESS-AC-15` | `CalendarMutationExecutorTests`, `CalendarAutomaticReconciliationTests`, `CalendarCleanupAccessTests`, and `CalendarManualCleanupTests` cover ready empty success, ordered confirmation, no ordinary verification read, persisted freshness, and cleanup verification. | Live ordinary/automatic completion and cleanup verification under `D05-04B`/`D05-04C`. |
 
 ## Dependency order
 
@@ -235,15 +257,19 @@ Persist only the latest minimal metadata needed for standing authorization and a
 
 **Evidence:** Approved persisted metadata is restored and live scheduling, launch-at-login, authorization, retry, freshness, attention, notification, and Quit-warning presentation is rederived. The AppKit lifecycle adapter identifies login-item launches from the `kAEOpenApplication` Apple event only when `keyAEPropData` equals `keyAELaunchedAsLogInItem`; it does not use an ambiguous default-launch heuristic. Only that launch context initially suppresses the SwiftUI control panel. After live control-panel state, persisted automation state, and login-item health are available, `CalendarLoginLaunchPolicy` keeps healthy or actively retrying login launches hidden and opens actionable setup, recovery, exhausted-failure, or overdue-freshness states. Healthy launches remain suppressed through the prompt automatic launch attempt. Ordinary Dock/Finder launches stay visible, and a Dock reopen presents the hidden control panel. `CalendarLoginLaunchPolicyTests`, `swift build --product CalRelayApp`, `make format-check`, `make check`, and `make app` pass; an actual login-session behavior check remains under `D05-04C`.
 
-#### - [ ] CA-11-AC1 — Prove persisted disclosure compliance
+#### - [x] CA-11-AC1 — Prove persisted disclosure compliance
 
 Stored data, relaunch state, persistent diagnostics, and notifications contain only approved opaque identities, timestamps, safe categories, and aggregate counts. They contain no event details, raw configuration, selectors, names, markers, EventKit identifiers, review rows, or raw framework errors.
+
+**Evidence:** `CalendarAutomationPersistenceTests` proves allowlisted round-trip and negative serialized disclosure; automatic result tests retain only safe categories and aggregate counts; and `CalendarAutomationCoordinationTests` proves every notification title/body is fixed reason-category copy without Calendar or configuration payload.
 
 #### - [ ] CA-11-V1 — Pass persistence and presentation suites
 
 Run round-trip, version/corruption, negative disclosure, relaunch recovery, notification-denial, transient-review disposal, and primary-state-precedence tests.
 
-### - [ ] CA-12 — Complete deterministic acceptance coverage
+**Open evidence:** Registered persistence, corruption recovery, safe-copy notification, login-launch policy, configuration-change review invalidation, and primary-state precedence suites pass. Keep this broader validation item open until notification-denial behavior and complete transient-review disposal are mapped to and run through an explicit maintained suite; actual login-session behavior remains separately pending under `D05-04C`.
+
+### - [x] CA-12 — Complete deterministic acceptance coverage
 
 Map every Calendar Access acceptance check to deterministic evidence or an explicitly manual-only EventKit/lifecycle checkpoint. Keep default suites fast, isolated, offline, fake-backed, and registered in the custom test runner.
 
@@ -251,32 +277,34 @@ Map every Calendar Access acceptance check to deterministic evidence or an expli
 
 **Likely targets:** contract suites under `Tests/CalRelayKitTests/Features/CalendarRelay/Contracts/`, adjacent app/CLI handler tests, and `Tests/CalRelayKitTests/Main.swift`.
 
-#### - [ ] CA-12A — Extend no-prompt and authorization-state coverage
+#### - [x] CA-12A — Extend no-prompt and authorization-state coverage
 
 - Prove only setup/recovery can request access.
 - Cover not-determined, restricted, denied, write-only, full-access, revoked, and unknown/future authorization states.
 - Prove inventory, status, config check, manual ordinary, automatic ordinary, cleanup, retry, and scheduling never request access.
 
-#### - [ ] CA-12B — Cover automatic preflight and mutation behavior
+#### - [x] CA-12B — Cover automatic preflight and mutation behavior
 
 - Cover missing, ambiguous, colliding, unreadable, and read-only roles for automatic attempts.
 - Verify hub-first declaration-ordered reads and all-or-nothing mutation gating.
 - Cover configuration/policy/topology standing-authorization invalidation and selected-file change immediately before mutation.
 - Cover empty-plan success, ordered mutation confirmation without an ordinary verification read, partial failure, fresh retry, fresh coalesced follow-up, no automatic cleanup, and no plan-size heuristic.
 
-#### - [ ] CA-12C — Cover persisted privacy and coordination
+#### - [x] CA-12C — Cover persisted privacy and coordination
 
 - Test persistence allowlisting and search serialized output/log captures for prohibited representative values.
 - Cover relaunch recovery, cleanup-review transience, privacy-safe automatic/partial results, and notification fallback.
 - Cover app-process no-overlap and at-most-one coalesced follow-up without asserting cross-process serialization.
 
-#### - [ ] CA-12-AC1 — Map all acceptance checks to evidence
+#### - [x] CA-12-AC1 — Map all acceptance checks to evidence
 
 Maintain a test/evidence map for `ACCESS-AC-01` through `ACCESS-AC-15`; leave any unavailable live EventKit or lifecycle requirement explicitly pending rather than treating absent behavior as a pass.
 
-#### - [ ] CA-12-V1 — Pass all registered custom-runner suites
+#### - [x] CA-12-V1 — Pass all registered custom-runner suites
 
 Run focused exact suite names while iterating, then pass the full `swift run CalRelayKitTests` path through the repository quality gate.
+
+**Evidence:** The acceptance evidence map above identifies deterministic and explicitly manual-only evidence for `ACCESS-AC-01` through `ACCESS-AC-15`. The focused calendar-access/automation suite set and the complete `make test` custom-runner path pass on September 20, 2026. OS-mediated EventKit, notification-permission, and login-session behavior remains pending only where identified under `D05-04` or `CA-11-V1`.
 
 ### - [ ] CA-13 — Update operational documentation and complete validation
 
@@ -286,14 +314,16 @@ Update canonical project references after implementation and perform the complet
 
 **Likely targets:** `docs/configuration.md`, `docs/manual-validation.md`, `docs/development.md` if commands or lifecycle setup change, `docs/repository-layout.md` if new package areas are introduced, and this plan.
 
-#### - [ ] CA-13A — Align documentation and progress evidence
+#### - [x] CA-13A — Align documentation and progress evidence
 
 - Remove pending-automation wording only after the corresponding implementation and evidence exist.
 - Document standing authorization, scheduling/recovery state, privacy-safe persistence, and operator validation without exposing sensitive local data.
 - Distinguish deterministic evidence, live EventKit evidence, local mutation confirmation, cleanup verification, and provider convergence.
 - Synchronize detailed and dashboard checkboxes and record concise completion evidence or blockers.
 
-#### - [ ] CA-13B — Run the complete repository gates
+**Evidence:** This plan now synchronizes the completed `CA-10`, implemented `CA-11A`/`CA-11B`/`CA-11-AC1`, completed deterministic `CA-12`, open `CA-11-V1`, and wholly pending `D05-04` state. The acceptance map separates registered deterministic suites from unperformed EventKit, notification-permission, and login-session checks. Existing `docs/configuration.md`, `docs/development.md`, and `docs/manual-validation.md` already describe the implemented operator behavior and explicit live-validation boundary, so no duplicate project-reference changes were needed.
+
+#### - [x] CA-13B — Run the complete repository gates
 
 From the repository root, run:
 
@@ -306,13 +336,19 @@ git --no-pager diff HEAD --check
 
 Do not substitute `swift test` for the custom test runner. If a required check is blocked or fails for an unrelated pre-existing reason, report it explicitly without weakening or skipping the gate silently.
 
-#### - [ ] CA-13-AC1 — Confirm documentation and implementation consistency
+**Evidence:** On September 20, 2026, `make format-check`, `make check`, `make app`, and `git --no-pager diff HEAD --check` pass. `make format-check` continues to report existing non-fatal repository-wide formatting warnings; strict SwiftLint reports zero violations. The build, complete custom executable test runner, CLI help smoke check, and app-bundle build succeed.
+
+#### - [x] CA-13-AC1 — Confirm documentation and implementation consistency
 
 The accepted specifications, application behavior, operational references, manual-validation procedure, and progress evidence must describe the same permission, authorization, scheduling, success, privacy, and recovery semantics.
 
-#### - [ ] CA-13-V1 — Pass or accurately report every final gate
+**Evidence:** The accepted specifications remain unchanged because this work adds deterministic proof rather than product behavior. The implementation plan, configuration reference, development workflow, and manual-validation procedure consistently separate non-prompting deterministic automation from explicit setup permission requests and unperformed real EventKit/lifecycle checks.
+
+#### - [x] CA-13-V1 — Pass or accurately report every final gate
 
 All required repository checks pass, or every unresolved failure is identified with command output, scope, and impact. No check is claimed as passed unless it was run.
+
+**Evidence:** All current required gates pass as recorded under `CA-13B`. This validates the present change set only; rerun the gates after closing `CA-11-V1` or performing any resulting repository edits for `D05-04` before marking the `CA-13` parent complete.
 
 ### - [x] D05-01 — Repair and verify local app packaging
 
@@ -444,33 +480,33 @@ Calendar Access revision 7 is complete only when:
 - [x] D05-03 — Deliver reviewed manual ordinary apply
 - [x] D05-05 — Deliver separately reviewed app legacy cleanup
 
-### Remaining automatic integration
+### Completed automatic integration
 
-- [ ] CA-10 — Complete automatic app access integration
-- [ ] CA-10A — Complete app integration for the implemented standing-authorization orchestration
-- [ ] CA-10B — Add scheduled and automatic trigger coordination
-- [ ] CA-10C — Enforce fresh access gates for every attempt
-- [ ] CA-10D — Present denial, revocation, retry, and recovery state
-- [ ] CA-10-AC1 — Prove automatic operations are non-prompting and fully gated
-- [ ] CA-10-AC2 — Prove fresh-plan and completion semantics
-- [ ] CA-10-V1 — Pass focused automatic-operation suites
+- [x] CA-10 — Complete automatic app access integration
+- [x] CA-10A — Complete app integration for the implemented standing-authorization orchestration
+- [x] CA-10B — Add scheduled and automatic trigger coordination
+- [x] CA-10C — Enforce fresh access gates for every attempt
+- [x] CA-10D — Present denial, revocation, retry, and recovery state
+- [x] CA-10-AC1 — Prove automatic operations are non-prompting and fully gated
+- [x] CA-10-AC2 — Prove fresh-plan and completion semantics
+- [x] CA-10-V1 — Pass focused automatic-operation suites
 
 ### Remaining persistence and presentation
 
 - [ ] CA-11 — Complete privacy-safe persistence and operational presentation
 - [x] CA-11A — Add allowlisted standing-authorization and status persistence
-- [ ] CA-11B — Extend operational state and relaunch recovery
-- [ ] CA-11-AC1 — Prove persisted disclosure compliance
+- [x] CA-11B — Extend operational state and relaunch recovery
+- [x] CA-11-AC1 — Prove persisted disclosure compliance
 - [ ] CA-11-V1 — Pass persistence and presentation suites
 
-### Remaining deterministic coverage
+### Completed deterministic coverage
 
-- [ ] CA-12 — Complete deterministic acceptance coverage
-- [ ] CA-12A — Extend no-prompt and authorization-state coverage
-- [ ] CA-12B — Cover automatic preflight and mutation behavior
-- [ ] CA-12C — Cover persisted privacy and coordination
-- [ ] CA-12-AC1 — Map all acceptance checks to evidence
-- [ ] CA-12-V1 — Pass all registered custom-runner suites
+- [x] CA-12 — Complete deterministic acceptance coverage
+- [x] CA-12A — Extend no-prompt and authorization-state coverage
+- [x] CA-12B — Cover automatic preflight and mutation behavior
+- [x] CA-12C — Cover persisted privacy and coordination
+- [x] CA-12-AC1 — Map all acceptance checks to evidence
+- [x] CA-12-V1 — Pass all registered custom-runner suites
 
 ### Remaining live acceptance
 
@@ -484,11 +520,11 @@ Calendar Access revision 7 is complete only when:
 ### Remaining documentation and final validation
 
 - [ ] CA-13 — Update operational documentation and complete validation
-- [ ] CA-13A — Align documentation and progress evidence
-- [ ] CA-13B — Run the complete repository gates
-- [ ] CA-13-AC1 — Confirm documentation and implementation consistency
-- [ ] CA-13-V1 — Pass or accurately report every final gate
+- [x] CA-13A — Align documentation and progress evidence
+- [x] CA-13B — Run the complete repository gates
+- [x] CA-13-AC1 — Confirm documentation and implementation consistency
+- [x] CA-13-V1 — Pass or accurately report every final gate
 
 ## Next executable work
 
-Start with `CA-11A` and the application-only identity/orchestration portion of `CA-10A`. Establish the allowlisted persistence contract and opaque standing-authorization binding before connecting scheduled triggers or automatic mutation.
+Close the remaining explicit `CA-11-V1` evidence gap with maintained notification-denial and transient-review-disposal coverage. Then perform `D05-04` only with dedicated harmless calendars and an actual macOS login session, preserving every manual checkbox as pending until observed. After those checks, finish the `CA-13` handoff without treating provider convergence or unperformed live validation as an automated pass.

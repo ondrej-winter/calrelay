@@ -9,6 +9,7 @@ enum CalendarAutomationCoordinationTests {
         try testFixedCadenceAndFreshnessPolicy()
         try testTransientRetriesAreFiniteAndBounded()
         try testAttentionPolicyDistinguishesActionableRetryAndOverdueState()
+        try testNotificationContentIsFixedAndPrivacySafe()
         try await testStateUpdatesPreserveAuthorizationAndOperationHistory()
     }
 
@@ -146,6 +147,27 @@ enum CalendarAutomationCoordinationTests {
                 schedulingPreference: .enabled, hasStandingAuthorization: true,
                 launchAtLoginHealthy: false, operationalStatus: overdue, now: now) == .launchAtLoginUnavailable,
             "Launch-at-login recovery should precede freshness")
+    }
+
+    private static func testNotificationContentIsFixedAndPrivacySafe() throws {
+        let expectations: [(CalendarAutomationAttentionReason, String)] = [
+            (.schedulingPaused, "Scheduled sync is paused."),
+            (.standingAuthorizationRequired, "Review a fresh dry run and renew scheduled sync authorization."),
+            (.launchAtLoginUnavailable, "Enable or approve CalRelay in Login Items."),
+            (.configurationUnavailable, "Restore or fix the canonical configuration file."),
+            (.migrationPending, "Complete explicit legacy cleanup before scheduled sync can resume."),
+            (.calendarAccessUnavailable, "Restore full Calendar access in the CalRelay control panel."),
+            (.topologyNotReady, "Resolve the configured calendar readiness issue."),
+            (.partialMutation, "A scheduled run partially applied and bounded retries are exhausted."),
+            (.transientFailure, "Scheduled sync retries are exhausted after a transient failure."),
+            (.freshnessOverdue, "No successful ordinary reconciliation has completed within the last hour.")
+        ]
+
+        for (reason, expectedBody) in expectations {
+            let content = CalendarAutomationAttentionNotification(reason: reason)
+            try expect(content.title == "CalRelay needs attention", "Notification title should be fixed safe copy")
+            try expect(content.body == expectedBody, "Notification body should depend only on the safe reason category")
+        }
     }
 
     private static func testStateUpdatesPreserveAuthorizationAndOperationHistory() async throws {

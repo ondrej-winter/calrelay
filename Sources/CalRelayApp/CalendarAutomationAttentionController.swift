@@ -57,26 +57,12 @@ import UserNotifications
         let authorization = await center.notificationSettings().authorizationStatus
         guard authorization == .authorized || authorization == .provisional else { return }
 
+        let notification = CalendarAutomationAttentionNotification(reason: reason)
         let content = UNMutableNotificationContent()
-        content.title = "CalRelay needs attention"
-        content.body = Self.notificationBody(reason)
+        content.title = notification.title
+        content.body = notification.body
         let request = UNNotificationRequest(
             identifier: Self.notificationIdentifier, content: content, trigger: nil)
         try? await center.add(request)
-    }
-
-    private static func notificationBody(_ reason: CalendarAutomationAttentionReason) -> String {
-        switch reason {
-        case .schedulingPaused: "Scheduled sync is paused."
-        case .standingAuthorizationRequired: "Review a fresh dry run and renew scheduled sync authorization."
-        case .launchAtLoginUnavailable: "Enable or approve CalRelay in Login Items."
-        case .configurationUnavailable: "Restore or fix the canonical configuration file."
-        case .migrationPending: "Complete explicit legacy cleanup before scheduled sync can resume."
-        case .calendarAccessUnavailable: "Restore full Calendar access in the CalRelay control panel."
-        case .topologyNotReady: "Resolve the configured calendar readiness issue."
-        case .partialMutation: "A scheduled run partially applied and bounded retries are exhausted."
-        case .transientFailure: "Scheduled sync retries are exhausted after a transient failure."
-        case .freshnessOverdue: "No successful ordinary reconciliation has completed within the last hour."
-        }
     }
 }

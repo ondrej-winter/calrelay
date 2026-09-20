@@ -4,6 +4,9 @@ import Foundation
 enum CalendarAutomaticReconciliationTests {
     static func runAll() async throws {
         try await testFreshAuthorizedAttemptAppliesAndPersistsAggregateSuccess()
+        try await testAutomaticAndRetryAttemptsNeverRequestCalendarAccess()
+        try await testAutomaticPreflightFailuresPreventAllMutations()
+        try await testConfigurationAndMigrationFailuresStopBeforeCalendarAccess()
         try await testMissingStandingAuthorizationPerformsNoMutation()
         try await testReadyEmptyPlanUpdatesSuccessWithoutMutation()
         try await testBindingMismatchRevokesAuthorizationWithoutMutation()
@@ -12,6 +15,8 @@ enum CalendarAutomaticReconciliationTests {
         try await testPartialMutationPersistsOnlyAggregateConfirmedCounts()
         try await testDisabledSchedulingFailsClosedEvenWithStandingAuthorization()
         try await testTransientReadFailureSchedulesBoundedFreshRetry()
+        try await testRetryReloadsFreshConfigurationSnapshotAndPlan()
+        try await testLargeValidPlanAppliesWithoutHeuristicLimit()
         try await testConcurrentRevocationDuringMutationCannotBeResurrected()
     }
 
@@ -28,6 +33,10 @@ enum CalendarAutomaticReconciliationTests {
             result.confirmedCounts == CalendarAutomationMutationCounts(confirmedCreates: 1, confirmedDeletes: 0),
             "Automatic success should disclose only aggregate confirmed counts")
         try expect(await store.mutationCount() == 1, "The fresh authorized plan should be applied once")
+        try expect(await store.listCalendarsCallCount() == 1, "Automatic preflight should load one fresh inventory")
+        try expect(
+            await store.eventRequestCalendarIDs() == [fixture.hub.id, fixture.work.id],
+            "Automatic preflight should read hub first, then work calendars, without a verification reread")
         let persisted = await stateStore.currentState()
         try expect(persisted.operationalStatus.latestOutcome == .applied, "Applied outcome should persist")
         try expect(
@@ -64,6 +73,127 @@ enum CalendarAutomaticReconciliationTests {
         try expect(
             (await stateStore.currentState()).operationalStatus.freshness.lastSuccessAt == fixture.now,
             "Empty success should update last-success freshness")
+    }
+
+    private static func testAutomaticAndRetryAttemptsNeverRequestCalendarAccess() async throws {
+        let fixture = AutomaticReconciliationFixture()
+
+        for kind in [CalendarAutomaticAttemptKind.ordinary, .retry] {
+            for state in CalendarAuthorizationState.allCases {
+                let authorization = RequestCapableAutomaticAuthorization(state: state)
+                let stateStore = AutomaticStateStore(state: fixture.authorizedState())
+                let store = fixture.storeWithSourceEvent()
+
+                let result = try await fixture.useCase(
+                    authorization: authorization, calendarStore: store, stateStore: stateStore
+                ).run(kind: kind)
+
+                let expectedOutcome: CalendarAutomationOutcomeCategory =
+                    state == .fullAccess ? .applied : .calendarAccessUnavailable
+                try expect(
+                    result.outcome == expectedOutcome,
+                    "Automatic \(kind) should handle \(state) without requesting access")
+                try expect(
+                    await authorization.requestCount() == 0,
+                    "Automatic \(kind) must never request Calendar access for \(state)")
+            }
+        }
+    }
+
+    private static func testAutomaticPreflightFailuresPreventAllMutations() async throws {
+        let fixture = AutomaticReconciliationFixture()
+        let duplicateWork = RelayCalendar(
+            id: "work-duplicate", title: fixture.work.title, sourceTitle: fixture.work.sourceTitle, isWritable: true)
+        let collisionHub = RelayCalendar(
+            id: "shared", title: fixture.hub.title, sourceTitle: fixture.hub.sourceTitle, isWritable: true)
+        let collisionWork = RelayCalendar(
+            id: "shared", title: fixture.work.title, sourceTitle: fixture.work.sourceTitle, isWritable: true)
+        let readOnlyWork = RelayCalendar(
+            id: fixture.work.id, title: fixture.work.title, sourceTitle: fixture.work.sourceTitle, isWritable: false)
+        let scenarios: [AutomaticPreflightFailureScenario] = [
+            AutomaticPreflightFailureScenario(
+                name: "missing", store: AutomaticCalendarStore(calendars: [fixture.hub], eventsByCalendarID: [:]),
+                expectedOutcome: .topologyNotReady, expectedReads: [fixture.hub.id]),
+            AutomaticPreflightFailureScenario(
+                name: "ambiguous",
+                store: AutomaticCalendarStore(
+                    calendars: [fixture.hub, fixture.work, duplicateWork], eventsByCalendarID: [:]),
+                expectedOutcome: .topologyNotReady, expectedReads: [fixture.hub.id]),
+            AutomaticPreflightFailureScenario(
+                name: "colliding",
+                store: AutomaticCalendarStore(calendars: [collisionHub, collisionWork], eventsByCalendarID: [:]),
+                expectedOutcome: .topologyNotReady, expectedReads: [collisionHub.id, collisionWork.id]),
+            AutomaticPreflightFailureScenario(
+                name: "read-only",
+                store: AutomaticCalendarStore(calendars: [fixture.hub, readOnlyWork], eventsByCalendarID: [:]),
+                expectedOutcome: .topologyNotReady, expectedReads: [fixture.hub.id, fixture.work.id]),
+            AutomaticPreflightFailureScenario(
+                name: "unreadable",
+                store: AutomaticCalendarStore(
+                    calendars: [fixture.hub, fixture.work], eventsByCalendarID: [:],
+                    readFailureCalendarIDs: [fixture.work.id]),
+                expectedOutcome: .transientFailure, expectedReads: [fixture.hub.id, fixture.work.id])
+        ]
+
+        for scenario in scenarios {
+            let result = try await fixture.useCase(
+                calendarStore: scenario.store, stateStore: AutomaticStateStore(state: fixture.authorizedState())
+            ).run()
+
+            try expect(
+                result.outcome == scenario.expectedOutcome,
+                "Automatic preflight should categorize the \(scenario.name) case")
+            try expect(
+                await scenario.store.mutationCount() == 0,
+                "The \(scenario.name) preflight failure must prevent all mutation")
+            try expect(
+                await scenario.store.eventRequestCalendarIDs() == scenario.expectedReads,
+                "The \(scenario.name) preflight should read every safely resolvable role in topology order")
+        }
+    }
+
+    private static func testConfigurationAndMigrationFailuresStopBeforeCalendarAccess() async throws {
+        let fixture = AutomaticReconciliationFixture()
+        let cases: [AutomaticConfigurationFailureScenario] = [
+            AutomaticConfigurationFailureScenario(
+                name: "missing",
+                provider: FailingAutomaticSettingsProvider(
+                    error: .missing(displayPath: "~/.config/calrelay/config.yaml")),
+                expectedOutcome: .configurationUnavailable),
+            AutomaticConfigurationFailureScenario(
+                name: "invalid",
+                provider: AutomaticSettingsProvider(
+                    settings: CalendarRelaySettings(
+                        hubCalendar: fixture.settings.hubCalendar, personalPrefix: fixture.settings.personalPrefix,
+                        syncWindowDays: fixture.settings.syncWindowDays, workCalendars: [], legacyMarkers: [])),
+                expectedOutcome: .configurationUnavailable),
+            AutomaticConfigurationFailureScenario(
+                name: "migration pending",
+                provider: AutomaticSettingsProvider(
+                    settings: CalendarRelaySettings(
+                        hubCalendar: fixture.settings.hubCalendar, personalPrefix: fixture.settings.personalPrefix,
+                        syncWindowDays: fixture.settings.syncWindowDays, workCalendars: fixture.settings.workCalendars,
+                        legacyMarkers: ["[OLD]"])),
+                expectedOutcome: .migrationPending)
+        ]
+
+        for scenario in cases {
+            let store = fixture.storeWithSourceEvent()
+            let result = try await fixture.useCase(
+                settingsProvider: scenario.provider, calendarStore: store,
+                stateStore: AutomaticStateStore(state: fixture.authorizedState())
+            ).run()
+
+            try expect(
+                result.outcome == scenario.expectedOutcome,
+                "Automatic attempt should report \(scenario.name) safely")
+            try expect(
+                await store.listCalendarsCallCount() == 0,
+                "The \(scenario.name) configuration gate should fail before Calendar inventory")
+            try expect(
+                await store.mutationCount() == 0,
+                "The \(scenario.name) configuration gate must prevent mutation")
+        }
     }
 
     private static func testBindingMismatchRevokesAuthorizationWithoutMutation() async throws {
@@ -149,6 +279,7 @@ enum CalendarAutomaticReconciliationTests {
         try expect(
             result.retryState == .scheduled(attempt: 1, nextAttemptAt: fixture.now.addingTimeInterval(60)),
             "Partial automatic mutation should schedule a bounded fresh retry")
+        try expect(await store.operationAttemptCount() == 2, "Automatic mutation should stop at the first failure")
     }
 
     private static func testDisabledSchedulingFailsClosedEvenWithStandingAuthorization() async throws {
@@ -192,6 +323,52 @@ enum CalendarAutomaticReconciliationTests {
             result.retryState == .scheduled(attempt: 2, nextAttemptAt: fixture.now.addingTimeInterval(5 * 60)),
             "A retry attempt should advance the bounded backoff series")
         try expect(await store.mutationCount() == 0, "Transient snapshot failure must not mutate")
+    }
+
+    private static func testRetryReloadsFreshConfigurationSnapshotAndPlan() async throws {
+        let fixture = AutomaticReconciliationFixture()
+        let provider = CountingAutomaticSettingsProvider(settings: fixture.settings)
+        let stateStore = AutomaticStateStore(state: fixture.authorizedState())
+        let store = RecoveringAutomaticCalendarStore(fixture: fixture)
+        let useCase = fixture.useCase(
+            settingsProvider: provider, calendarStore: store, stateStore: stateStore)
+
+        let first = try await useCase.run()
+        let retry = try await useCase.run(kind: .retry)
+
+        try expect(first.outcome == .transientFailure, "The first inventory failure should schedule a fresh retry")
+        try expect(retry.outcome == .applied, "The recovered retry should build and apply a fresh plan")
+        try expect(await provider.callCount() == 3, "The retry should reload configuration and recheck it before mutation")
+        try expect(await store.listCalendarsCallCount() == 2, "The retry should reload Calendar inventory")
+        try expect(
+            await store.eventRequestCalendarIDs() == [fixture.hub.id, fixture.work.id],
+            "Only the recovered attempt should load a fresh ordered snapshot")
+        try expect(await store.mutationCount() == 1, "The retry should apply only its fresh plan")
+    }
+
+    private static func testLargeValidPlanAppliesWithoutHeuristicLimit() async throws {
+        let fixture = AutomaticReconciliationFixture()
+        let eventCount = 128
+        let workIdentity = CalendarIdentity(
+            id: fixture.work.id, title: fixture.work.title, sourceTitle: fixture.work.sourceTitle)
+        let workEvents = (0..<eventCount).map { index in
+            let start = fixture.now.addingTimeInterval(TimeInterval(index * 10))
+            return CalendarEvent(
+                id: "source-\(index)", calendar: workIdentity, title: "Example \(index)", start: start,
+                end: start.addingTimeInterval(5), isAllDay: false, availability: .busy, status: .confirmed)
+        }
+        let store = AutomaticCalendarStore(
+            calendars: [fixture.hub, fixture.work], eventsByCalendarID: [fixture.work.id: workEvents])
+
+        let result = try await fixture.useCase(
+            calendarStore: store, stateStore: AutomaticStateStore(state: fixture.authorizedState())
+        ).run()
+
+        try expect(result.outcome == .applied, "A large valid deterministic plan should remain authoritative")
+        try expect(
+            result.confirmedCounts.confirmedCreates == eventCount,
+            "Automatic apply should confirm every valid action without a size threshold")
+        try expect(await store.mutationCount() == eventCount, "No valid action should be dropped by a heuristic limit")
     }
 
     private static func testConcurrentRevocationDuringMutationCannotBeResurrected() async throws {
@@ -295,6 +472,22 @@ private actor ChangingAutomaticSettingsProvider: CalendarRelaySettingsProvider {
     }
 }
 
+private actor RequestCapableAutomaticAuthorization: CalendarAuthorizationStatusPort, CalendarFullAccessRequestPort {
+    private let state: CalendarAuthorizationState
+    private var requests = 0
+
+    init(state: CalendarAuthorizationState) { self.state = state }
+
+    func authorizationStatus() async -> CalendarAuthorizationState { state }
+
+    func requestFullAccess() async throws -> Bool {
+        requests += 1
+        return state == .fullAccess
+    }
+
+    func requestCount() -> Int { requests }
+}
+
 private actor ScriptedAutomaticAuthorization: CalendarAuthorizationStatusPort {
     private var states: [CalendarAuthorizationState]
 
@@ -304,6 +497,39 @@ private actor ScriptedAutomaticAuthorization: CalendarAuthorizationStatusPort {
         guard !states.isEmpty else { return .unknown }
         return states.removeFirst()
     }
+}
+
+private struct AutomaticPreflightFailureScenario {
+    let name: String
+    let store: AutomaticCalendarStore
+    let expectedOutcome: CalendarAutomationOutcomeCategory
+    let expectedReads: [PhysicalCalendarReference]
+}
+
+private struct AutomaticConfigurationFailureScenario {
+    let name: String
+    let provider: any CalendarRelaySettingsProvider
+    let expectedOutcome: CalendarAutomationOutcomeCategory
+}
+
+private struct FailingAutomaticSettingsProvider: CalendarRelaySettingsProvider {
+    let error: CalendarRelaySettingsProviderError
+
+    func loadSettings() async throws -> LoadedCalendarRelaySettings { throw error }
+}
+
+private actor CountingAutomaticSettingsProvider: CalendarRelaySettingsProvider {
+    private let settings: CalendarRelaySettings
+    private var calls = 0
+
+    init(settings: CalendarRelaySettings) { self.settings = settings }
+
+    func loadSettings() async throws -> LoadedCalendarRelaySettings {
+        calls += 1
+        return LoadedCalendarRelaySettings(displayPath: "test-configuration", settings: settings)
+    }
+
+    func callCount() -> Int { calls }
 }
 
 private struct AutomaticSettingsProvider: CalendarRelaySettingsProvider {
@@ -328,6 +554,39 @@ private actor AutomaticStateStore: CalendarAutomationStateStore {
         return state
     }
     func currentState() -> CalendarAutomationPersistentState { state }
+}
+
+private actor RecoveringAutomaticCalendarStore: CalendarStorePort {
+    private let fixture: AutomaticReconciliationFixture
+    private var listCalls = 0
+    private var eventRequests: [PhysicalCalendarReference] = []
+    private var mutations = 0
+
+    init(fixture: AutomaticReconciliationFixture) { self.fixture = fixture }
+
+    func listCalendars() async throws -> [RelayCalendar] {
+        listCalls += 1
+        if listCalls == 1 { throw AutomaticStoreFailure() }
+        return [fixture.hub, fixture.work]
+    }
+
+    func events(in calendar: CalendarIdentity, from start: Date, to end: Date) async throws -> [CalendarEvent] {
+        eventRequests.append(calendar.id)
+        guard calendar.id == fixture.work.id else { return [] }
+        return [
+            CalendarEvent(
+                id: "source", calendar: calendar, title: "Example", start: fixture.now,
+                end: fixture.now.addingTimeInterval(100), isAllDay: false, availability: .busy,
+                status: .confirmed)
+        ]
+    }
+
+    func createEvent(_ event: CalendarEventProjection) async throws { mutations += 1 }
+    func deleteEvent(_ event: CalendarEventIdentity) async throws { mutations += 1 }
+
+    func listCalendarsCallCount() -> Int { listCalls }
+    func eventRequestCalendarIDs() -> [PhysicalCalendarReference] { eventRequests }
+    func mutationCount() -> Int { mutations }
 }
 
 private actor BlockingAutomaticCalendarStore: CalendarStorePort {
@@ -375,27 +634,35 @@ private actor AutomaticCalendarStore: CalendarStorePort {
     private let eventsByCalendarID: [PhysicalCalendarReference: [CalendarEvent]]
     private let failOperationNumber: Int?
     private let failCalendarInventory: Bool
+    private let readFailureCalendarIDs: Set<PhysicalCalendarReference>
+    private var listCalls = 0
+    private var eventRequests: [PhysicalCalendarReference] = []
     private var operations = 0
     private var creates = 0
     private var deletes = 0
 
     init(
         calendars: [RelayCalendar], eventsByCalendarID: [PhysicalCalendarReference: [CalendarEvent]],
-        failOperationNumber: Int? = nil, failCalendarInventory: Bool = false
+        failOperationNumber: Int? = nil, failCalendarInventory: Bool = false,
+        readFailureCalendarIDs: Set<PhysicalCalendarReference> = []
     ) {
         self.calendars = calendars
         self.eventsByCalendarID = eventsByCalendarID
         self.failOperationNumber = failOperationNumber
         self.failCalendarInventory = failCalendarInventory
+        self.readFailureCalendarIDs = readFailureCalendarIDs
     }
 
     func listCalendars() async throws -> [RelayCalendar] {
+        listCalls += 1
         if failCalendarInventory { throw AutomaticStoreFailure() }
         return calendars
     }
 
     func events(in calendar: CalendarIdentity, from start: Date, to end: Date) async throws -> [CalendarEvent] {
-        eventsByCalendarID[calendar.id, default: []]
+        eventRequests.append(calendar.id)
+        if readFailureCalendarIDs.contains(calendar.id) { throw AutomaticStoreFailure() }
+        return eventsByCalendarID[calendar.id, default: []]
     }
 
     func createEvent(_ event: CalendarEventProjection) async throws {
@@ -408,7 +675,10 @@ private actor AutomaticCalendarStore: CalendarStorePort {
         deletes += 1
     }
 
+    func listCalendarsCallCount() -> Int { listCalls }
+    func eventRequestCalendarIDs() -> [PhysicalCalendarReference] { eventRequests }
     func mutationCount() -> Int { creates + deletes }
+    func operationAttemptCount() -> Int { operations }
 
     private func recordOperation() throws {
         operations += 1
