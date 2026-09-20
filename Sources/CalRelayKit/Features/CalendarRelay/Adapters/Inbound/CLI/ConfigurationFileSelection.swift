@@ -49,9 +49,11 @@ public enum ConfigurationFileSelection {
 
     public static func select(
         overridePath: String?, homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+        currentDirectory: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true),
         fileExists: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
     ) throws -> SelectedConfigurationFile {
-        let selectedFile = selectedFile(overridePath: overridePath, homeDirectory: homeDirectory)
+        let selectedFile = selectedFile(
+            overridePath: overridePath, homeDirectory: homeDirectory, currentDirectory: currentDirectory)
 
         guard fileExists(selectedFile.path) else { throw MissingConfigurationFileError(selectedFile: selectedFile) }
 
@@ -59,10 +61,21 @@ public enum ConfigurationFileSelection {
     }
 
     public static func selectedFile(
-        overridePath: String?, homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+        overridePath: String?, homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+        currentDirectory: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
     ) -> SelectedConfigurationFile {
         if let overridePath, !overridePath.isEmpty {
-            return SelectedConfigurationFile(path: overridePath, displayPath: overridePath, source: .explicitOverride)
+            let resolvedPath: String
+            if overridePath.hasPrefix("/") {
+                resolvedPath = overridePath
+            } else if overridePath == "~" {
+                resolvedPath = homeDirectory.path
+            } else if overridePath.hasPrefix("~/") {
+                resolvedPath = homeDirectory.appendingPathComponent(String(overridePath.dropFirst(2))).path
+            } else {
+                resolvedPath = currentDirectory.appendingPathComponent(overridePath).path
+            }
+            return SelectedConfigurationFile(path: resolvedPath, displayPath: overridePath, source: .explicitOverride)
         }
 
         let path = homeDirectory.appendingPathComponent(defaultRelativePath).path

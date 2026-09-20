@@ -91,7 +91,7 @@ Tasks `CLI-P01`, `CLI-P02`, and `CLI-P03` are conceptually independent, but `CLI
 
 ## Detailed plan
 
-### - [ ] CLI-P01 — Complete explicit configuration-path resolution
+### - [x] CLI-P01 — Complete explicit configuration-path resolution
 
 Implement all explicit override semantics owned by `CONFIG-04` and required by `CLI-AC-10` at the filesystem adapter boundary.
 
@@ -112,17 +112,19 @@ Implement all explicit override semantics owned by `CONFIG-04` and required by `
 - Preserve a useful user-facing selected-path representation while using the correctly resolved path for filesystem access.
 - Retain distinct missing-file guidance for the canonical default and an explicit override.
 
-#### - [ ] CLI-P01-AC1 — Prove every accepted override form
+#### - [x] CLI-P01-AC1 — Prove every accepted override form
 
 Tests cover the canonical default, absolute override, relative override, exact `~`, and leading `~/...` using injected home and working directories rather than developer state.
 
-#### - [ ] CLI-P01-AC2 — Reject unsupported expansion without reinterpretation
+#### - [x] CLI-P01-AC2 — Reject unsupported expansion without reinterpretation
 
 Tests prove that `~otheruser`, `$HOME/...`, and unrelated tilde-containing paths are not expanded and that missing-file diagnostics retain explicit-override semantics.
 
-#### - [ ] CLI-P01-V1 — Pass focused configuration-selection tests
+#### - [x] CLI-P01-V1 — Pass focused configuration-selection tests
 
 Run `swift run CalRelayKitTests ConfigurationFileSelectionTests` and record the result before continuing.
+
+**Completion evidence (September 20, 2026):** Passed `swift run CalRelayKitTests ConfigurationFileSelectionTests`.
 
 ### - [ ] CLI-P02 — Align ordinary reconciliation output with ordered execution semantics
 
@@ -408,10 +410,10 @@ Do not use `swift test`; this repository uses the `CalRelayKitTests` executable 
 
 ### Configuration-path slice
 
-- [ ] CLI-P01 — Complete explicit configuration-path resolution
-- [ ] CLI-P01-AC1 — Prove every accepted override form
-- [ ] CLI-P01-AC2 — Reject unsupported expansion without reinterpretation
-- [ ] CLI-P01-V1 — Pass focused configuration-selection tests
+- [x] CLI-P01 — Complete explicit configuration-path resolution
+- [x] CLI-P01-AC1 — Prove every accepted override form
+- [x] CLI-P01-AC2 — Reject unsupported expansion without reinterpretation
+- [x] CLI-P01-V1 — Pass focused configuration-selection tests
 
 ### Ordinary presentation slice
 
@@ -461,7 +463,7 @@ Do not use `swift test`; this repository uses the `CalRelayKitTests` executable 
 ## Handoff
 
 - **Plan readiness:** Ready.
-- **Next executable task:** `CLI-P01` — complete explicit configuration-path resolution and focused tests.
+- **Next executable task:** `CLI-P02` — align ordinary reconciliation output with ordered execution semantics and truthful no-change reporting.
 - **Blocking product decisions:** None.
 - **Conditional final checkpoint:** `CLI-P07` requires explicit authorization and suitable harmless dedicated calendars; it does not block automated implementation and validation through `CLI-P06`.
 - **Deferred enhancements:** machine-readable output, new public commands or flags, stable failure-code categories, cross-process locking, provider APIs, and automatic marker-retirement editing remain outside this plan.
