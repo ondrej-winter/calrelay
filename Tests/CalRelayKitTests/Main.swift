@@ -70,6 +70,9 @@ import Foundation
         if filters.isEmpty || filters.contains("CalendarAutomationCoordinationTests") {
             try await CalendarAutomationCoordinationTests.runAll()
         }
+        if filters.isEmpty || filters.contains("CalendarLoginLaunchPolicyTests") {
+            try CalendarLoginLaunchPolicyTests.runAll()
+        }
     }
 
     private static func runCommandSuites(filters: Set<String>) async throws {

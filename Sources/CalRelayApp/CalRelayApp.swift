@@ -36,7 +36,11 @@ import SwiftUI
             automaticReconciliation: automaticReconciliation, automationState: automationState,
             configurationObserver: configurationObserver, automationTriggers: CalendarAutomationTriggerSource(),
             launchAtLogin: CalendarLaunchAtLoginController(),
-            automationAttention: CalendarAutomationAttentionController())
+            automationAttention: CalendarAutomationAttentionController(),
+            launchContext: { (NSApp.delegate as? CalRelayAppDelegate)?.initialLaunchContext ?? .ordinary },
+            resolveInitialLaunchPresentation: { presentation in
+                (NSApp.delegate as? CalRelayAppDelegate)?.resolveInitialLaunchPresentation(presentation)
+            })
         self.viewModel = viewModel
         appDelegate.shouldWarnBeforeQuit = { [weak viewModel] in viewModel?.isSchedulingEnabled == true }
     }

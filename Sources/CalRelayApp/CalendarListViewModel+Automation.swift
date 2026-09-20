@@ -61,6 +61,7 @@ extension CalendarListViewModel {
         applyAutomationState(state)
         refreshLaunchAtLoginSummary()
         await refreshNotificationSummary()
+        prepareInitialLaunchPresentation(using: state)
         if state.schedulingPreference == .enabled {
             automationTriggers.scheduleRetry(state.operationalStatus.retryState)
             await startAutomationTriggersIfNeeded(runLaunchAttempt: true)
@@ -92,12 +93,17 @@ extension CalendarListViewModel {
             do {
                 let result = try await automaticReconciliation.run(kind: kind)
                 automationTriggers.scheduleRetry(result.retryState)
-                applyAutomationState(await automationState.loadState())
+                let state = await automationState.loadState()
+                applyAutomationState(state)
+                completeInitialAutomaticAttemptPresentation(using: state)
                 output = Self.automaticOutput(result)
             } catch CalendarAutomaticReconciliationError.schedulingNotEnabled {
-                applyAutomationState(await automationState.loadState())
+                let state = await automationState.loadState()
+                applyAutomationState(state)
+                completeInitialAutomaticAttemptPresentation(using: state)
             } catch {
                 output = "Scheduled sync could not record its result. Refresh status and try again."
+                completeInitialLaunchPresentation(.showControlPanel)
             }
             finishOperation()
         }
@@ -181,6 +187,39 @@ extension CalendarListViewModel {
 
     func refreshNotificationSummary() async {
         notificationSummary = await automationAttention.authorizationSummary()
+    }
+
+    private func prepareInitialLaunchPresentation(using state: CalendarAutomationPersistentState) {
+        guard !didResolveInitialLaunchPresentation else { return }
+        let presentation = loginLaunchPresentation(using: state)
+        if launchContext() == .loginItem, presentation == .keepControlPanelHidden,
+            state.schedulingPreference == .enabled
+        {
+            isAwaitingInitialAutomaticAttempt = true
+            return
+        }
+        completeInitialLaunchPresentation(presentation)
+    }
+
+    private func completeInitialAutomaticAttemptPresentation(using state: CalendarAutomationPersistentState) {
+        guard isAwaitingInitialAutomaticAttempt else { return }
+        completeInitialLaunchPresentation(loginLaunchPresentation(using: state))
+    }
+
+    private func loginLaunchPresentation(using state: CalendarAutomationPersistentState)
+        -> CalendarLoginLaunchPresentation
+    {
+        guard let controlPanelPrimaryState else { return .showControlPanel }
+        return CalendarLoginLaunchPolicy().presentation(
+            launchContext: launchContext(), controlPanelState: controlPanelPrimaryState, automationState: state,
+            launchAtLoginHealthy: launchAtLogin.currentState() == .enabled, now: Date())
+    }
+
+    func completeInitialLaunchPresentation(_ presentation: CalendarLoginLaunchPresentation) {
+        guard !didResolveInitialLaunchPresentation else { return }
+        didResolveInitialLaunchPresentation = true
+        isAwaitingInitialAutomaticAttempt = false
+        resolveInitialLaunchPresentation(presentation)
     }
 
     private func applyAutomationAttention(_ state: CalendarAutomationPersistentState, overdue: Bool) {

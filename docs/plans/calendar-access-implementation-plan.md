@@ -6,8 +6,8 @@
 - **Related accepted contracts:** [`../specs/configuration-spec.md`](../specs/configuration-spec.md), [`../specs/reconciliation-spec.md`](../specs/reconciliation-spec.md), [`../specs/projection-and-safety-spec.md`](../specs/projection-and-safety-spec.md), [`../specs/cli-spec.md`](../specs/cli-spec.md), and [`../specs/macos-app-spec.md`](../specs/macos-app-spec.md).
 - **Architecture decision:** [`../adr/0001-launch-normal-app-at-login-for-scheduled-sync.md`](../adr/0001-launch-normal-app-at-login-for-scheduled-sync.md).
 - **Readiness:** Ready. Required outcomes, sequencing, privacy constraints, and validation are specific enough to execute without an unresolved product decision.
-- **Progress date:** September 18, 2026.
-- **Implementation state:** Partial. The shared access boundary, non-prompting EventKit adapter, complete preflight, CLI/manual-app flows, cleanup, mutation-time failure handling, exact occurrence handling, reusable privacy contracts, allowlisted automation persistence, and application-only standing-authorization orchestration are implemented. App composition, scheduling, automatic-run coordination, operational presentation/relaunch recovery, and the corresponding live lifecycle validation remain open.
+- **Progress date:** September 19, 2026.
+- **Implementation state:** Partial. The shared access boundary, non-prompting EventKit adapter, complete preflight, CLI/manual-app flows, cleanup, mutation-time failure handling, exact occurrence handling, reusable privacy contracts, allowlisted automation persistence, app scheduling and automatic-run coordination, and operational presentation/relaunch recovery are implemented. Remaining closure is deterministic acceptance mapping plus dedicated-calendar and live macOS lifecycle validation.
 - **Execution approach:** Close only the remaining gaps. Do not replace or duplicate behavior already implemented under the access slice or behavior owned by adjacent accepted specifications.
 
 ## Outcome
@@ -226,14 +226,14 @@ Persist only the latest minimal metadata needed for standing authorization and a
 
 **Evidence:** Purpose-specific application DTOs and the `CalendarAutomationStateStore` port are implemented with a versioned `UserDefaults` adapter. Deterministic tests cover round-trip behavior, opaque semantic binding, prohibited-value absence, unsupported-version recovery, corruption recovery, and authorization-safe reset.
 
-#### - [ ] CA-11B — Extend operational state and relaunch recovery
+#### - [x] CA-11B — Extend operational state and relaunch recovery
 
 - Restore only approved persisted metadata after relaunch and rederive live configuration, authorization, topology, scheduling, retry, and freshness state.
 - Show scheduling and launch-at-login health, standing-authorization state, last attempt, last success, next nominal timer run, active retry, latest safe result/failure category, aggregate mutation counts, and overdue freshness.
 - Preserve the primary recovery order defined by the macOS app specification: configuration, Calendar access, topology, migration, standing authorization, launch-at-login, scheduling/retry/freshness, then healthy state.
 - Discard transient ordinary/cleanup review data after completion, cancellation, failure, or relaunch.
 
-**Progress:** Approved persisted metadata is restored and live scheduling, launch-at-login, authorization, retry, freshness, attention, notification, and Quit-warning presentation is rederived. The remaining gap is healthy login-launch window suppression: AppKit's default-launch indication does not reliably distinguish a login-item launch from an ordinary default user launch, so the app does not hide the control panel based on that signal alone.
+**Evidence:** Approved persisted metadata is restored and live scheduling, launch-at-login, authorization, retry, freshness, attention, notification, and Quit-warning presentation is rederived. The AppKit lifecycle adapter identifies login-item launches from the `kAEOpenApplication` Apple event only when `keyAEPropData` equals `keyAELaunchedAsLogInItem`; it does not use an ambiguous default-launch heuristic. Only that launch context initially suppresses the SwiftUI control panel. After live control-panel state, persisted automation state, and login-item health are available, `CalendarLoginLaunchPolicy` keeps healthy or actively retrying login launches hidden and opens actionable setup, recovery, exhausted-failure, or overdue-freshness states. Healthy launches remain suppressed through the prompt automatic launch attempt. Ordinary Dock/Finder launches stay visible, and a Dock reopen presents the hidden control panel. `CalendarLoginLaunchPolicyTests`, `swift build --product CalRelayApp`, `make format-check`, `make check`, and `make app` pass; an actual login-session behavior check remains under `D05-04C`.
 
 #### - [ ] CA-11-AC1 — Prove persisted disclosure compliance
 
@@ -358,6 +358,7 @@ Validate real EventKit permissions, exact mutations, provider visibility, and au
 
 - Validate standing-authorization grant, relaunch restoration, and invalidation after mutation-relevant configuration, policy-version, or resolved physical-topology change.
 - Validate launch-at-login health, launch/wake runs, fixed cadence, bounded retry, freshness, pause, Quit warning, and notification-denial fallback.
+- Validate that an actual login-item Apple-event launch stays hidden when healthy or actively retrying, opens for actionable recovery, and remains distinct from an ordinary Dock/Finder launch and a later Dock reopen.
 - Validate no overlap, at-most-one coalesced fresh follow-up, pre-mutation selected-file change abort, denial/revocation recovery, and no automatic cleanup.
 
 #### - [ ] D05-04-AC1 — Preserve operator data and record limitations safely

@@ -45,11 +45,15 @@ import SwiftUI
     let automationTriggers: CalendarAutomationTriggerSource
     let launchAtLogin: CalendarLaunchAtLoginController
     let automationAttention: CalendarAutomationAttentionController
+    let launchContext: () -> CalendarAppLaunchContext
+    let resolveInitialLaunchPresentation: (CalendarLoginLaunchPresentation) -> Void
     var operationCoordinator = CalendarAppOperationCoordinator()
     var pendingAutomaticKind: CalendarAutomaticAttemptKind?
     var isAutomationTriggerSourceRunning = false
     private var didStart = false
     private var didRestoreAutomationLifecycle = false
+    var didResolveInitialLaunchPresentation = false
+    var isAwaitingInitialAutomaticAttempt = false
     var controlPanelPrimaryState: CalendarControlPanelPrimaryState?
 
     init(
@@ -62,7 +66,9 @@ import SwiftUI
         configurationObserver: ConfigurationFileObserver,
         automationTriggers: CalendarAutomationTriggerSource,
         launchAtLogin: CalendarLaunchAtLoginController,
-        automationAttention: CalendarAutomationAttentionController
+        automationAttention: CalendarAutomationAttentionController,
+        launchContext: @escaping () -> CalendarAppLaunchContext,
+        resolveInitialLaunchPresentation: @escaping (CalendarLoginLaunchPresentation) -> Void
     ) {
         self.inventory = inventory
         self.setup = setup
@@ -77,6 +83,8 @@ import SwiftUI
         self.automationTriggers = automationTriggers
         self.launchAtLogin = launchAtLogin
         self.automationAttention = automationAttention
+        self.launchContext = launchContext
+        self.resolveInitialLaunchPresentation = resolveInitialLaunchPresentation
     }
 
     func start() {
@@ -103,6 +111,7 @@ import SwiftUI
                 primaryStatus = "Status refresh failed."
                 canRunOrdinarySync = false
                 output = "Status could not be refreshed. Check the configuration and try again."
+                completeInitialLaunchPresentation(.showControlPanel)
             }
 
             if !didRestoreAutomationLifecycle {
