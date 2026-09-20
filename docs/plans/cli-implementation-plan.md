@@ -126,7 +126,7 @@ Run `swift run CalRelayKitTests ConfigurationFileSelectionTests` and record the 
 
 **Completion evidence (September 20, 2026):** Passed `swift run CalRelayKitTests ConfigurationFileSelectionTests`.
 
-### - [ ] CLI-P02 — Align ordinary reconciliation output with ordered execution semantics
+### - [x] CLI-P02 — Align ordinary reconciliation output with ordered execution semantics
 
 Make ordinary dry-run and apply output consume the authoritative ordered actions and report empty-plan success truthfully.
 
@@ -149,21 +149,23 @@ Make ordinary dry-run and apply output consume the authoritative ordered actions
 - For nonempty apply, retain progressive confirmations and report completion only after every ordered action succeeds.
 - Do not perform or claim an ordinary post-apply verification read.
 
-#### - [ ] CLI-P02-AC1 — Prove exact ordinary presentation order
+#### - [x] CLI-P02-AC1 — Prove exact ordinary presentation order
 
 A representative multi-role test asserts hub deletes, declaration-ordered work deletes, hub creates, and declaration-ordered work creates in the same sequence as `OrdinaryReconciliationResult.actions`.
 
-#### - [ ] CLI-P02-AC2 — Prove truthful no-change output
+#### - [x] CLI-P02-AC2 — Prove truthful no-change output
 
 Focused tests cover empty ordinary dry-run and empty ordinary apply, require success wording, and reject any statement that mutations were performed or post-apply state was verified.
 
-#### - [ ] CLI-P02-AC3 — Preserve successful-only confirmations and local apply completion
+#### - [x] CLI-P02-AC3 — Preserve successful-only confirmations and local apply completion
 
 Tests retain confirmation-after-success behavior and prove nonempty apply output does not promise provider convergence or an immediate empty later plan.
 
-#### - [ ] CLI-P02-V1 — Pass focused ordinary CLI tests
+#### - [x] CLI-P02-V1 — Pass focused ordinary CLI tests
 
 Run `swift run CalRelayKitTests ReconcileCommandHandlerTests` and the relevant `CalRelayContractTests` formatter coverage.
+
+**Completion evidence (September 20, 2026):** Passed `swift run CalRelayKitTests ReconcileCommandHandlerTests` and `swift run CalRelayKitTests CalRelayContractTests`.
 
 ### - [ ] CLI-P03 — Complete cleanup review, summaries, and migration guidance
 
@@ -417,11 +419,11 @@ Do not use `swift test`; this repository uses the `CalRelayKitTests` executable 
 
 ### Ordinary presentation slice
 
-- [ ] CLI-P02 — Align ordinary reconciliation output with ordered execution semantics
-- [ ] CLI-P02-AC1 — Prove exact ordinary presentation order
-- [ ] CLI-P02-AC2 — Prove truthful no-change output
-- [ ] CLI-P02-AC3 — Preserve successful-only confirmations and local apply completion
-- [ ] CLI-P02-V1 — Pass focused ordinary CLI tests
+- [x] CLI-P02 — Align ordinary reconciliation output with ordered execution semantics
+- [x] CLI-P02-AC1 — Prove exact ordinary presentation order
+- [x] CLI-P02-AC2 — Prove truthful no-change output
+- [x] CLI-P02-AC3 — Preserve successful-only confirmations and local apply completion
+- [x] CLI-P02-V1 — Pass focused ordinary CLI tests
 
 ### Cleanup presentation slice
 
@@ -463,7 +465,7 @@ Do not use `swift test`; this repository uses the `CalRelayKitTests` executable 
 ## Handoff
 
 - **Plan readiness:** Ready.
-- **Next executable task:** `CLI-P02` — align ordinary reconciliation output with ordered execution semantics and truthful no-change reporting.
+- **Next executable task:** `CLI-P03` — complete cleanup review, summaries, privacy, and migration guidance.
 - **Blocking product decisions:** None.
 - **Conditional final checkpoint:** `CLI-P07` requires explicit authorization and suitable harmless dedicated calendars; it does not block automated implementation and validation through `CLI-P06`.
 - **Deferred enhancements:** machine-readable output, new public commands or flags, stable failure-code categories, cross-process locking, provider APIs, and automatic marker-retirement editing remain outside this plan.

@@ -92,6 +92,7 @@ enum CalRelayContractTests {
         try await Self.testExplanationUsesSharedOrderedActionsAndCreateCausality()
         try Self.testFormatsEmptyReconciliationPlan()
         try Self.testFormatsPlannedCreatesAndDeletes()
+        try Self.testFormatsOrdinaryActionsInSuppliedExecutionOrder()
         try Self.testReconciliationPlanOutputAvoidsDebugDumps()
         try Self.testFormatsCalendarList()
         try Self.testFormatsEventExplanations()
@@ -1147,6 +1148,34 @@ enum CalRelayContractTests {
             "Output should include delete time range")
     }
 
+    private static func testFormatsOrdinaryActionsInSuppliedExecutionOrder() throws {
+        let hub = CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud")
+        let work = CalendarIdentity(id: "work-1", title: "ACME Work", sourceTitle: "Google")
+        let delete = calendarEvent(
+            id: "delete-1", calendar: work, title: "01 work delete", start: Date(timeIntervalSince1970: 1_000),
+            end: Date(timeIntervalSince1970: 2_000))
+        let create = calendarEventProjection(
+            destinationCalendar: hub, title: "02 hub create", start: Date(timeIntervalSince1970: 3_000),
+            end: Date(timeIntervalSince1970: 4_000))
+        let laterDelete = calendarEvent(
+            id: "delete-2", calendar: work, title: "03 supplied later delete",
+            start: Date(timeIntervalSince1970: 5_000), end: Date(timeIntervalSince1970: 6_000))
+        let actions: [CalendarMutationAction] = [
+            .delete(role: .work(name: "ACME", declarationIndex: 0), event: delete), .create(role: .hub, event: create),
+            .delete(role: .work(name: "ACME", declarationIndex: 0), event: laterDelete)
+        ]
+        let result = OrdinaryReconciliationResult(
+            plan: ReconciliationPlan(creates: [create], deletes: [delete, laterDelete]), actions: actions)
+
+        let output = ReconciliationPlanFormatter.format(result)
+
+        try expect(output.contains("Deletes (2)"), "Ordinary output should retain the aggregate delete count")
+        try expect(output.contains("Creates (1)"), "Ordinary output should retain the aggregate create count")
+        try expectOutputOrder(
+            ["01 work delete", "02 hub create", "03 supplied later delete"], in: output,
+            message: "Ordinary detailed rows should follow the authoritative supplied action order")
+    }
+
     private static func testReconciliationPlanOutputAvoidsDebugDumps() throws {
         let output = ReconciliationPlanFormatter.format(
             ReconciliationPlan(creates: [calendarEventProjection(title: "[ACME] Client Planning")], deletes: []))
@@ -1610,6 +1639,16 @@ enum CalRelayContractTests {
 
     private static func expect(_ condition: Bool, _ message: String) throws {
         guard condition else { throw ContractTestFailure(message) }
+    }
+
+    private static func expectOutputOrder(_ values: [String], in output: String, message: String) throws {
+        var searchStart = output.startIndex
+        for value in values {
+            guard let range = output.range(of: value, range: searchStart..<output.endIndex) else {
+                throw ContractTestFailure("\(message): missing \(value)")
+            }
+            searchStart = range.upperBound
+        }
     }
 }
 

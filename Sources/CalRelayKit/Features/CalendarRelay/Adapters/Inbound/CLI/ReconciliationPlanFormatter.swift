@@ -16,20 +16,25 @@ public enum ReconciliationPlanFormatter {
     public static func format(_ result: OrdinaryReconciliationResult) -> String {
         if result.actions.isEmpty { return "No changes planned." }
 
-        let deletes = result.actions.compactMap { action -> CalendarEvent? in
-            guard case .delete(_, let event) = action else { return nil }
-            return event
+        let deleteCount = result.actions.count { action in
+            if case .delete = action { return true }
+            return false
         }
-        let creates = result.actions.compactMap { action -> CalendarEventProjection? in
-            guard case .create(_, let event) = action else { return nil }
-            return event
+        let createCount = result.actions.count { action in
+            if case .create = action { return true }
+            return false
         }
 
-        var lines: [String] = ["Deletes (\(deletes.count))"]
-        lines.append(contentsOf: deletes.map(formatDelete))
-        lines.append("Creates (\(creates.count))")
-        lines.append(contentsOf: creates.map(formatCreate))
+        var lines = ["Deletes (\(deleteCount))", "Creates (\(createCount))", "Actions in execution order"]
+        lines.append(contentsOf: result.actions.map(formatAction))
         return lines.joined(separator: "\n")
+    }
+
+    private static func formatAction(_ action: CalendarMutationAction) -> String {
+        switch action {
+        case .delete(_, let event): formatDelete(event)
+        case .create(_, let event): formatCreate(event)
+        }
     }
 
     private static func formatCreate(_ event: CalendarEventProjection) -> String {

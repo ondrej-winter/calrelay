@@ -75,10 +75,18 @@ public struct ReconcileCommandHandler: Sendable {
         } else {
             result = try await useCase.dryRunResult(settings: settings, now: currentDate)
         }
-        let modeMessage =
-            apply
-            ? "Apply mode. Planned calendar mutations were performed."
-            : "Dry-run mode. No calendar mutations were performed."
+        let modeMessage: String
+        if result.actions.isEmpty {
+            modeMessage =
+                apply
+                ? "Apply mode completed successfully. No ordinary reconciliation changes were needed; no calendar mutations were performed."
+                : "Dry-run mode completed successfully. No ordinary reconciliation changes are needed; no calendar mutations were performed."
+        } else {
+            modeMessage =
+                apply
+                ? "Apply mode completed successfully. All planned calendar mutations were confirmed."
+                : "Dry-run mode. No calendar mutations were performed."
+        }
 
         return [modeMessage, ReconciliationPlanFormatter.format(result)].joined(separator: "\n")
     }

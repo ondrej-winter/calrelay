@@ -16,10 +16,16 @@ actor CommandHandlerCalendarStore: CalendarStorePort {
     private var recordedDeletes: [CalendarEventIdentity] = []
     private var listCalendarsCalls = 0
     private var recordedEventRequests: [PhysicalCalendarReference] = []
+    private let failMutationNumber: Int?
+    private var mutationAttempts = 0
 
-    init(calendars: [RelayCalendar], eventsByCalendarID: [PhysicalCalendarReference: [CalendarEvent]] = [:]) {
+    init(
+        calendars: [RelayCalendar], eventsByCalendarID: [PhysicalCalendarReference: [CalendarEvent]] = [:],
+        failMutationNumber: Int? = nil
+    ) {
         self.calendars = calendars
         self.eventsByCalendarID = eventsByCalendarID
+        self.failMutationNumber = failMutationNumber
     }
 
     func listCalendars() async throws -> [RelayCalendar] {
@@ -32,9 +38,13 @@ actor CommandHandlerCalendarStore: CalendarStorePort {
         return eventsByCalendarID[calendar.id, default: []]
     }
 
-    func createEvent(_ event: CalendarEventProjection) async throws { recordedCreates.append(event) }
+    func createEvent(_ event: CalendarEventProjection) async throws {
+        try recordMutationAttempt()
+        recordedCreates.append(event)
+    }
 
     func deleteEvent(_ event: CalendarEventIdentity) async throws {
+        try recordMutationAttempt()
         recordedDeletes.append(event)
         eventsByCalendarID[event.calendar.id, default: []].removeAll { $0.identity == event }
     }
@@ -46,4 +56,11 @@ actor CommandHandlerCalendarStore: CalendarStorePort {
     func listCalendarsCallCount() -> Int { listCalendarsCalls }
 
     func eventRequestCalendarIDs() -> [PhysicalCalendarReference] { recordedEventRequests }
+
+    private func recordMutationAttempt() throws {
+        mutationAttempts += 1
+        if mutationAttempts == failMutationNumber { throw CommandHandlerCalendarStoreFailure() }
+    }
 }
+
+private struct CommandHandlerCalendarStoreFailure: Error {}
