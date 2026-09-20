@@ -1,12 +1,17 @@
 import AppKit
 import CalRelayKit
 import CoreServices
+import SwiftUI
 
 @MainActor final class CalRelayAppDelegate: NSObject, NSApplicationDelegate {
     var shouldWarnBeforeQuit: () -> Bool = { false }
     private(set) var initialLaunchContext = CalendarAppLaunchContext.ordinary
     private var isSuppressingInitialLoginWindow = false
     private var windowPresentationObserver: NSObjectProtocol?
+    private var uiTestViewModel: CalendarListViewModel?
+    private var uiTestWindow: NSWindow?
+
+    func configureUITestWindow(viewModel: CalendarListViewModel) { uiTestViewModel = viewModel }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         initialLaunchContext = Self.launchContext(for: NSAppleEventManager.shared().currentAppleEvent)
@@ -19,6 +24,18 @@ import CoreServices
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if let uiTestViewModel {
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 820, height: 860),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+            window.title = "CalRelay"
+            window.center()
+            window.contentView = NSHostingView(rootView: CalendarListView(viewModel: uiTestViewModel))
+            window.makeKeyAndOrderFront(nil)
+            uiTestWindow = window
+            NSApp.activate()
+            return
+        }
         if isSuppressingInitialLoginWindow { hideControlPanel() }
     }
 

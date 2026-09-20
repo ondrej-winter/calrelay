@@ -4,6 +4,7 @@ import Foundation
 
 public final class ConfigurationFileObserver: @unchecked Sendable {
     private let selectedFile: SelectedConfigurationFile
+    private let isEnabled: Bool
     private let queue = DispatchQueue(label: "dev.owinter.CalRelay.configuration-observer")
     private var source: DispatchSourceFileSystemObject?
     private var timer: DispatchSourceTimer?
@@ -11,11 +12,15 @@ public final class ConfigurationFileObserver: @unchecked Sendable {
     private var lastFingerprint: FileFingerprint?
     private var onChange: (@Sendable () -> Void)?
 
-    public init(selectedFile: SelectedConfigurationFile) { self.selectedFile = selectedFile }
+    public init(selectedFile: SelectedConfigurationFile, isEnabled: Bool = true) {
+        self.selectedFile = selectedFile
+        self.isEnabled = isEnabled
+    }
 
     deinit { stop() }
 
     public func start(onChange: @escaping @Sendable () -> Void) {
+        guard isEnabled else { return }
         queue.sync { [self] in
             self.onChange = onChange
             lastFingerprint = fingerprint()

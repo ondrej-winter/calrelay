@@ -47,6 +47,7 @@ import SwiftUI
     let automationAttention: CalendarAutomationAttentionController
     let launchContext: () -> CalendarAppLaunchContext
     let resolveInitialLaunchPresentation: (CalendarLoginLaunchPresentation) -> Void
+    let automaticAttemptsEnabled: Bool
     var operationCoordinator = CalendarAppOperationCoordinator()
     var pendingAutomaticKind: CalendarAutomaticAttemptKind?
     var isAutomationTriggerSourceRunning = false
@@ -68,7 +69,8 @@ import SwiftUI
         launchAtLogin: CalendarLaunchAtLoginController,
         automationAttention: CalendarAutomationAttentionController,
         launchContext: @escaping () -> CalendarAppLaunchContext,
-        resolveInitialLaunchPresentation: @escaping (CalendarLoginLaunchPresentation) -> Void
+        resolveInitialLaunchPresentation: @escaping (CalendarLoginLaunchPresentation) -> Void,
+        automaticAttemptsEnabled: Bool = true
     ) {
         self.inventory = inventory
         self.setup = setup
@@ -85,6 +87,7 @@ import SwiftUI
         self.automationAttention = automationAttention
         self.launchContext = launchContext
         self.resolveInitialLaunchPresentation = resolveInitialLaunchPresentation
+        self.automaticAttemptsEnabled = automaticAttemptsEnabled
     }
 
     func start() {

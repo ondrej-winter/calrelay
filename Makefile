@@ -1,17 +1,21 @@
-.PHONY: help resolve build test lint format format-check check app commit clean require-swift-format require-swiftlint
+.PHONY: help resolve build test ui-test lint format format-check check app commit clean require-swift-format require-swiftlint
 
 SWIFT_FORMAT ?= $(shell command -v swift-format 2>/dev/null || xcrun --find swift-format 2>/dev/null || printf '%s' swift-format)
 SWIFTLINT ?= $(shell command -v swiftlint 2>/dev/null || test ! -x /opt/homebrew/bin/swiftlint || printf '%s' /opt/homebrew/bin/swiftlint || printf '%s' swiftlint)
 XCODE_DEVELOPER_DIR ?= /Applications/Xcode.app/Contents/Developer
+UI_TEST_WORKSPACE_KEY := $(shell printf '%s' "$(CURDIR)" | /usr/bin/shasum -a 256 | /usr/bin/cut -d ' ' -f 1)
+UI_TEST_DERIVED_DATA ?= $(HOME)/Library/Caches/dev.owinter.CalRelay/xcode-ui-tests/$(UI_TEST_WORKSPACE_KEY)
+UI_TEST_RESULT_BUNDLE ?= $(CURDIR)/.build/CalRelayUITests.xcresult
 
-SWIFT_FORMAT_PATHS := Package.swift Sources Tests
-SWIFTLINT_PATHS := Sources Tests Package.swift
+SWIFT_FORMAT_PATHS := Package.swift Sources Tests UITests
+SWIFTLINT_PATHS := Sources Tests UITests Package.swift
 
 help:
 	@printf '%s\n' 'CalRelay developer targets:'
 	@printf '  %-14s %s\n' 'resolve' 'Resolve Swift package dependencies and update Package.resolved when needed'
 	@printf '  %-14s %s\n' 'build' 'Build all SwiftPM products'
 	@printf '  %-14s %s\n' 'test' 'Run deterministic SwiftPM tests'
+	@printf '  %-14s %s\n' 'ui-test' 'Run fake-backed macOS UI smoke tests'
 	@printf '  %-14s %s\n' 'format-check' 'Check Swift formatting without modifying files'
 	@printf '  %-14s %s\n' 'format' 'Apply Swift formatting in place'
 	@printf '  %-14s %s\n' 'lint' 'Run SwiftLint'
@@ -28,6 +32,16 @@ build:
 
 test:
 	swift run CalRelayKitTests
+
+ui-test:
+	zsh scripts/build-calrelay-ui-test-app.sh
+	rm -rf "$(UI_TEST_RESULT_BUNDLE)"
+	DEVELOPER_DIR="$(XCODE_DEVELOPER_DIR)" /usr/bin/xcodebuild test \
+		-project CalRelayUITests.xcodeproj \
+		-scheme CalRelayUITests \
+		-destination 'platform=macOS' \
+		-derivedDataPath "$(UI_TEST_DERIVED_DATA)" \
+		-resultBundlePath "$(UI_TEST_RESULT_BUNDLE)"
 
 format-check: require-swift-format
 	$(SWIFT_FORMAT) lint --recursive $(SWIFT_FORMAT_PATHS)

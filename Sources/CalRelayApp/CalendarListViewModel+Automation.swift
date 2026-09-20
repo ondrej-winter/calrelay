@@ -117,7 +117,7 @@ extension CalendarListViewModel {
             isAutomationTriggerSourceRunning = true
             try? await automationState.setNextNominalRunAt(nextNominalRunAt)
         }
-        if runLaunchAttempt { requestAutomaticAttempt(kind: .ordinary) }
+        if runLaunchAttempt && automaticAttemptsEnabled { requestAutomaticAttempt(kind: .ordinary) }
     }
 
     func stopAutomationTriggers() {

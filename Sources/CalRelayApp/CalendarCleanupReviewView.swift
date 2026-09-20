@@ -8,10 +8,11 @@ struct CalendarCleanupReviewView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(viewModel.cleanupAllowsConfirmation ? "Review Legacy Cleanup" : "Legacy Cleanup Dry Run").font(.title2)
-            Text(viewModel.cleanupNotice)
+                .accessibilityIdentifier("cleanup-review-title")
+            Text(viewModel.cleanupNotice).accessibilityIdentifier("cleanup-review-notice")
             ScrollView {
                 Text(CalendarManualCleanupFormatter.formatReview(review)).font(.system(.body, design: .monospaced))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("cleanup-review-output")
             }
             Text(
                 "Only these ordered deletions are reviewed. Confirmation reloads configuration and calendars; changed targets or order require new review. Verification covers only this local range, not global or historical retirement."
@@ -21,13 +22,13 @@ struct CalendarCleanupReviewView: View {
             ).font(.footnote)
             HStack {
                 Button(viewModel.cleanupAllowsConfirmation ? "Cancel" : "Close") { viewModel.cancelCleanupReview() }
-                    .keyboardShortcut(.cancelAction)
+                    .keyboardShortcut(.cancelAction).accessibilityIdentifier("cleanup-review-cancel")
                 Spacer()
                 if viewModel.cleanupAllowsConfirmation {
                     Button(
                         viewModel.isLoading ? "Checking, deleting and verifying…" : "Confirm Legacy Cleanup",
                         role: .destructive
-                    ) { viewModel.confirmCleanup() }
+                    ) { viewModel.confirmCleanup() }.accessibilityIdentifier("cleanup-review-confirm")
                 }
             }.disabled(viewModel.isLoading)
         }.padding(24).frame(width: 620, height: 500).interactiveDismissDisabled()

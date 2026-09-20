@@ -13,6 +13,9 @@ This page describes the main source and test areas in the repository. The root `
 ## Tests
 
 - `Tests/CalRelayKitTests/`: consolidated deterministic executable test runner for shared library, CLI-support, and contract behavior; it uses fakes and does not require real EventKit access.
+- `UITests/CalRelayUITests/`: XCUITest smoke workflows for deterministic macOS app presentation and review/cancellation flows.
+- `CalRelayUITests.xcodeproj/`: minimal UI-test-only Xcode project and shared scheme. `Package.swift` remains authoritative for application products, library targets, and dependencies.
+- `Resources/CalRelayUITestHost/` and `scripts/build-calrelay-ui-test-app.sh`: separately identified, ad-hoc-signed fake host packaging used only by XCUITest. Generated host bundles live outside the workspace and `.build/CalRelayUITestHost.app` is a symlink.
 
 ## Documentation
 

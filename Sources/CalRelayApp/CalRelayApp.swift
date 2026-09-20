@@ -6,6 +6,13 @@ import SwiftUI
     private let viewModel: CalendarListViewModel
 
     init() {
+        if let scenario = CalendarUITestScenario.current(arguments: CommandLine.arguments) {
+            let viewModel = CalendarUITestComposition.makeViewModel(scenario: scenario)
+            self.viewModel = viewModel
+            appDelegate.configureUITestWindow(viewModel: viewModel)
+            return
+        }
+
         let authorization = EventKitCalendarAuthorizationStatus()
         let calendarStore = EventKitCalendarStore(authorizationStatus: authorization)
         let selectedFile = ConfigurationFileSelection.selectedFile(overridePath: nil)

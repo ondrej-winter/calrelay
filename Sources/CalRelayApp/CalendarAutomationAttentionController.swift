@@ -4,20 +4,23 @@ import UserNotifications
 
 @MainActor final class CalendarAutomationAttentionController: NSObject, UNUserNotificationCenterDelegate {
     private static let notificationIdentifier = "calendar-automation-attention"
-    private let center = UNUserNotificationCenter.current()
+    private let center: UNUserNotificationCenter?
     private var currentReason: CalendarAutomationAttentionReason?
 
-    override init() {
+    init(isEnabled: Bool = true) {
+        center = isEnabled ? UNUserNotificationCenter.current() : nil
         super.init()
-        center.delegate = self
+        center?.delegate = self
     }
 
     func requestAuthorization() async {
+        guard let center else { return }
         _ = try? await center.requestAuthorization(options: [.alert, .badge])
     }
 
     func authorizationSummary() async -> String {
-        switch await center.notificationSettings().authorizationStatus {
+        guard let center else { return "Disabled in the isolated UI-test host." }
+        return switch await center.notificationSettings().authorizationStatus {
         case .notDetermined: "Not requested. In-app and Dock fallback state remains active."
         case .denied: "Denied. Scheduling remains available with in-app and Dock fallback state."
         case .authorized: "Authorized for actionable recovery and overdue-freshness alerts."
@@ -29,6 +32,7 @@ import UserNotifications
     func update(reason: CalendarAutomationAttentionReason?) {
         let changed = reason != currentReason
         currentReason = reason
+        guard let center else { return }
         NSApp.dockTile.badgeLabel = reason == nil ? nil : "!"
         NSApp.dockTile.display()
 
@@ -49,6 +53,7 @@ import UserNotifications
     }
 
     private func deliverIfAuthorized(_ reason: CalendarAutomationAttentionReason) async {
+        guard let center else { return }
         let authorization = await center.notificationSettings().authorizationStatus
         guard authorization == .authorized || authorization == .provisional else { return }
 

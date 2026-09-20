@@ -2,6 +2,15 @@
 
 CalRelay's default local test gate is deterministic and does not require real Apple Calendar data. EventKit behavior depends on local Calendar state, permissions, and writable calendars, so capability checks use the built `CalRelay.app` bundle, which has its own stable macOS permission identity.
 
+Run `make ui-test` before this checklist when app UI code changes. The fake-backed
+suite already covers deterministic missing-configuration and unavailable-access
+states, privacy-safe ready inventory and dry-run output, ordinary review
+cancellation, cleanup review cancellation, and scheduled-sync authorization with
+pause/resume. The manual checks below remain for real TCC transitions, EventKit
+topology/read/write behavior, provider propagation, configuration-file
+observation, login/wake/timer lifecycle, notifications, recurring events, and
+actual harmless test-calendar mutation.
+
 Use harmless test calendars before relying on CalRelay for real calendars.
 
 The examples below use `--config calrelay.yml` as an explicit local validation fixture override. Everyday CLI usage defaults to `~/.config/calrelay/config.yaml`; see [`configuration.md`](configuration.md) for the canonical configuration location.
@@ -18,18 +27,16 @@ Use **Set Up or Recover Calendar Access** to trigger the permission prompt for b
 ## Implemented Calendar access and readiness checks
 
 1. Open `.build/CalRelay.app` and confirm CalRelay appears as a normal Dock-visible app with no CalRelay menu-bar item.
-2. Confirm the main window shows distinct configuration, Calendar access, configured-readiness, and migration states.
-3. With Calendar access not determined, click **Set Up or Recover Calendar Access** and confirm the macOS full-access prompt appears for `dev.owinter.CalRelay`.
-4. Deny or revoke access, refresh status, and confirm the app provides System Settings recovery guidance without prompting again. Repeat with write-only access if available and confirm it is treated as insufficient.
-5. With restricted access, confirm the app explains that the restriction must be resolved outside CalRelay.
-6. With full access, click the setup/recovery action again and confirm it verifies state without prompting.
-7. Click **Show Calendar Inventory** and confirm source/account, title, and writable/read-only state are shown without EventKit calendar IDs and without claiming configured readiness.
-8. Remove or invalidate `~/.config/calrelay/config.yaml` while the app is open. Confirm the status refreshes automatically, configuration recovery becomes primary, configuration-dependent actions remain disabled, and no Calendar prompt appears.
-9. Restore or atomically replace the file with a valid configuration. Confirm the app automatically reloads current status rather than requiring a manual refresh or using the prior settings.
-10. Confirm readiness rejects missing, ambiguous, physically colliding, unreadable, or read-only roles. Create several simultaneous failures and confirm every safely determinable issue is shown without event details or EventKit IDs.
-11. Add a legacy marker and confirm a ready topology reports migration pending separately from readiness.
-12. With a ready non-migration configuration, click **Dry Run Sync** and confirm the app reloads current configuration and Calendar state, reports only aggregate planned delete/create counts, performs no mutation, and displays no event titles or EventKit IDs.
-13. Run CLI inventory, config check, ordinary dry-run, explanation, and cleanup while access is unavailable. Confirm every command fails nonzero with app recovery guidance and none triggers a permission prompt.
+2. With Calendar access not determined, click **Set Up or Recover Calendar Access** and confirm the macOS full-access prompt appears for `dev.owinter.CalRelay`.
+3. Deny or revoke access, refresh status, and confirm the app provides System Settings recovery guidance without prompting again. Repeat with write-only access if available and confirm it is treated as insufficient.
+4. With restricted access, confirm the app explains that the restriction must be resolved outside CalRelay.
+5. With full access, click the setup/recovery action again and confirm it verifies state without prompting.
+6. Click **Show Calendar Inventory** and compare it with the calendars visible in Apple Calendar. Confirm source/account, title, and writable/read-only state are accurate without EventKit calendar IDs and without claiming configured readiness.
+7. Remove or invalidate `~/.config/calrelay/config.yaml` while the app is open. Confirm the status refreshes automatically, configuration recovery becomes primary, configuration-dependent actions remain disabled, and no Calendar prompt appears.
+8. Restore or atomically replace the file with a valid configuration. Confirm the app automatically reloads current status rather than requiring a manual refresh or using the prior settings.
+9. Confirm readiness rejects real missing, ambiguous, physically colliding, unreadable, or read-only roles. Create several simultaneous failures and confirm every safely determinable issue is shown without event details or EventKit IDs.
+10. With a ready non-migration configuration, click **Dry Run Sync** and compare aggregate counts with the fresh harmless test-calendar state. Confirm no mutation occurs and no event titles or EventKit IDs are displayed.
+11. Run CLI inventory, config check, ordinary dry-run, explanation, and cleanup while access is unavailable. Confirm every command fails nonzero with app recovery guidance and none triggers a permission prompt.
 
 Use only harmless dedicated calendars for steps that can mutate EventKit data.
 
@@ -37,29 +44,27 @@ Use only harmless dedicated calendars for steps that can mutate EventKit data.
 
 Use only confirmed dedicated test calendars for these mutation checks. Do not replace an existing personal configuration just to run them.
 
-1. Click **Run Sync Now** and confirm an aggregate review appears without event details or mutation. Cancel and confirm nothing changes.
-2. Confirm an unchanged fresh plan and verify delete-first execution and aggregate confirmed counts. Ordinary completion does not perform post-apply verification or imply immediate provider convergence.
-3. Change an exact action, physical destination, occurrence, or order while the review is open. Confirm the old confirmation causes no mutation and a new review is required, even with identical counts. Rationale-only changes with identical executable actions do not require renewed confirmation.
-4. Change mutation-relevant configuration during review, or invalidate/remove it before mutation. Confirm no stale configuration is used. A changed semantic identity requires fresh review even for an empty plan; comments and diagnostic role-name changes do not change mutation identity.
-5. Cause a partial failure only on harmless test calendars. Confirm later actions stop, no rollback occurs, and recovery requires a new manual review. No per-event details are included in the partial result.
-6. Confirm repeated clicks cannot start overlapping manual operations, a consumed confirmation cannot be reused, and migration pending disables ordinary actions.
+1. Confirm an unchanged fresh plan and verify real EventKit delete-first execution and aggregate confirmed counts. Ordinary completion does not perform post-apply verification or imply immediate provider convergence.
+2. Change an exact action, physical destination, occurrence, or order while the review is open. Confirm the old confirmation causes no mutation and a new review is required, even with identical counts. Rationale-only changes with identical executable actions do not require renewed confirmation.
+3. Change mutation-relevant configuration during review, or invalidate/remove it before mutation. Confirm no stale configuration is used. A changed semantic identity requires fresh review even for an empty plan; comments and diagnostic role-name changes do not change mutation identity.
+4. Cause a partial failure only on harmless test calendars. Confirm later actions stop, no rollback occurs, and recovery requires a new manual review. No per-event details are included in the partial result.
+5. Confirm repeated clicks cannot start overlapping manual operations and a consumed confirmation cannot be reused.
 
 ## Implemented app automation checks
 
 Use harmless dedicated calendars for all checks that can reach automatic mutation. The deterministic test gate covers orchestration and policy; these checks exercise macOS lifecycle, Login Items, notifications, Dock state, and the built app bundle.
 
-1. Confirm scheduling cannot be enabled until a successful fresh ordinary dry run is reviewed and explicit standing authorization is granted. Confirm setup itself performs no mutation.
-2. Grant standing authorization. Confirm CalRelay requests user-notification permission, enables launch-at-login for the normal Dock-visible app, queues a fresh launch attempt, and shows scheduling, login-item, authorization, attempt/success, outcome/count, next-run, retry, and freshness state separately.
-3. Deny user-notification permission. Confirm scheduling remains enabled and actionable recovery or overdue freshness remains visible in the control panel and through the Dock badge. Grant permission separately and confirm only actionable recovery or overdue freshness—not every failed attempt—produces a notification.
-4. With scheduling enabled, validate a fresh attempt at every app launch and Mac wake, the fixed 15-minute timer cadence, and fresh bounded retries after 1, 5, and 15 minutes for transient failures or partial automatic mutation. Confirm repeated triggers during active work produce at most one later fresh attempt and never overlap manual or cleanup work.
-5. Pause scheduling. Confirm timers/retries stop, launch-at-login remains unchanged, no automatic launch attempt runs, and the paused/degraded attention state remains visible. Resume with valid standing authorization and confirm a fresh automatic attempt is queued; invalidate authorization and confirm resume is rejected until a new review.
-6. Disable or require approval for CalRelay in **System Settings > General > Login Items** while scheduling remains enabled. Click **Refresh Status** and confirm the login-item row, primary recovery state, and Dock attention update together. Use **Enable Launch at Login** and confirm all three surfaces refresh again.
-7. With scheduling enabled, choose **Quit** and confirm the warning explains that synchronization stops while the normal app is not running. Cancel once, then quit and confirm scheduling and launch-at-login preferences remain persisted. Confirm no warning appears when scheduling is paused or disabled.
-8. Relaunch after prior operation history. Confirm only privacy-safe timestamps, categories, aggregate counts, retry, scheduling, and freshness metadata return; no event details, raw configuration, selectors, marker values, calendar names, EventKit IDs, or transient review data reappear.
-9. Confirm topology, policy, mutation-relevant configuration, or unproven physical-calendar identity changes revoke standing authorization and prevent automatic mutation. Confirm representation-only YAML changes refresh status without requiring renewed authorization.
-10. Establish a healthy state with scheduling and launch-at-login enabled, quit CalRelay, and then log out and back in or restart the Mac. Do not substitute `open .build/CalRelay.app`: an ordinary open does not carry the login-item Apple-event signal. Confirm the normal Dock-visible app process starts, runs its fresh launch attempt, does not activate itself, and keeps the control-panel window closed when the resulting state is healthy or has a bounded retry pending.
-11. Repeat an actual login launch with one safe actionable condition at a time, such as paused scheduling, a missing or invalid canonical configuration, revoked Calendar access, invalidated standing authorization, migration pending, an exhausted transient/partial failure, or overdue freshness. Confirm the control panel opens and becomes active with the dependency-ordered recovery state. Restore the healthy fixture between cases.
-12. After a healthy hidden login launch, click the CalRelay Dock icon and confirm the control panel opens. Quit and use `open .build/CalRelay.app`; confirm an ordinary Finder/Dock-style launch presents the control panel immediately rather than applying login-item suppression.
+1. Grant standing authorization. Confirm CalRelay requests user-notification permission, enables launch-at-login for the normal Dock-visible app, queues a fresh launch attempt, and shows scheduling, login-item, authorization, attempt/success, outcome/count, next-run, retry, and freshness state separately.
+2. Deny user-notification permission. Confirm scheduling remains enabled and actionable recovery or overdue freshness remains visible in the control panel and through the Dock badge. Grant permission separately and confirm only actionable recovery or overdue freshness—not every failed attempt—produces a notification.
+3. With scheduling enabled, validate a fresh attempt at every app launch and Mac wake, the fixed 15-minute timer cadence, and fresh bounded retries after 1, 5, and 15 minutes for transient failures or partial automatic mutation. Confirm repeated triggers during active work produce at most one later fresh attempt and never overlap manual or cleanup work.
+4. Pause scheduling and confirm real timers/retries stop, launch-at-login remains unchanged, and no automatic launch attempt runs. Resume with valid standing authorization and confirm a fresh automatic attempt is queued; invalidate authorization and confirm resume is rejected until a new review.
+5. Disable or require approval for CalRelay in **System Settings > General > Login Items** while scheduling remains enabled. Click **Refresh Status** and confirm the login-item row, primary recovery state, and Dock attention update together. Use **Enable Launch at Login** and confirm all three surfaces refresh again.
+6. With scheduling enabled, choose **Quit** and confirm the warning explains that synchronization stops while the normal app is not running. Cancel once, then quit and confirm scheduling and authorization remain persisted for the next launch.
+7. Relaunch and confirm a fresh automatic attempt runs only when scheduling is enabled and authorization remains valid. Confirm configuration, policy, or physical-topology changes invalidate authorization before mutation.
+8. Confirm successful empty and mutating automatic runs update last success, while blocked or failed runs do not. Exhaust bounded retries and confirm the retry state stops and actionable recovery remains visible.
+9. Perform an actual login launch with a healthy authorized fixture. Confirm the Dock-visible app process starts, automatic reconciliation runs, and the control-panel window remains closed when the resulting state is healthy or has a bounded retry pending.
+10. Repeat an actual login launch with one safe actionable condition at a time, such as paused scheduling, a missing or invalid canonical configuration, revoked Calendar access, invalidated standing authorization, migration pending, an exhausted transient/partial failure, or overdue freshness. Confirm the control panel opens and becomes active with the dependency-ordered recovery state. Restore the healthy fixture between cases.
+11. After a healthy hidden login launch, click the CalRelay Dock icon and confirm the control panel opens. Quit and use `open .build/CalRelay.app`; confirm an ordinary Finder/Dock-style launch presents the control panel immediately rather than applying login-item suppression.
 
 Record the tested macOS version, app build identity, exact login transition used, and pass/fail outcome without calendar names, event titles, identifiers, configuration contents, or other personal data. Actual login-item delivery and window behavior remain manual-only lifecycle evidence; the deterministic suite covers the presentation policy separately.
 
@@ -181,15 +186,14 @@ Use only harmless, dedicated test calendars. Cleanup is a broad deletion workflo
 
 Validate this separate review/confirmation flow using confirmed dedicated test calendars and the canonical configuration. Do not replace an existing personal configuration merely to exercise the UI. Full-access live acceptance remains an explicit operator check; deterministic tests are not evidence of real EventKit deletion or provider convergence.
 
-1. Confirm migration pending blocks **Dry Run Sync**, **Run Sync Now**, and automatic reconciliation but exposes separate cleanup actions.
-2. Click **Dry Run Legacy Cleanup** and confirm it shows the cleanup range, deletion count, and a transient execution-ordered row for each selected event containing its title with the leading legacy marker omitted, configured role, and time or all-day range. IDs, selectors, calendar titles, and explicit marker values must be absent. The sheet offers only **Close**, never confirmation or mutation.
-3. Click **Run Legacy Cleanup…** and confirm it first runs a fresh dry run, then requires **Confirm Legacy Cleanup** for that detailed plan. **Cancel** discards authorization without mutation. Other app operations remain blocked during review and apply; repeated clicks must not overlap deletion.
-4. Change an exact target, occurrence, physical calendar, action order, cleanup range, or mutation-relevant configuration before confirmation. Confirm the old authorization performs no deletion and a fresh ordered review is required, even when counts match. Changes that leave the ordered executable actions and configuration identity unchanged do not require reconfirmation.
-5. Invalidate or remove the selected file after snapshot loading but before deletion. Confirm every deletion is prevented and the stale confirmation cannot be reused. A later attempt requires a fresh review.
-6. Apply only against harmless test calendars and confirm success requires the complete post-mutation bounded-range verification snapshot, including for an empty plan. Success remains local and point-in-time, not proof of global or historical retirement.
-7. Cause a partial deletion failure, verification read failure, or remaining verification match on harmless test calendars. Confirm the result is unsuccessful, preserves confirmed deletion counts, omits event details and raw errors, and never rolls back, retries automatically, or deletes newly found matches in that run. Recovery requires refresh and a new review/confirmation.
-8. Close or complete the review and confirm per-event rows disappear. Relaunch and confirm review content is not restored or logged. Persisted operational history and scheduled-sync authorization checks remain pending until automation is implemented.
-9. Confirm the app does not edit YAML or enable ordinary sync after cleanup; remove the tombstone manually only after the topology's migration is complete, then refresh status.
+1. Click **Dry Run Legacy Cleanup** and compare the cleanup range, deletion count, configured roles, titles, and time/all-day ranges with the real harmless test-calendar state. IDs, selectors, calendar titles, and explicit marker values must be absent.
+2. Confirm **Run Legacy Cleanup…** requires **Confirm Legacy Cleanup** before any real EventKit deletion. Other app operations remain blocked during review and apply; repeated clicks must not overlap deletion.
+3. Change an exact target, occurrence, physical calendar, action order, cleanup range, or mutation-relevant configuration before confirmation. Confirm the old authorization performs no deletion and a fresh ordered review is required, even when counts match. Changes that leave the ordered executable actions and configuration identity unchanged do not require reconfirmation.
+4. Invalidate or remove the selected file after snapshot loading but before deletion. Confirm every deletion is prevented and the stale confirmation cannot be reused. A later attempt requires a fresh review.
+5. Apply only against harmless test calendars and confirm success requires the complete post-mutation bounded-range verification snapshot, including for an empty plan. Success remains local and point-in-time, not proof of global or historical retirement.
+6. Cause a partial deletion failure, verification read failure, or remaining verification match on harmless test calendars. Confirm the result is unsuccessful, preserves confirmed deletion counts, omits event details and raw errors, and never rolls back, retries automatically, or deletes newly found matches in that run. Recovery requires refresh and a new review/confirmation.
+7. Relaunch and confirm transient review content is not restored or logged.
+8. Confirm the app does not edit YAML or enable ordinary sync after cleanup; remove the tombstone manually only after the topology's migration is complete, then refresh status.
 
 ## Recurring-event capability check
 

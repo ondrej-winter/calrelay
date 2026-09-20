@@ -8,10 +8,14 @@ enum CalendarLaunchAtLoginState: Equatable {
 }
 
 struct CalendarLaunchAtLoginController {
+    private let isEnabled: Bool
     private let service = SMAppService.mainApp
 
+    init(isEnabled: Bool = true) { self.isEnabled = isEnabled }
+
     func currentState() -> CalendarLaunchAtLoginState {
-        switch service.status {
+        guard isEnabled else { return .enabled }
+        return switch service.status {
         case .enabled: .enabled
         case .notRegistered: .disabled
         case .requiresApproval: .requiresApproval
@@ -21,6 +25,7 @@ struct CalendarLaunchAtLoginController {
     }
 
     func enable() throws {
+        guard isEnabled else { return }
         guard service.status != .enabled else { return }
         try service.register()
     }

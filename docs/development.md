@@ -6,6 +6,7 @@ This page is the canonical local development reference for requirements, build c
 
 - macOS 26+
 - Swift 6.2+
+- Xcode 27+ for macOS UI tests
 - `make` for the canonical local development commands
 - `swift-format` for formatting checks
 - SwiftLint for lint checks
@@ -20,6 +21,7 @@ Use the `Makefile` as the canonical local tooling entrypoint:
 ```sh
 make help
 make check
+make ui-test
 make app
 make commit
 ```
@@ -39,7 +41,35 @@ swift run calrelay --help
 
 `make test` is the local deterministic test gate. It runs `swift run CalRelayKitTests` and does not require real EventKit access, real calendars, `CalRelay.app`, Swift Testing, XCTest, or a separately selected full Xcode toolchain.
 
+`make ui-test` is a separate fake-backed macOS UI smoke lane. It requires full
+Xcode at `XCODE_DEVELOPER_DIR` (default:
+`/Applications/Xcode.app/Contents/Developer`) and runs the shared
+`CalRelayUITests` scheme. The command builds an ad-hoc-signed host with the
+separate bundle identifier `dev.owinter.CalRelay.UITestHost`, launches only
+explicit deterministic scenarios, and never uses EventKit, requests Calendar or
+notification permission, registers launch-at-login, starts wake/timer triggers,
+or reads production persistence. The suite covers:
+
+- missing configuration;
+- Calendar access unavailable;
+- ready-state inventory and ordinary dry run;
+- manual-sync review and cancellation;
+- migration-cleanup review and cancellation; and
+- scheduled-sync authorization with pause/resume.
+
+UI tests intentionally remain outside `make check`. Run them when app sources,
+accessibility contracts, fake UI composition, or the UI-test harness changes.
+The external DerivedData cache lives under
+`~/Library/Caches/dev.owinter.CalRelay/xcode-ui-tests`; the isolated app bundle
+lives under `~/Library/Caches/dev.owinter.CalRelay/ui-test-builds` and is linked
+at `.build/CalRelayUITestHost.app`. The latest result bundle is
+`.build/CalRelayUITests.xcresult`. These caches are disposable and are not
+removed by `make clean`.
+
 The package manifest (`Package.swift`) is the source of truth for products, targets, and dependencies. Keep `Package.resolved` committed with intentional dependency resolution updates.
+`CalRelayUITests.xcodeproj` owns only the XCTest UI-test bundle and shared scheme;
+it does not replace or duplicate the SwiftPM app and library target graph. See
+[ADR 0003](adr/0003-use-xctest-only-for-isolated-ui-automation.md).
 
 Run `make commit` to create a Conventional Commit with Fabrica using the repository skill root and configured model. Review the staged changes before invoking it because the command starts a Git commit workflow.
 
