@@ -2,7 +2,15 @@ import AppKit
 import CalRelayKit
 import UserNotifications
 
-@MainActor final class CalendarAutomationAttentionController: NSObject, UNUserNotificationCenterDelegate {
+@MainActor protocol CalendarAutomationAttentionControlling: AnyObject {
+    func requestAuthorization() async
+    func authorizationSummary() async -> String
+    func update(reason: CalendarAutomationAttentionReason?)
+}
+
+@MainActor final class CalendarAutomationAttentionController: NSObject, CalendarAutomationAttentionControlling,
+    UNUserNotificationCenterDelegate
+{
     private static let notificationIdentifier = "calendar-automation-attention"
     private let center: UNUserNotificationCenter?
     private var currentReason: CalendarAutomationAttentionReason?

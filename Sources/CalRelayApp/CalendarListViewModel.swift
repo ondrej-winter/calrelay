@@ -44,7 +44,7 @@ import SwiftUI
     let automationState: CalendarAutomationStateUseCase
     let automationTriggers: CalendarAutomationTriggerSource
     let launchAtLogin: CalendarLaunchAtLoginController
-    let automationAttention: CalendarAutomationAttentionController
+    let automationAttention: any CalendarAutomationAttentionControlling
     let launchContext: () -> CalendarAppLaunchContext
     let resolveInitialLaunchPresentation: (CalendarLoginLaunchPresentation) -> Void
     let automaticAttemptsEnabled: Bool
@@ -67,7 +67,7 @@ import SwiftUI
         configurationObserver: ConfigurationFileObserver,
         automationTriggers: CalendarAutomationTriggerSource,
         launchAtLogin: CalendarLaunchAtLoginController,
-        automationAttention: CalendarAutomationAttentionController,
+        automationAttention: any CalendarAutomationAttentionControlling,
         launchContext: @escaping () -> CalendarAppLaunchContext,
         resolveInitialLaunchPresentation: @escaping (CalendarLoginLaunchPresentation) -> Void,
         automaticAttemptsEnabled: Bool = true

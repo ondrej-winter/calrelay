@@ -1,3 +1,4 @@
+import AppKit
 import CalRelayKit
 import Foundation
 
@@ -5,7 +6,9 @@ enum CalendarUITestScenario: String {
     case missingConfiguration = "missing-configuration"
     case calendarAccessUnavailable = "calendar-access-unavailable"
     case ready
+    case manualApplyFailure = "manual-apply-failure"
     case migrationPending = "migration-pending"
+    case cleanupApplyFailure = "cleanup-apply-failure"
 
     static func current(arguments: [String]) -> CalendarUITestScenario? {
         guard arguments.contains("--calrelay-ui-testing") else { return nil }
@@ -57,7 +60,7 @@ enum CalendarUITestScenario: String {
             configurationObserver: ConfigurationFileObserver(selectedFile: selectedFile, isEnabled: false),
             automationTriggers: CalendarAutomationTriggerSource(isEnabled: false),
             launchAtLogin: CalendarLaunchAtLoginController(isEnabled: false),
-            automationAttention: CalendarAutomationAttentionController(isEnabled: false), launchContext: { .ordinary },
+            automationAttention: CalendarUITestAttentionController(), launchContext: { .ordinary },
             resolveInitialLaunchPresentation: { _ in }, automaticAttemptsEnabled: false)
     }
 }
@@ -76,7 +79,8 @@ private struct CalendarUITestFixture {
 
         let hub = RelayCalendar(id: "ui-hub", title: "Test Hub", sourceTitle: "Test Account", isWritable: true)
         let work = RelayCalendar(id: "ui-work", title: "Test Work", sourceTitle: "Test Account", isWritable: true)
-        let legacyMarkers = scenario == .migrationPending ? ["[RETIRED_TEST]"] : []
+        let legacyMarkers =
+            scenario == .migrationPending || scenario == .cleanupApplyFailure ? ["[RETIRED_TEST]"] : []
         let settings = CalendarRelaySettings(
             hubCalendar: HubCalendarSettings(
                 calendar: CalendarSelector(sourceTitle: hub.sourceTitle, calendarTitle: hub.title)),
@@ -99,20 +103,22 @@ private struct CalendarUITestFixture {
                     LoadedCalendarRelaySettings(displayPath: "~/.config/calrelay/config.yaml", settings: settings)))
             authorization = CalendarUITestAuthorization(state: .denied)
             calendarStore = CalendarUITestCalendarStore(calendars: [hub, work], events: [:])
-        case .ready:
+        case .ready, .manualApplyFailure:
             settingsProvider = CalendarUITestSettingsProvider(
                 result: .success(
                     LoadedCalendarRelaySettings(displayPath: "~/.config/calrelay/config.yaml", settings: settings)))
             authorization = CalendarUITestAuthorization(state: .fullAccess)
             calendarStore = CalendarUITestCalendarStore(
-                calendars: [hub, work], events: [work.id: [Self.sourceEvent(calendar: work, now: now)]])
-        case .migrationPending:
+                calendars: [hub, work], events: [work.id: [Self.sourceEvent(calendar: work, now: now)]],
+                failsCreate: scenario == .manualApplyFailure)
+        case .migrationPending, .cleanupApplyFailure:
             settingsProvider = CalendarUITestSettingsProvider(
                 result: .success(
                     LoadedCalendarRelaySettings(displayPath: "~/.config/calrelay/config.yaml", settings: settings)))
             authorization = CalendarUITestAuthorization(state: .fullAccess)
             calendarStore = CalendarUITestCalendarStore(
-                calendars: [hub, work], events: [hub.id: [Self.legacyEvent(calendar: hub, now: now)]])
+                calendars: [hub, work], events: [hub.id: [Self.legacyEvent(calendar: hub, now: now)]],
+                failsDelete: scenario == .cleanupApplyFailure)
         }
     }
 
@@ -158,10 +164,17 @@ private actor CalendarUITestAuthorization: CalendarAuthorizationStatusPort, Cale
 private actor CalendarUITestCalendarStore: CalendarStorePort {
     private let calendars: [RelayCalendar]
     private var events: [PhysicalCalendarReference: [CalendarEvent]]
+    private let failsCreate: Bool
+    private let failsDelete: Bool
 
-    init(calendars: [RelayCalendar], events: [PhysicalCalendarReference: [CalendarEvent]]) {
+    init(
+        calendars: [RelayCalendar], events: [PhysicalCalendarReference: [CalendarEvent]], failsCreate: Bool = false,
+        failsDelete: Bool = false
+    ) {
         self.calendars = calendars
         self.events = events
+        self.failsCreate = failsCreate
+        self.failsDelete = failsDelete
     }
 
     func listCalendars() async throws -> [RelayCalendar] { calendars }
@@ -171,6 +184,7 @@ private actor CalendarUITestCalendarStore: CalendarStorePort {
     }
 
     func createEvent(_ event: CalendarEventProjection) async throws {
+        if failsCreate { throw CalendarUITestStoreFailure() }
         let id = "ui-created-\(events.values.reduce(0) { $0 + $1.count })"
         events[event.destinationCalendar.id, default: []].append(
             CalendarEvent(
@@ -179,7 +193,23 @@ private actor CalendarUITestCalendarStore: CalendarStorePort {
     }
 
     func deleteEvent(_ event: CalendarEventIdentity) async throws {
+        if failsDelete { throw CalendarUITestStoreFailure() }
         events[event.calendar.id, default: []].removeAll { $0.identity == event }
+    }
+}
+
+private struct CalendarUITestStoreFailure: Error {}
+
+@MainActor private final class CalendarUITestAttentionController: CalendarAutomationAttentionControlling {
+    func requestAuthorization() async {}
+
+    func authorizationSummary() async -> String {
+        "Denied. Scheduling remains available with in-app and Dock fallback state."
+    }
+
+    func update(reason: CalendarAutomationAttentionReason?) {
+        NSApp.dockTile.badgeLabel = reason == nil ? nil : "!"
+        NSApp.dockTile.display()
     }
 }
 

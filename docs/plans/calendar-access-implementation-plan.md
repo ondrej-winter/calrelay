@@ -7,7 +7,7 @@
 - **Architecture decision:** [`../adr/0001-launch-normal-app-at-login-for-scheduled-sync.md`](../adr/0001-launch-normal-app-at-login-for-scheduled-sync.md).
 - **Readiness:** Ready. Required outcomes, sequencing, privacy constraints, and validation are specific enough to execute without an unresolved product decision.
 - **Progress date:** September 20, 2026.
-- **Implementation state:** Partial. The shared access boundary, non-prompting EventKit adapter, complete preflight, CLI/manual-app flows, cleanup, mutation-time failure handling, exact occurrence handling, reusable privacy contracts, allowlisted automation persistence, app scheduling and automatic-run coordination, operational presentation/relaunch recovery, deterministic acceptance mapping, documentation reconciliation, and current repository gates are complete. Remaining closure is the explicit `CA-11-V1` evidence gap plus dedicated-calendar and live macOS lifecycle validation; the final handoff gates must be rerun after those remaining changes.
+- **Implementation state:** Partial. The shared access boundary, non-prompting EventKit adapter, complete preflight, CLI/manual-app flows, cleanup, mutation-time failure handling, exact occurrence handling, reusable privacy contracts, allowlisted automation persistence, app scheduling and automatic-run coordination, operational presentation/relaunch recovery, maintained notification-denial and transient-review-disposal evidence, deterministic acceptance mapping, documentation reconciliation, and current repository gates are complete. Remaining closure is dedicated-calendar and live macOS lifecycle validation; the final handoff gates must be rerun after any resulting changes.
 - **Execution approach:** Close only the remaining gaps. Do not replace or duplicate behavior already implemented under the access slice or behavior owned by adjacent accepted specifications.
 
 ## Outcome
@@ -230,7 +230,7 @@ Run exact registered suites covering standing authorization, automatic execution
 
 **Evidence:** `CalendarStandingAuthorizationTests`, `CalendarAutomaticReconciliationTests`, and `CalendarAutomationCoordinationTests` pass through the custom SwiftPM executable runner, and `swift build --product CalRelayApp` passes.
 
-### - [ ] CA-11 — Complete privacy-safe persistence and operational presentation
+### - [x] CA-11 — Complete privacy-safe persistence and operational presentation
 
 Persist only the latest minimal metadata needed for standing authorization and app recovery across relaunch. Extend presentation without weakening reusable access diagnostics or retaining transient cleanup/event detail.
 
@@ -263,11 +263,11 @@ Stored data, relaunch state, persistent diagnostics, and notifications contain o
 
 **Evidence:** `CalendarAutomationPersistenceTests` proves allowlisted round-trip and negative serialized disclosure; automatic result tests retain only safe categories and aggregate counts; and `CalendarAutomationCoordinationTests` proves every notification title/body is fixed reason-category copy without Calendar or configuration payload.
 
-#### - [ ] CA-11-V1 — Pass persistence and presentation suites
+#### - [x] CA-11-V1 — Pass persistence and presentation suites
 
 Run round-trip, version/corruption, negative disclosure, relaunch recovery, notification-denial, transient-review disposal, and primary-state-precedence tests.
 
-**Open evidence:** Registered persistence, corruption recovery, safe-copy notification, login-launch policy, configuration-change review invalidation, and primary-state precedence suites pass. Keep this broader validation item open until notification-denial behavior and complete transient-review disposal are mapped to and run through an explicit maintained suite; actual login-session behavior remains separately pending under `D05-04C`.
+**Evidence:** On September 20, 2026, the fake-backed macOS UI suite passes all 9 registered scenarios. Maintained coverage proves that ordinary and cleanup review data is discarded after successful and failed apply attempts and is not restored after app relaunch. A fake notification controller reports denied authorization without changing system notification permissions; scheduling remains enabled while the in-app fallback attention state stays visible. Registered persistence, corruption recovery, safe-copy notification, login-launch policy, configuration-change review invalidation, and primary-state precedence suites also pass through `make check`. Actual notification-permission transitions and login-session behavior remain separately pending under `D05-04C`.
 
 ### - [x] CA-12 — Complete deterministic acceptance coverage
 
@@ -304,7 +304,7 @@ Maintain a test/evidence map for `ACCESS-AC-01` through `ACCESS-AC-15`; leave an
 
 Run focused exact suite names while iterating, then pass the full `swift run CalRelayKitTests` path through the repository quality gate.
 
-**Evidence:** The acceptance evidence map above identifies deterministic and explicitly manual-only evidence for `ACCESS-AC-01` through `ACCESS-AC-15`. The focused calendar-access/automation suite set and the complete `make test` custom-runner path pass on September 20, 2026. OS-mediated EventKit, notification-permission, and login-session behavior remains pending only where identified under `D05-04` or `CA-11-V1`.
+**Evidence:** The acceptance evidence map above identifies deterministic and explicitly manual-only evidence for `ACCESS-AC-01` through `ACCESS-AC-15`. The focused calendar-access/automation suite set and the complete `make test` custom-runner path pass on September 20, 2026. Fake-backed notification-denial fallback and transient-review disposal are covered under `CA-11-V1`; OS-mediated EventKit, real notification-permission transitions, and login-session behavior remain pending only where identified under `D05-04`.
 
 ### - [ ] CA-13 — Update operational documentation and complete validation
 
@@ -321,7 +321,7 @@ Update canonical project references after implementation and perform the complet
 - Distinguish deterministic evidence, live EventKit evidence, local mutation confirmation, cleanup verification, and provider convergence.
 - Synchronize detailed and dashboard checkboxes and record concise completion evidence or blockers.
 
-**Evidence:** This plan now synchronizes the completed `CA-10`, implemented `CA-11A`/`CA-11B`/`CA-11-AC1`, completed deterministic `CA-12`, open `CA-11-V1`, and wholly pending `D05-04` state. The acceptance map separates registered deterministic suites from unperformed EventKit, notification-permission, and login-session checks. Existing `docs/configuration.md`, `docs/development.md`, and `docs/manual-validation.md` already describe the implemented operator behavior and explicit live-validation boundary, so no duplicate project-reference changes were needed.
+**Evidence:** This plan now synchronizes the completed `CA-10`, completed `CA-11`, completed deterministic `CA-12`, and wholly pending `D05-04` state. The acceptance map separates registered deterministic and fake-backed UI suites from unperformed real EventKit, notification-permission-transition, and login-session checks. Existing `docs/configuration.md`, `docs/development.md`, and `docs/manual-validation.md` already describe the implemented operator behavior and explicit live-validation boundary, so no duplicate project-reference changes were needed.
 
 #### - [x] CA-13B — Run the complete repository gates
 
@@ -348,7 +348,7 @@ The accepted specifications, application behavior, operational references, manua
 
 All required repository checks pass, or every unresolved failure is identified with command output, scope, and impact. No check is claimed as passed unless it was run.
 
-**Evidence:** All current required gates pass as recorded under `CA-13B`. This validates the present change set only; rerun the gates after closing `CA-11-V1` or performing any resulting repository edits for `D05-04` before marking the `CA-13` parent complete.
+**Evidence:** All current required gates pass as recorded under `CA-13B`, including the maintained UI evidence that closes `CA-11-V1`. This validates the present change set only; rerun the gates after performing any resulting repository edits for `D05-04` before marking the `CA-13` parent complete.
 
 ### - [x] D05-01 — Repair and verify local app packaging
 
@@ -491,13 +491,13 @@ Calendar Access revision 7 is complete only when:
 - [x] CA-10-AC2 — Prove fresh-plan and completion semantics
 - [x] CA-10-V1 — Pass focused automatic-operation suites
 
-### Remaining persistence and presentation
+### Completed persistence and presentation
 
-- [ ] CA-11 — Complete privacy-safe persistence and operational presentation
+- [x] CA-11 — Complete privacy-safe persistence and operational presentation
 - [x] CA-11A — Add allowlisted standing-authorization and status persistence
 - [x] CA-11B — Extend operational state and relaunch recovery
 - [x] CA-11-AC1 — Prove persisted disclosure compliance
-- [ ] CA-11-V1 — Pass persistence and presentation suites
+- [x] CA-11-V1 — Pass persistence and presentation suites
 
 ### Completed deterministic coverage
 
@@ -527,4 +527,4 @@ Calendar Access revision 7 is complete only when:
 
 ## Next executable work
 
-Close the remaining explicit `CA-11-V1` evidence gap with maintained notification-denial and transient-review-disposal coverage. Then perform `D05-04` only with dedicated harmless calendars and an actual macOS login session, preserving every manual checkbox as pending until observed. After those checks, finish the `CA-13` handoff without treating provider convergence or unperformed live validation as an automated pass.
+Perform `D05-04` only with dedicated harmless calendars and an actual macOS login session, preserving every manual checkbox as pending until observed. After those checks, finish the `CA-13` handoff and rerun the required gates without treating provider convergence or unperformed live validation as an automated pass.

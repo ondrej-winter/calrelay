@@ -61,6 +61,26 @@ import XCTest
             "operation-output", in: app, contains: "Sync review cancelled. No calendar mutations were performed.")
     }
 
+    func testManualSyncReviewIsDisposedAfterCompletionAndFailure() {
+        let successfulApp = launch(scenario: "ready")
+        waitUntilEnabled(element("run-sync-now", in: successfulApp))
+        element("run-sync-now", in: successfulApp).click()
+        assertElement("manual-review-title", in: successfulApp, contains: "Review Sync Plan")
+        element("manual-review-confirm", in: successfulApp).click()
+        waitUntilMissing(element("manual-review-title", in: successfulApp))
+        assertElement("operation-output", in: successfulApp, contains: "Sync completed")
+        successfulApp.terminate()
+
+        let failingApp = launch(scenario: "manual-apply-failure")
+        defer { failingApp.terminate() }
+        waitUntilEnabled(element("run-sync-now", in: failingApp))
+        element("run-sync-now", in: failingApp).click()
+        assertElement("manual-review-title", in: failingApp, contains: "Review Sync Plan")
+        element("manual-review-confirm", in: failingApp).click()
+        waitUntilMissing(element("manual-review-title", in: failingApp))
+        assertElement("operation-output", in: failingApp, contains: "Sync partially applied")
+    }
+
     func testMigrationCleanupReviewIsSeparateAndTransient() {
         let app = launch(scenario: "migration-pending")
         defer { app.terminate() }
@@ -82,6 +102,50 @@ import XCTest
             "operation-output", in: app, contains: "Cleanup review closed. No calendar mutations were performed.")
     }
 
+    func testCleanupReviewIsDisposedAfterCompletionAndFailure() {
+        let successfulApp = launch(scenario: "migration-pending")
+        waitUntilEnabled(element("run-legacy-cleanup", in: successfulApp))
+        element("run-legacy-cleanup", in: successfulApp).click()
+        assertElement("cleanup-review-title", in: successfulApp, contains: "Review Legacy Cleanup")
+        element("cleanup-review-confirm", in: successfulApp).click()
+        waitUntilMissing(element("cleanup-review-title", in: successfulApp))
+        assertElement("operation-output", in: successfulApp, contains: "Cleanup verified")
+        successfulApp.terminate()
+
+        let failingApp = launch(scenario: "cleanup-apply-failure")
+        defer { failingApp.terminate() }
+        waitUntilEnabled(element("run-legacy-cleanup", in: failingApp))
+        element("run-legacy-cleanup", in: failingApp).click()
+        assertElement("cleanup-review-title", in: failingApp, contains: "Review Legacy Cleanup")
+        element("cleanup-review-confirm", in: failingApp).click()
+        waitUntilMissing(element("cleanup-review-title", in: failingApp))
+        assertElement("operation-output", in: failingApp, contains: "Cleanup unsuccessful")
+    }
+
+    func testTransientReviewsAreNotRestoredAfterRelaunch() {
+        let manualApp = launch(scenario: "ready")
+        waitUntilEnabled(element("run-sync-now", in: manualApp))
+        element("run-sync-now", in: manualApp).click()
+        assertElement("manual-review-title", in: manualApp, contains: "Review Sync Plan")
+        manualApp.terminate()
+
+        let relaunchedManualApp = launch(scenario: "ready")
+        XCTAssertFalse(element("manual-review-title", in: relaunchedManualApp).waitForExistence(timeout: 1))
+        waitUntilEnabled(element("run-sync-now", in: relaunchedManualApp))
+        relaunchedManualApp.terminate()
+
+        let cleanupApp = launch(scenario: "migration-pending")
+        waitUntilEnabled(element("run-legacy-cleanup", in: cleanupApp))
+        element("run-legacy-cleanup", in: cleanupApp).click()
+        assertElement("cleanup-review-title", in: cleanupApp, contains: "Review Legacy Cleanup")
+        cleanupApp.terminate()
+
+        let relaunchedCleanupApp = launch(scenario: "migration-pending")
+        defer { relaunchedCleanupApp.terminate() }
+        XCTAssertFalse(element("cleanup-review-title", in: relaunchedCleanupApp).waitForExistence(timeout: 1))
+        waitUntilEnabled(element("run-legacy-cleanup", in: relaunchedCleanupApp))
+    }
+
     func testScheduledSyncAuthorizationPauseAndResume() {
         let app = launch(scenario: "ready")
         defer { app.terminate() }
@@ -101,7 +165,8 @@ import XCTest
 
         waitUntilEnabled(element("pause-scheduled-sync", in: app))
         assertElement("operation-output", in: app, contains: "Scheduled sync resumed")
-        assertElement("notification-status", in: app, contains: "Disabled in the isolated UI-test host")
+        assertElement("notification-status", in: app, contains: "Denied. Scheduling remains available")
+        assertElement("automation-attention-status", in: app, contains: "within the last hour")
     }
 
     private func launch(scenario: String) -> XCUIApplication {
