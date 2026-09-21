@@ -5,7 +5,7 @@
 - **Requirements basis:** [`../specs/cli-spec.md`](../specs/cli-spec.md), revision 7, accepted September 16, 2026.
 - **Related accepted contracts:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), [`../specs/configuration-spec.md`](../specs/configuration-spec.md), and [`../specs/reconciliation-spec.md`](../specs/reconciliation-spec.md).
 - **Readiness:** Ready. Required outcomes, sequencing, architectural boundaries, privacy constraints, and validation are specific enough to execute without an unresolved product decision.
-- **Progress date:** September 20, 2026.
+- **Progress date:** September 21, 2026.
 - **Implementation state:** Partial. The command hierarchy, shared application use cases, preflight behavior, planning, mutation execution, cleanup verification, explanation, and initial CLI tests exist. This plan closes conformance and evidence gaps instead of rebuilding the CLI.
 - **Execution approach:** Implement small CLI-facing vertical slices, add focused deterministic evidence with each slice, then add process-level coverage and complete the repository gates.
 - **Workspace constraint:** Preserve the pre-existing staged deletion of `docs/plans/calendar-access-implementation-plan.md`. Do not restore, modify, stage, or otherwise include it in CLI implementation work.
@@ -167,7 +167,7 @@ Run `swift run CalRelayKitTests ReconcileCommandHandlerTests` and the relevant `
 
 **Completion evidence (September 20, 2026):** Passed `swift run CalRelayKitTests ReconcileCommandHandlerTests` and `swift run CalRelayKitTests CalRelayContractTests`.
 
-### - [ ] CLI-P03 — Complete cleanup review, summaries, and migration guidance
+### - [x] CLI-P03 — Complete cleanup review, summaries, and migration guidance
 
 Close cleanup presentation gaps without changing shared cleanup selection, mutation authorization, or verification behavior.
 
@@ -191,21 +191,23 @@ Close cleanup presentation gaps without changing shared cleanup selection, mutat
 - After verified success, state that CalRelay did not edit configuration and direct the operator to remove tombstones manually only after eventual-convergence migration is complete for the topology.
 - Distinguish dry-run no-match in the loaded snapshot from apply no-match in the post-mutation verification snapshot.
 
-#### - [ ] CLI-P03-AC1 — Prove complete role and count reporting
+#### - [x] CLI-P03-AC1 — Prove complete role and count reporting
 
 Tests cover hub and multiple work roles, including zero-count roles, and verify role summaries and detailed rows retain configuration and execution order.
 
-#### - [ ] CLI-P03-AC2 — Prove cleanup privacy and local-scope wording
+#### - [x] CLI-P03-AC2 — Prove cleanup privacy and local-scope wording
 
 Tests use sentinel marker values, selectors, calendar titles, and EventKit IDs and assert their absence while retaining approved title, role, and time-range review details and rejecting global-retirement claims.
 
-#### - [ ] CLI-P03-AC3 — Prove direct apply and post-success guidance
+#### - [x] CLI-P03-AC3 — Prove direct apply and post-success guidance
 
 Tests require the fresh apply plan before mutation, non-interactive authorization wording, successful-only confirmations, verified no-match success, no automatic YAML edit claim, and eventual-convergence tombstone guidance.
 
-#### - [ ] CLI-P03-V1 — Pass focused cleanup CLI tests
+#### - [x] CLI-P03-V1 — Pass focused cleanup CLI tests
 
 Run `swift run CalRelayKitTests ReconcileCommandHandlerTests`, `CalendarCleanupAccessTests`, and `CalendarAccessPrivacyTests`.
+
+**Completion evidence (September 21, 2026):** Passed `swift run CalRelayKitTests ReconcileCommandHandlerTests`, `swift run CalRelayKitTests CalendarCleanupAccessTests`, and `swift run CalRelayKitTests CalendarAccessPrivacyTests`.
 
 ### - [ ] CLI-P04 — Complete deterministic handler and acceptance evidence
 
@@ -427,11 +429,11 @@ Do not use `swift test`; this repository uses the `CalRelayKitTests` executable 
 
 ### Cleanup presentation slice
 
-- [ ] CLI-P03 — Complete cleanup review, summaries, and migration guidance
-- [ ] CLI-P03-AC1 — Prove complete role and count reporting
-- [ ] CLI-P03-AC2 — Prove cleanup privacy and local-scope wording
-- [ ] CLI-P03-AC3 — Prove direct apply and post-success guidance
-- [ ] CLI-P03-V1 — Pass focused cleanup CLI tests
+- [x] CLI-P03 — Complete cleanup review, summaries, and migration guidance
+- [x] CLI-P03-AC1 — Prove complete role and count reporting
+- [x] CLI-P03-AC2 — Prove cleanup privacy and local-scope wording
+- [x] CLI-P03-AC3 — Prove direct apply and post-success guidance
+- [x] CLI-P03-V1 — Pass focused cleanup CLI tests
 
 ### Deterministic acceptance coverage
 
@@ -465,7 +467,7 @@ Do not use `swift test`; this repository uses the `CalRelayKitTests` executable 
 ## Handoff
 
 - **Plan readiness:** Ready.
-- **Next executable task:** `CLI-P03` — complete cleanup review, summaries, privacy, and migration guidance.
+- **Next executable task:** `CLI-P04` — complete deterministic handler and acceptance evidence.
 - **Blocking product decisions:** None.
 - **Conditional final checkpoint:** `CLI-P07` requires explicit authorization and suitable harmless dedicated calendars; it does not block automated implementation and validation through `CLI-P06`.
 - **Deferred enhancements:** machine-readable output, new public commands or flags, stable failure-code categories, cross-process locking, provider APIs, and automatic marker-retirement editing remain outside this plan.

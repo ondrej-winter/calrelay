@@ -11,8 +11,10 @@ enum ReconcileCommandHandlerTests {
         try await testApplyFailureOnlyConfirmsCompletedActions()
         try await testReconcileHandlerFormatsExplanationFromInjectedStoreAndConfig()
         try await testOrdinaryMigrationPendingFailsBeforeCalendarAccess()
-        try await testCleanupDryRunFormatsReviewWithoutMutation()
+        try await testCleanupDryRunReportsCompleteRoleSummariesAndPrivateOrderedReview()
+        try await testCleanupDryRunNoMatchUsesLoadedSnapshotScope()
         try await testCleanupApplyEmitsFreshReviewAndProgressiveConfirmation()
+        try await testCleanupApplyNoMatchUsesVerificationSnapshotScope()
     }
 
     private static func testReconcileHandlerFormatsDryRunPlanFromInjectedStoreAndConfig() async throws {
@@ -265,28 +267,85 @@ enum ReconcileCommandHandlerTests {
         throw TestFailure("Expected migration-pending ordinary reconciliation failure")
     }
 
-    private static func testCleanupDryRunFormatsReviewWithoutMutation() async throws {
-        let fixture = reconciliationFixture()
-        let cleanupEvent = CalendarEvent(
-            id: "legacy-1", calendar: fixture.workEvent.calendar, title: "[OLD] Client Planning",
-            start: fixture.workEvent.start, end: fixture.workEvent.end, isAllDay: false, availability: .busy,
-            status: .confirmed)
-        let configURL = try writeTemporaryConfigFile(legacyMarkers: ["[OLD]"])
+    private static func testCleanupDryRunReportsCompleteRoleSummariesAndPrivateOrderedReview() async throws {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let hubCalendar = RelayCalendar(
+            id: "private-hub-id", title: "Personal Work", sourceTitle: "iCloud", isWritable: true)
+        let acmeCalendar = RelayCalendar(
+            id: "private-acme-id", title: "ACME Work", sourceTitle: "Google", isWritable: true)
+        let betaCalendar = RelayCalendar(
+            id: "private-beta-id", title: "Beta Work", sourceTitle: "Microsoft", isWritable: true)
+        let hub = CalendarIdentity(id: hubCalendar.id, title: hubCalendar.title, sourceTitle: hubCalendar.sourceTitle)
+        let acme = CalendarIdentity(
+            id: acmeCalendar.id, title: acmeCalendar.title, sourceTitle: acmeCalendar.sourceTitle)
+        let hubEvent = CalendarEvent(
+            id: "private-hub-event", calendar: hub, title: "[SECRET_OLD] Hub Review",
+            start: Date(timeIntervalSince1970: 10_100), end: Date(timeIntervalSince1970: 10_200), isAllDay: false,
+            availability: .busy, status: .confirmed)
+        let acmeFirst = CalendarEvent(
+            id: "private-acme-first", calendar: acme, title: "[SECRET_OLD] ACME First",
+            start: Date(timeIntervalSince1970: 10_300), end: Date(timeIntervalSince1970: 10_400), isAllDay: false,
+            availability: .busy, status: .confirmed)
+        let acmeAllDay = CalendarEvent(
+            id: "private-acme-all-day", calendar: acme, title: "[SECRET_OLD] ACME All Day",
+            start: Date(timeIntervalSince1970: 86_400), end: Date(timeIntervalSince1970: 172_800), isAllDay: true,
+            availability: .busy, status: .confirmed)
+        let configURL = try writeTemporaryConfigFile(
+            contents: multiRoleSettingsYAML() + "\nlegacyMarkers:\n  - \"[SECRET_OLD]\"\n")
         let store = CommandHandlerCalendarStore(
-            calendars: [fixture.hubCalendar, fixture.workCalendar],
-            eventsByCalendarID: [fixture.workCalendar.id: [cleanupEvent]])
+            calendars: [hubCalendar, acmeCalendar, betaCalendar],
+            eventsByCalendarID: [hubCalendar.id: [hubEvent], acmeCalendar.id: [acmeAllDay, acmeFirst]])
+        let handler = ReconcileCommandHandler(
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { now })
+
+        let output = try await handler.run(config: configURL.path, apply: false, explain: false, cleanupLegacy: true)
+
+        try expect(output.contains("Cleanup dry-run"), "Cleanup dry-run should identify its mode")
+        try expect(output.contains("Selected deletions: 3"), "Cleanup dry-run should report the total selected count")
+        try expect(output.contains("Configured roles covered: 3"), "Cleanup should report every configured role")
+        try expectOutputOrder(
+            [
+                "- Hub: 1 selected deletion", "- Work role ACME: 2 selected deletions",
+                "- Work role Beta: 0 selected deletions"
+            ], in: output, message: "Role summaries should be hub-first and declaration ordered, including zero counts")
+        try expectOutputOrder(
+            [
+                "- delete from Hub: Hub Review", "- delete from Work role ACME: ACME First",
+                "- delete from Work role ACME: ACME All Day"
+            ], in: output, message: "Cleanup review rows should remain in execution order")
+        try expect(
+            output.contains("local point-in-time scope; end exclusive"),
+            "Cleanup range should state its bounded local point-in-time interval semantics")
+        try expect(output.contains("all-day dates; end exclusive"), "All-day review should state date-range semantics")
+        for forbidden in [
+            "[SECRET_OLD]", "private-hub-id", "private-acme-id", "private-beta-id", "private-hub-event",
+            "private-acme-first", "private-acme-all-day", "iCloud", "Google", "Microsoft", "Personal Work", "ACME Work",
+            "Beta Work"
+        ] { try expect(!output.contains(forbidden), "Cleanup output should omit prohibited detail: \(forbidden)") }
+        try expect(
+            !output.contains("globally retired") && !output.contains("retired everywhere"),
+            "Cleanup output should not claim global marker retirement")
+        try expect((await store.deletedEvents()).isEmpty, "Cleanup dry-run should not delete events")
+    }
+
+    private static func testCleanupDryRunNoMatchUsesLoadedSnapshotScope() async throws {
+        let fixture = reconciliationFixture()
+        let configURL = try writeTemporaryConfigFile(legacyMarkers: ["[OLD]"])
+        let store = CommandHandlerCalendarStore(calendars: [fixture.hubCalendar, fixture.workCalendar])
         let handler = ReconcileCommandHandler(
             authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { fixture.now })
 
         let output = try await handler.run(config: configURL.path, apply: false, explain: false, cleanupLegacy: true)
 
-        try expect(output.contains("Cleanup dry-run"), "Cleanup dry-run should identify its mode")
-        try expect(output.contains("Client Planning"), "Cleanup review should include the selected event title text")
-        try expect(!output.contains("[OLD]"), "Cleanup review should omit configured marker values")
-        try expect(output.contains("Work role ACME"), "Cleanup review should include the configured role")
-        try expect(!output.contains("legacy-1"), "Cleanup output should omit EventKit event IDs")
-        try expect(!output.contains("acme-1"), "Cleanup output should omit EventKit calendar IDs")
-        try expect((await store.deletedEvents()).isEmpty, "Cleanup dry-run should not delete events")
+        try expect(
+            output.contains("no matching legacy-marker events in the loaded local snapshot"),
+            "Dry-run no-match should be scoped to the loaded local snapshot")
+        try expect(
+            !output.contains("post-mutation verification snapshot"), "Dry-run should not claim apply verification")
+        try expect(output.contains("- Hub: 0 selected deletions"), "Dry-run should include a zero-count hub summary")
+        try expect(
+            output.contains("- Work role ACME: 0 selected deletions"), "Dry-run should include zero-count work roles")
+        try expect((await store.deletedEvents()).isEmpty, "No-match dry-run should not mutate")
     }
 
     private static func testCleanupApplyEmitsFreshReviewAndProgressiveConfirmation() async throws {
@@ -317,8 +376,56 @@ enum ReconcileCommandHandlerTests {
             output.contains("verified no matching legacy-marker events"),
             "Cleanup apply should report verified local success")
         try expect(
+            lines.first?.contains("A prior cleanup dry-run is recommended but not required") == true,
+            "Direct cleanup apply should recommend dry-run without requiring it")
+        try expect(
+            lines.first?.contains("--apply authorizes this non-interactive cleanup") == true,
+            "Fresh cleanup plan should state that apply is sufficient non-interactive authorization")
+        try expect(
+            output.contains("post-mutation verification snapshot contained no matching legacy-marker events"),
+            "Cleanup apply should scope no-match success to its verification snapshot")
+        try expect(
+            output.contains("Configuration was not changed") && output.contains("Remove legacyMarkers manually")
+                && output.contains("eventual-convergence migration is complete for your topology"),
+            "Cleanup success should provide manual eventual-convergence tombstone guidance")
+        try expect(
+            !output.contains("Client Planning") && !output.contains("Work role ACME"),
+            "Cleanup completion should retain no transient review details")
+        try expect(
             await store.deletedEvents().map(\.id) == [CalendarEventReference(providerIdentifier: "legacy-1")],
             "Cleanup apply should delete the planned event")
+    }
+
+    private static func testCleanupApplyNoMatchUsesVerificationSnapshotScope() async throws {
+        let fixture = reconciliationFixture()
+        let configURL = try writeTemporaryConfigFile(legacyMarkers: ["[OLD]"])
+        let store = CommandHandlerCalendarStore(calendars: [fixture.hubCalendar, fixture.workCalendar])
+        let progressiveOutput = CommandOutputRecorder()
+        let handler = ReconcileCommandHandler(
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { fixture.now })
+
+        let output = try await handler.run(
+            config: configURL.path, apply: true, explain: false, cleanupLegacy: true,
+            onOutput: { line in await progressiveOutput.record(line) })
+
+        let lines = await progressiveOutput.values()
+        try expect(lines.count == 1, "Empty direct apply should emit only its fresh review before verification")
+        try expect(
+            lines[0].contains("Fresh cleanup plan before mutation"), "Empty apply should still show a fresh plan")
+        try expect(lines[0].contains("- Hub: 0 selected deletions"), "Fresh apply should summarize the zero-count hub")
+        try expect(
+            lines[0].contains("- Work role ACME: 0 selected deletions"),
+            "Fresh apply should summarize zero-count work roles")
+        try expect(
+            output.contains("post-mutation verification snapshot contained no matching legacy-marker events"),
+            "No-match apply should report its verified snapshot rather than the initial loaded snapshot")
+        try expect(
+            !output.contains("loaded local snapshot"), "Apply completion should not reuse dry-run no-match wording")
+        try expect(
+            await store.eventRequestCalendarIDs() == [
+                fixture.hubCalendar.id, fixture.workCalendar.id, fixture.hubCalendar.id, fixture.workCalendar.id
+            ], "Even no-match cleanup apply should perform a complete verification snapshot read")
+        try expect((await store.deletedEvents()).isEmpty, "No-match cleanup apply should perform no deletion")
     }
 
     private static func reconciliationFixture() -> CommandHandlerFixture {

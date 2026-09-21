@@ -38,13 +38,21 @@ public struct ReconcileCommandHandler: Sendable {
 
         if cleanupLegacy {
             let cleanupWindow = LegacyCleanupWindow.calculate(referenceDate: currentDate, calendar: calendar)
+            let configuredRoles =
+                [ConfiguredCalendarRole.hub]
+                + settings.workCalendars.enumerated().map { entry in
+                    let (index, workCalendar) = entry
+                    return ConfiguredCalendarRole.work(name: workCalendar.name, declarationIndex: index)
+                }
             let cleanup = CalendarCleanupUseCase(
                 authorizationStatus: authorizationStatus, calendarStore: calendarStore, calendar: calendar)
             if apply {
                 let result = try await cleanup.apply(
                     settings: settings, now: currentDate,
                     onPlanReady: { plan in
-                        await onOutput(CalendarCleanupFormatter.formatFreshApplyPlan(plan, window: cleanupWindow))
+                        await onOutput(
+                            CalendarCleanupFormatter.formatFreshApplyPlan(
+                                plan, window: cleanupWindow, configuredRoles: configuredRoles))
                     },
                     onConfirmation: { confirmation in
                         await onOutput(CalendarMutationConfirmationFormatter.format(confirmation))
@@ -53,7 +61,7 @@ public struct ReconcileCommandHandler: Sendable {
             }
 
             let plan = try await cleanup.dryRun(settings: settings, now: currentDate)
-            return CalendarCleanupFormatter.formatDryRun(plan, window: cleanupWindow)
+            return CalendarCleanupFormatter.formatDryRun(plan, window: cleanupWindow, configuredRoles: configuredRoles)
         }
 
         guard settings.legacyMarkers.isEmpty else { throw ReconcileCommandError.migrationPending }
