@@ -2,7 +2,7 @@
 name: using-agnostic-software-development-skills
 description: Discover and invoke technology-agnostic software development skills. Use when starting general engineering work or deciding which reusable workflow skill applies to a task.
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
   dependencies:
     tools: []
     skills:
@@ -14,6 +14,9 @@ metadata:
         required: false
       - name: author-agent-skill
         purpose: Route Agent Skill creation, update, and review work.
+        required: false
+      - name: author-agents-config
+        purpose: Route repository coding-agent instructions, scoped policy, client adapters, and configuration migration work.
         required: false
       - name: browser-runtime-verification
         purpose: Route browser-based verification of UI behavior.
@@ -155,6 +158,7 @@ Task arrives
   - Need a project documentation update: update-project-docs
   - Need an architecture decision record: write-adr
 - Creating, updating, or reviewing skills: author-agent-skill
+- Creating, auditing, or synchronizing repository agent instructions and client adapters: author-agents-config
 - Deploying or launching: shipping-and-launch
 ```
 
@@ -313,3 +317,4 @@ Not every task needs every skill. A bug fix might only need `debugging-and-error
 | Ship   | write-adr                    | Record durable architectural decisions with context and consequences                                 |
 | Ship   | shipping-and-launch          | Pre-launch checklist, monitoring, rollback plan                                                      |
 | Skill  | author-agent-skill           | Create, update, or review Agent Skill directories and SKILL.md files                                 |
+| Config | author-agents-config         | Create, audit, update, or synchronize repository agent instructions and client adapters              |

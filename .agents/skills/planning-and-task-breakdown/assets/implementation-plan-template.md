@@ -36,31 +36,23 @@ questions.]
 
 [For short plans, task basis fields can supply this mapping instead.]
 
-## Progress Tracking
+## Execution summary
 
-Mirror every detailed task, acceptance, verification, and checkpoint checkbox
-here with the same ID, meaning, and state. Each ID labels one checkbox here and
-one in the details. Preserve IDs when reordering; add fresh IDs for new work.
+Use this section only for sequencing and navigation. The detailed task and
+checkpoint sections are the sole source of checkbox state, item wording, evidence,
+and blockers. Do not copy their checkboxes or maintain a second status list here.
 
-- [ ] `T1` — [Task title]
-  - [ ] `T1-AC1` — [Observable acceptance condition]
-  - [ ] `T1-V1` — [Focused verification and expected result]
-- [ ] `CP1` — [Integration or risk checkpoint and pass condition]
-- [ ] `CP-FINAL-1` — All required acceptance criteria met
-- [ ] `CP-FINAL-2` — Final handoff checks resolved with evidence
+- **Execution order:** `T1` -> `CP1` -> Final handoff
+- **Parallel groups:** [Task ID groups, or None.]
 
-After each completed task or meaningful change, update both views and the status
-notes. Check items only with evidence or an explicit `Not applicable — <reason>`;
-N/A records applicability, not a passing check. Complete a parent only when all
-required child items are resolved. Unknown, failed, unverified, blocked, and
-unapproved deferred items remain unchecked. Move authorized deferrals out of
-required scope in both views and record their disposition without marking them
-completed. Reopen items whose evidence is invalidated by later changes.
+Update this summary when task order, parallelism, or scope changes. Progress-only
+updates belong in the canonical detailed sections and the status notes below.
 
 ## Task details
 
-[Repeat this task block as needed, adding its IDs to the dashboard. Group tasks
-into phases only when the boundaries help execution.]
+[Repeat this task block as needed. Keep every checkbox and its state only in its
+detailed task or checkpoint section. Group tasks into phases only when the
+boundaries help execution.]
 
 ### T1: [Short outcome title]
 
@@ -107,8 +99,8 @@ deliverable, and decision needed to unlock dependent work.]
 
 **Evidence and status:** [Pending; record results when executed.]
 
-[Add checkpoints at actual boundaries, or remove CP1 here and in the dashboard
-if final handoff is the only useful checkpoint.]
+[Add checkpoints at actual boundaries, or remove CP1 if final handoff is the only
+useful checkpoint. Update the execution summary when the sequence changes.]
 
 ### Final handoff
 
@@ -141,4 +133,5 @@ recovery from reverting code. Omit when no additional risks need tracking.]
 
 [After each task or meaningful change, record affected IDs, evidence or blocker,
 deviation and its basis, any authorized deferral, and the next action. Update
-readiness and both checkbox views when needed; do not renumber existing IDs.]
+readiness and the canonical detailed checkboxes when needed; do not renumber
+existing IDs.]

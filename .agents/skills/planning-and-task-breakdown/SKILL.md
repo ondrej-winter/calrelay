@@ -2,7 +2,7 @@
 name: planning-and-task-breakdown
 description: Create or revise an implementation plan from clear requirements, with ordered tasks, acceptance criteria, dependencies, verification, and progress tracking. Use when scope needs decomposition, sequencing is uncertain, or work must be coordinated across agents or sessions.
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
   dependencies:
     tools: []
     skills:
@@ -218,26 +218,33 @@ with ready tasks and pause only the work that depends on unresolved decisions.
 ## Maintain progress during implementation
 
 Give every task, acceptance criterion, verification item, and checkpoint checkbox
-a stable ID. Each ID labels exactly two checkboxes: one in the detailed plan and
-one in the Progress Tracking dashboard, with matching meaning and state. The details
-carry context and evidence; the dashboard mirrors completion. Preserve IDs on
-reorder and revision, and allocate new IDs for newly discovered work.
+a stable, unique ID. Keep each checkbox, its wording, completion state, and
+evidence in exactly one canonical location: the detailed task or checkpoint
+section. Preserve IDs on reorder and revision, and allocate new IDs for newly
+discovered work.
 
-After each completed task or meaningful change, synchronize both copies, record
-brief evidence or blockers, and update dependencies, scope, and the next action.
-Do not wait for a progress request. Check an item only when its condition holds
-with evidence, or it is explicitly `Not applicable — <reason>`. A checked N/A
-item records applicability, not a successful test. Mark a parent task complete
-only when all its required acceptance and verification items are resolved.
+A summary may reference task or checkpoint IDs to show execution order, parallel
+groups, or the next action, but it must not duplicate checkboxes, acceptance or
+verification descriptions, completion state, or evidence. Treat the detailed
+sections as authoritative if a summary reference becomes stale, then repair the
+summary.
+
+After each completed task or meaningful change, update the canonical checkboxes,
+record brief evidence or blockers, and revise dependencies, scope, the execution
+summary, and the next action when affected. Do not wait for a progress request.
+Check an item only when its condition holds with evidence, or it is explicitly
+`Not applicable — <reason>`. A checked N/A item records applicability, not a
+successful test. Mark a parent task complete only when all its required acceptance
+and verification items are resolved.
 
 Unknown, failed, unverified, blocked, or unapproved deferred items stay unchecked
 and block completion of the affected task or checkpoint. An authorized deferral
-must record its basis and move the item out of required scope in both views;
-retain its ID and disposition without representing it as completed work. Update
-the canonical requirements if the deferral changes the agreed outcome.
+must record its basis and move the item out of required scope; retain its ID and
+disposition without representing it as completed work. Update the canonical
+requirements if the deferral changes the agreed outcome.
 
 Preserve completed work and evidence when revising a plan. If a change invalidates
-an earlier check, reopen the affected items in both views and explain why. Record
+an earlier check, reopen the affected canonical items and explain why. Record
 material deviations and changed assumptions so the next session can resume
 without repeating completed work or trusting stale verification.
 
@@ -253,6 +260,7 @@ without repeating completed work or trusting stale verification.
   write boundaries and an integration step.
 - Focused and final checks have pass conditions; unknown or unavailable required
   verification remains unresolved.
-- Every progress ID has one detailed checkbox and one matching dashboard
-  checkbox; parent completion follows required child completion.
+- Every progress ID labels exactly one canonical checkbox in a detailed task or
+  checkpoint section; summaries do not duplicate mutable progress state, and parent
+  completion follows required child completion.
 - Readiness, affected blockers, and the next authorized action are explicit.

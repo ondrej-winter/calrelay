@@ -1,0 +1,7 @@
+@AGENTS.md
+
+<!--
+Client adapter maintained through author-agents-config.
+Shared project instructions belong in the adjacent AGENTS.md.
+Keep only genuinely Claude-specific behavior here.
+-->
