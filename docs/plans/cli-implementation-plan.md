@@ -6,7 +6,7 @@
 - **Related accepted contracts:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), [`../specs/configuration-spec.md`](../specs/configuration-spec.md), and [`../specs/reconciliation-spec.md`](../specs/reconciliation-spec.md).
 - **Readiness:** Ready. Required outcomes, sequencing, architectural boundaries, privacy constraints, and validation are specific enough to execute without an unresolved product decision.
 - **Progress date:** September 21, 2026.
-- **Implementation state:** Automated implementation and validation complete through `CLI-P06`; separately authorized live EventKit validation remains pending in `CLI-P07`.
+- **Implementation state:** Automated implementation and final handoff validation are complete; `CLI-P07` records that live EventKit validation remains blocked pending explicit authorization and identified harmless dedicated calendars.
 - **Execution approach:** Implement small CLI-facing vertical slices, add focused deterministic evidence with each slice, then add process-level coverage and complete the repository gates.
 - **Workspace constraint:** Preserve pre-existing staged CLI implementation and test changes. The deletion of `docs/plans/calendar-access-implementation-plan.md` mentioned by an earlier plan checkpoint was not present when `CLI-P06` began and was not recreated or modified.
 
@@ -373,13 +373,17 @@ Perform real EventKit checks only with explicit authorization and harmless dedic
 - Cleanup dry-run, fresh non-interactive apply review, complete verification, local-scope wording, and manual tombstone handling.
 - Partial application and recurring exact-occurrence behavior where safely reproducible.
 
-#### - [ ] CLI-P07-AC1 — Record live EventKit evidence or an explicit blocker
+#### - [x] CLI-P07-AC1 — Record live EventKit evidence or an explicit blocker
 
 Complete the harmless-calendar checklist when authorized, or identify the missing authorization/environment condition without treating deterministic tests as proof of real EventKit behavior.
 
-#### - [ ] CLI-P07-V1 — Re-run affected gates and prepare final handoff
+**Blocker record (September 21, 2026):** The implementation request did not explicitly authorize access to or mutation of Apple Calendar data, and no harmless dedicated calendar topology was identified for live validation. No live EventKit command or mutation was attempted. Deterministic fake-backed and process-level evidence remains complete through `CLI-P06`, but it is not treated as proof of real EventKit behavior. The live checkpoint remains open until both explicit authorization and suitable dedicated calendars are available.
+
+#### - [x] CLI-P07-V1 — Re-run affected gates and prepare final handoff
 
 After any changes resulting from live validation, rerun the affected focused suites plus `make format-check` and `make check`, re-check Git status, and summarize completed work, pending live evidence, and unrelated preserved workspace changes.
+
+**Completion evidence (September 21, 2026):** No implementation change resulted from live validation because the authorization and harmless-calendar prerequisites were unavailable. `make format-check` passed with the repository's existing warning-only Swift formatting diagnostics. `make check` passed with status `0`, including SwiftLint, the SwiftPM build, the complete `CalRelayKitTests` runner, and all four CLI help smoke checks; the build retained non-fatal local linker search-path warnings. The only workspace change is this unstaged plan update, and live EventKit behavior remains explicitly unvalidated.
 
 ## Acceptance coverage
 
@@ -487,13 +491,13 @@ Do not use `swift test`; this repository uses the `CalRelayKitTests` executable 
 ### Live validation and handoff
 
 - [ ] CLI-P07 — Complete authorized live validation and final handoff
-- [ ] CLI-P07-AC1 — Record live EventKit evidence or an explicit blocker
-- [ ] CLI-P07-V1 — Re-run affected gates and prepare final handoff
+- [x] CLI-P07-AC1 — Record live EventKit evidence or an explicit blocker
+- [x] CLI-P07-V1 — Re-run affected gates and prepare final handoff
 
 ## Handoff
 
 - **Plan readiness:** Ready.
-- **Next executable task:** `CLI-P07` — complete separately authorized live EventKit validation and final handoff, or record the missing authorization or harmless-calendar environment as an explicit blocker.
+- **Next executable task:** `CLI-P07` — when explicitly authorized and supplied with suitable harmless dedicated calendars, complete live EventKit validation; the missing-authorization and missing-environment blocker is recorded above.
 - **Blocking product decisions:** None.
 - **Conditional final checkpoint:** `CLI-P07` requires explicit authorization and suitable harmless dedicated calendars; it does not block automated implementation and validation through `CLI-P06`.
 - **Deferred enhancements:** machine-readable output, new public commands or flags, stable failure-code categories, cross-process locking, provider APIs, and automatic marker-retirement editing remain outside this plan.
