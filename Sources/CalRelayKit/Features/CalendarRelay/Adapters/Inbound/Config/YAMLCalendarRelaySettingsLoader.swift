@@ -50,20 +50,35 @@ private enum StrictCalendarRelayYAMLShape {
         let rootMapping = try mapping(root)
         try validateKeys(rootMapping, allowed: rootKeys)
 
-        if let hubCalendar = rootMapping["hubCalendar"] {
-            try validateKeys(try mapping(hubCalendar), allowed: selectorKeys)
+        if let personalPrefix = rootMapping["personalPrefix"] { try validateString(personalPrefix) }
+
+        if let syncWindowDays = rootMapping["syncWindowDays"], syncWindowDays.int == nil {
+            throw YAMLCalendarRelaySettingsError.invalidConfiguration
         }
+
+        if let hubCalendar = rootMapping["hubCalendar"] { try validateSelector(hubCalendar) }
 
         if let workCalendars = rootMapping["workCalendars"] {
             let sequence = try sequence(workCalendars)
             for workCalendar in sequence {
                 let workMapping = try mapping(workCalendar)
                 try validateKeys(workMapping, allowed: workCalendarKeys)
-                if let calendar = workMapping["calendar"] {
-                    try validateKeys(try mapping(calendar), allowed: selectorKeys)
-                }
+                if let name = workMapping["name"] { try validateString(name) }
+                if let prefix = workMapping["prefix"] { try validateString(prefix) }
+                if let calendar = workMapping["calendar"] { try validateSelector(calendar) }
             }
         }
+
+        if let legacyMarkers = rootMapping["legacyMarkers"] {
+            for marker in try sequence(legacyMarkers) { try validateString(marker) }
+        }
+    }
+
+    private static func validateSelector(_ node: Node) throws {
+        let selector = try mapping(node)
+        try validateKeys(selector, allowed: selectorKeys)
+        if let sourceTitle = selector["sourceTitle"] { try validateString(sourceTitle) }
+        if let calendarTitle = selector["calendarTitle"] { try validateString(calendarTitle) }
     }
 
     private static func mapping(_ node: Node) throws -> Node.Mapping {
@@ -76,9 +91,16 @@ private enum StrictCalendarRelayYAMLShape {
         return sequence
     }
 
+    private static func validateString(_ node: Node) throws {
+        guard node.scalar != nil, node.tag == Tag(.str) else {
+            throw YAMLCalendarRelaySettingsError.invalidConfiguration
+        }
+    }
+
     private static func validateKeys(_ mapping: Node.Mapping, allowed: Set<String>) throws {
+        var seenKeys: Set<String> = []
         for pair in mapping {
-            guard let key = pair.key.string, allowed.contains(key) else {
+            guard let key = pair.key.string, allowed.contains(key), seenKeys.insert(key).inserted else {
                 throw YAMLCalendarRelaySettingsError.invalidConfiguration
             }
         }

@@ -59,18 +59,27 @@ public enum SettingsValidationError: Error, Equatable, CustomStringConvertible, 
         case .emptyHubCalendarTitle: "Hub calendar title must not be empty."
         case .missingWorkCalendars: "At least one work calendar must be configured."
         case .emptyWorkCalendarName: "Work calendar name must not be empty."
-        case .emptyWorkCalendarPrefix(let name): "Work calendar prefix must not be empty for \(name)."
-        case .emptyWorkCalendarSourceTitle(let name): "Work calendar source title must not be empty for \(name)."
-        case .emptyWorkCalendarTitle(let name): "Work calendar title must not be empty for \(name)."
+        case .emptyWorkCalendarPrefix: "Work calendar prefix must not be empty."
+        case .emptyWorkCalendarSourceTitle: "Work calendar source title must not be empty."
+        case .emptyWorkCalendarTitle: "Work calendar title must not be empty."
         case .nonPositiveSyncWindowDays: "Sync window days must be greater than zero."
         case .syncWindowDaysOutOfRange: "Sync window days must be from 1 through 365."
-        case .invalidMarker(let marker): "Invalid marker: \(marker)."
-        case .duplicateMarker(let marker): "Markers must be pairwise distinct: \(marker)."
-        case .duplicateCalendarSelector(let selector, let roles):
-            "Calendar selector is used by multiple roles (\(roles.map(\.description).joined(separator: ", "))): \(selector.sourceTitle) / \(selector.calendarTitle)."
-        case .duplicateWorkCalendarPrefix(let prefix): "Work calendar prefix must be unique: \(prefix)."
-        case .personalPrefixConflictsWithWorkPrefix(let prefix):
-            "Personal prefix must not match a work calendar prefix: \(prefix)."
+        case .invalidMarker: "Invalid marker. Markers must match \\[[A-Za-z0-9_-]+\\]."
+        case .duplicateMarker: "Markers must be pairwise distinct."
+        case .duplicateCalendarSelector(_, let roles):
+            "Calendar selector is used by multiple roles (\(roles.map(\.configurationDescription).joined(separator: ", ")))."
+        case .duplicateWorkCalendarPrefix: "Markers must be pairwise distinct. Work calendar prefix must be unique."
+        case .personalPrefixConflictsWithWorkPrefix:
+            "Markers must be pairwise distinct. Personal prefix must not match a work calendar prefix."
+        }
+    }
+}
+
+extension ConfiguredCalendarRole {
+    fileprivate var configurationDescription: String {
+        switch self {
+        case .hub: "Hub"
+        case .work(_, let declarationIndex): "Work role at declaration index \(declarationIndex)"
         }
     }
 }

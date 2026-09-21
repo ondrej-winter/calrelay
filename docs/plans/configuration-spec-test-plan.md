@@ -6,7 +6,7 @@
 - **Related accepted contracts:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), [`../specs/projection-and-safety-spec.md`](../specs/projection-and-safety-spec.md), [`../specs/routing-spec.md`](../specs/routing-spec.md), [`../specs/reconciliation-spec.md`](../specs/reconciliation-spec.md), [`../specs/cli-spec.md`](../specs/cli-spec.md), and [`../specs/macos-app-spec.md`](../specs/macos-app-spec.md).
 - **Readiness:** Ready. The required outcomes, test boundaries, expected evidence, sequencing, and validation commands are specific enough to execute without an unresolved product decision.
 - **Progress date:** September 21, 2026.
-- **Implementation state:** Not started. Existing source and tests were inspected to establish the coverage baseline, but no suite was executed and no existing evidence is marked complete by this plan.
+- **Implementation state:** In progress. `CFG-P01` is complete with focused schema coverage and full repository validation; `CFG-P02` is the next executable slice.
 - **Execution approach:** Add focused deterministic contract evidence for uncovered behavior, preserve useful existing suites, fix only defects exposed by specification-derived tests, then run the complete repository gate.
 
 ## Outcome
@@ -485,12 +485,12 @@ Apply the conditions in `CFG-P08-V4`; do not run real EventKit or real-calendar 
 
 ### Schema and structural validation
 
-- [ ] CFG-P01 — Complete strict schema, marker, window, and structural selector tests
-- [ ] CFG-P01-AC1 — Prove the exact schema and privacy-safe structural failures
-- [ ] CFG-P01-AC2 — Prove complete marker grammar and pairwise uniqueness
-- [ ] CFG-P01-AC3 — Prove `syncWindowDays` defaults, boundaries, and types
-- [ ] CFG-P01-AC4 — Prove structural selector collision diagnostics
-- [ ] CFG-P01-V1 — Pass focused schema and validation suites
+- [x] CFG-P01 — Complete strict schema, marker, window, and structural selector tests
+- [x] CFG-P01-AC1 — Prove the exact schema and privacy-safe structural failures
+- [x] CFG-P01-AC2 — Prove complete marker grammar and pairwise uniqueness
+- [x] CFG-P01-AC3 — Prove `syncWindowDays` defaults, boundaries, and types
+- [x] CFG-P01-AC4 — Prove structural selector collision diagnostics
+- [x] CFG-P01-V1 — Pass focused schema and validation suites
 
 ### Configuration selection and file provider
 
@@ -555,4 +555,4 @@ Apply the conditions in `CFG-P08-V4`; do not run real EventKit or real-calendar 
 
 ## Next executable work
 
-Start with `CFG-P01`: add the missing schema, marker, window, and selector-collision cases, register a dedicated suite only if it improves ownership, and run the focused custom test runner before changing another capability area.
+Continue with `CFG-P02`: complete configuration-selection and fresh file-provider coverage, then run the focused custom test runner before changing another capability area.
