@@ -3,7 +3,7 @@ import Foundation
 @main struct CalRelayKitTestRunner {
     static func main() async throws {
         let filters = Set(CommandLine.arguments.dropFirst())
-        try runConfigurationSuites(filters: filters)
+        try await runConfigurationSuites(filters: filters)
         if filters.isEmpty || filters.contains("CalendarReviewedActionTests") {
             try CalendarReviewedActionTests.runAll()
         }
@@ -23,9 +23,12 @@ import Foundation
         print("CalRelayKitTests passed")
     }
 
-    private static func runConfigurationSuites(filters: Set<String>) throws {
+    private static func runConfigurationSuites(filters: Set<String>) async throws {
         if filters.isEmpty || filters.contains("ConfigurationFileSelectionTests") {
             try ConfigurationFileSelectionTests.runAll()
+        }
+        if filters.isEmpty || filters.contains("FileCalendarRelaySettingsProviderTests") {
+            try await FileCalendarRelaySettingsProviderTests.runAll()
         }
         if filters.isEmpty || filters.contains("CalendarConfigurationSchemaTests") {
             try CalendarConfigurationSchemaTests.runAll()

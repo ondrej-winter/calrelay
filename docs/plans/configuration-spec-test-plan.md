@@ -6,7 +6,7 @@
 - **Related accepted contracts:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), [`../specs/projection-and-safety-spec.md`](../specs/projection-and-safety-spec.md), [`../specs/routing-spec.md`](../specs/routing-spec.md), [`../specs/reconciliation-spec.md`](../specs/reconciliation-spec.md), [`../specs/cli-spec.md`](../specs/cli-spec.md), and [`../specs/macos-app-spec.md`](../specs/macos-app-spec.md).
 - **Readiness:** Ready. The required outcomes, test boundaries, expected evidence, sequencing, and validation commands are specific enough to execute without an unresolved product decision.
 - **Progress date:** September 21, 2026.
-- **Implementation state:** In progress. `CFG-P01` is complete with focused schema coverage and full repository validation; `CFG-P02` is the next executable slice.
+- **Implementation state:** In progress. `CFG-P01` and `CFG-P02` are complete with focused schema, path-selection, and fresh file-provider coverage plus full repository validation; `CFG-P03` is the next executable slice.
 - **Execution approach:** Add focused deterministic contract evidence for uncovered behavior, preserve useful existing suites, fix only defects exposed by specification-derived tests, then run the complete repository gate.
 
 ## Outcome
@@ -494,11 +494,11 @@ Apply the conditions in `CFG-P08-V4`; do not run real EventKit or real-calendar 
 
 ### Configuration selection and file provider
 
-- [ ] CFG-P02 — Complete configuration selection and fresh file-provider tests
-- [ ] CFG-P02-AC1 — Prove canonical and explicit path semantics
-- [ ] CFG-P02-AC2 — Prove missing and invalid file precedence without side effects
-- [ ] CFG-P02-AC3 — Prove every provider call loads the selected file afresh
-- [ ] CFG-P02-V1 — Pass focused path and file-provider suites
+- [x] CFG-P02 — Complete configuration selection and fresh file-provider tests
+- [x] CFG-P02-AC1 — Prove canonical and explicit path semantics
+- [x] CFG-P02-AC2 — Prove missing and invalid file precedence without side effects
+- [x] CFG-P02-AC3 — Prove every provider call loads the selected file afresh
+- [x] CFG-P02-V1 — Pass focused path and file-provider suites
 
 ### Runtime readiness and migration
 
@@ -555,4 +555,4 @@ Apply the conditions in `CFG-P08-V4`; do not run real EventKit or real-calendar 
 
 ## Next executable work
 
-Continue with `CFG-P02`: complete configuration-selection and fresh file-provider coverage, then run the focused custom test runner before changing another capability area.
+Continue with `CFG-P03`: complete runtime readiness and migration-pending gates, then run the focused access, ordinary-operation, config-check, and process suites before changing another capability area.
