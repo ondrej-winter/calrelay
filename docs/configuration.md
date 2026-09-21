@@ -16,6 +16,8 @@ Use `--config <path>` for tests, experiments, or temporary alternate configurati
 
 ```sh
 swift run calrelay reconcile --config ./calrelay.yml
+swift run calrelay config check --config ~/.config/calrelay/alternate.yaml
+swift run calrelay reconcile --config /tmp/calrelay-validation.yaml
 ```
 
 Explicit override paths behave as follows:
@@ -260,7 +262,7 @@ In the app, **Dry Run Legacy Cleanup** shows the bounded range, deletion count, 
 
 After partial deletion or failed verification, the app discards the detailed review and reports aggregate confirmed deletions plus a safe failure category. Confirmed deletions remain applied; there is no rollback or automatic retry. Refresh status, resolve the cause, and review and confirm a fresh cleanup plan. Even an empty cleanup plan must pass complete-range verification before reporting success.
 
-CLI cleanup dry-run shows the same per-event review details in execution order. Direct `--cleanup-legacy --apply` shows its fresh detailed ordered plan and remains non-interactive: `--apply` alone authorizes mutation, and a prior dry-run is recommended but not enforced.
+CLI cleanup dry-run reports every configured role, including zero-count roles, with per-role and total selected-deletion counts. It then shows the same per-event review details in execution order. Direct `--cleanup-legacy --apply` shows its fresh detailed ordered plan and remains non-interactive: `--apply` alone authorizes mutation, and a prior dry-run is recommended but not enforced. These detailed review rows are transient command output and are not persisted or logged by CalRelay.
 
 Cleanup performs no ordinary creates or current-marker reconciliation. With `D` as the captured local date, it searches the configured hub and every locally configured work calendar over local dates `D - 2` through `D + 365`, inclusive, using the same positive-overlap rule as ordinary reconciliation. Every configured role must resolve uniquely, be writable, and be readable over that complete bounded range before deletion begins.
 

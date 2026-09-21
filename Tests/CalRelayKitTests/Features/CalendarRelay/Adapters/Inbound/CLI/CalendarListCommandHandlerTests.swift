@@ -4,6 +4,7 @@ enum CalendarListCommandHandlerTests {
     static func runAll() async throws {
         try await testCalendarListHandlerFormatsCalendarsFromInjectedStore()
         try await testCalendarListHandlerTreatsEmptyInventoryAsSuccessWithoutReadinessClaim()
+        try await testCalendarListHandlerReportsReadOnlyCalendars()
         try testAppInventoryFormattingOmitsEventKitCalendarIDs()
     }
 
@@ -33,6 +34,20 @@ enum CalendarListCommandHandlerTests {
         try expect(
             output.contains("Inventory discovery succeeded"), "Empty inventory should explicitly remain successful")
         try expect(!output.contains("configured topology is ready"), "Inventory must not claim configured readiness")
+    }
+
+    private static func testCalendarListHandlerReportsReadOnlyCalendars() async throws {
+        let readOnly = RelayCalendar(
+            id: "readonly-1", title: "Shared Calendar", sourceTitle: "Exchange", isWritable: false)
+        let store = CommandHandlerCalendarStore(calendars: [readOnly])
+        let authorization = CalendarListAuthorizationStatus(state: .fullAccess)
+        let inventory = CalendarInventoryUseCase(authorizationStatus: authorization, calendarStore: store)
+
+        let output = try await CalendarListCommandHandler(inventory: inventory).run()
+
+        try expect(output.contains("Exchange / Shared Calendar"), "Inventory should include source and title")
+        try expect(output.contains("id: readonly-1"), "Inventory should include the EventKit calendar ID")
+        try expect(output.contains("read-only"), "Inventory should report read-only status")
     }
 
     private static func testAppInventoryFormattingOmitsEventKitCalendarIDs() throws {

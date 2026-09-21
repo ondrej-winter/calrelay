@@ -22,12 +22,13 @@ struct ReconcileCommand: AsyncParsableCommand {
     }
 
     func run() async throws {
-        let authorization = EventKitCalendarAuthorizationStatus()
-        let calendarStore = EventKitCalendarStore(authorizationStatus: authorization)
-        let result = try await ReconcileCommandHandler(authorizationStatus: authorization, calendarStore: calendarStore)
-            .run(
-                config: config, apply: apply, explain: explain, cleanupLegacy: cleanupLegacy,
-                onOutput: { line in print(line) })
+        let composition = CalendarCLIComposition.current()
+        let result = try await ReconcileCommandHandler(
+            authorizationStatus: composition.authorizationStatus, calendarStore: composition.calendarStore,
+            now: composition.now, calendar: composition.calendar
+        ).run(
+            config: config, apply: apply, explain: explain, cleanupLegacy: cleanupLegacy,
+            onOutput: { line in print(line) })
         print(result)
     }
 }

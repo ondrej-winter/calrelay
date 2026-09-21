@@ -54,6 +54,9 @@ lint: require-swiftlint
 
 check: lint build test
 	swift run calrelay --help >/dev/null
+	swift run calrelay calendars --help >/dev/null
+	swift run calrelay config check --help >/dev/null
+	swift run calrelay reconcile --help >/dev/null
 
 app:
 	zsh scripts/build-calrelay-app.sh

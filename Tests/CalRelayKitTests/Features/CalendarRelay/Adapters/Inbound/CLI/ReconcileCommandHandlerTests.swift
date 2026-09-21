@@ -10,10 +10,17 @@ enum ReconcileCommandHandlerTests {
         try await testEmptyApplyReportsSuccessfulNoChange()
         try await testApplyFailureOnlyConfirmsCompletedActions()
         try await testReconcileHandlerFormatsExplanationFromInjectedStoreAndConfig()
+        try await testExplanationAccessFailureEmitsNoPartialOutputOrIdentifiers()
+        try await testMissingConfigurationFailsBeforeCalendarAccess()
+        try await testStructurallyInvalidConfigurationFailsBeforeCalendarAccess()
+        try await testCleanupRequiresLegacyMarkersBeforeCalendarAccess()
+        try await testOrdinaryModesUseOrdinaryAccessWindow()
+        try await testCleanupModesUseCleanupAccessWindow()
         try await testOrdinaryMigrationPendingFailsBeforeCalendarAccess()
         try await testCleanupDryRunReportsCompleteRoleSummariesAndPrivateOrderedReview()
         try await testCleanupDryRunNoMatchUsesLoadedSnapshotScope()
         try await testCleanupApplyEmitsFreshReviewAndProgressiveConfirmation()
+        try await testCleanupApplyFailureOnlyConfirmsCompletedActionsAndStaysPrivate()
         try await testCleanupApplyNoMatchUsesVerificationSnapshotScope()
     }
 
@@ -178,11 +185,19 @@ enum ReconcileCommandHandlerTests {
                 sourceTitle: fixture.hubCalendar.sourceTitle), title: "[ACME] Old Planning",
             start: fixture.workEvent.start, end: fixture.workEvent.end, isAllDay: false, availability: .busy,
             status: .confirmed)
+        let personalHubEvent = CalendarEvent(
+            id: "personal-hub",
+            calendar: CalendarIdentity(
+                id: fixture.hubCalendar.id, title: fixture.hubCalendar.title,
+                sourceTitle: fixture.hubCalendar.sourceTitle), title: "Personal appointment",
+            start: Date(timeIntervalSince1970: 15_000), end: Date(timeIntervalSince1970: 16_000), isAllDay: false,
+            availability: .busy, status: .confirmed)
         let configURL = try writeTemporaryConfigFile()
         let store = CommandHandlerCalendarStore(
             calendars: [fixture.hubCalendar, fixture.workCalendar],
-            eventsByCalendarID: [fixture.hubCalendar.id: [staleHubEvent], fixture.workCalendar.id: [fixture.workEvent]],
-            failMutationNumber: 2)
+            eventsByCalendarID: [
+                fixture.hubCalendar.id: [staleHubEvent, personalHubEvent], fixture.workCalendar.id: [fixture.workEvent]
+            ], failMutationNumber: 2)
         let progressiveOutput = CommandOutputRecorder()
         let handler = ReconcileCommandHandler(
             authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { fixture.now })
@@ -191,14 +206,19 @@ enum ReconcileCommandHandlerTests {
             _ = try await handler.run(
                 config: configURL.path, apply: true, explain: false, cleanupLegacy: false,
                 onOutput: { line in await progressiveOutput.record(line) })
-        } catch is CalendarMutationExecutionError {
+        } catch let error as CalendarMutationExecutionError {
             try expect(
                 await progressiveOutput.values() == ["Confirmed delete for Hub."],
                 "Failed apply should retain confirmations only for completed actions")
             try expect(
                 await store.deletedEvents().map(\.id) == [CalendarEventReference(providerIdentifier: "stale-hub")],
                 "The successful action before failure should remain applied")
-            try expect((await store.createdEvents()).isEmpty, "The failed create should not be recorded as successful")
+            try expect(
+                (await store.createdEvents()).isEmpty, "The failed create and later work create should not succeed")
+            try expect(await store.mutationAttemptCount() == 2, "Ordinary apply should stop at the first failure")
+            try expect(
+                error.description.contains("No rollback was attempted"),
+                "Failure should give no-rollback recovery guidance")
             return
         }
 
@@ -246,6 +266,153 @@ enum ReconcileCommandHandlerTests {
         try expect(!output.contains("Dry-run mode"), "Explanation output should not include dry-run plan mode")
         try expect((await store.createdEvents()).isEmpty, "Explanation should not create events")
         try expect((await store.deletedEvents()).isEmpty, "Explanation should not delete events")
+    }
+
+    private static func testExplanationAccessFailureEmitsNoPartialOutputOrIdentifiers() async throws {
+        let fixture = reconciliationFixture()
+        let configURL = try writeTemporaryConfigFile()
+        let store = CommandHandlerCalendarStore(calendars: [fixture.hubCalendar, fixture.workCalendar])
+        let progressiveOutput = CommandOutputRecorder()
+        let handler = ReconcileCommandHandler(
+            authorizationStatus: TestCalendarAuthorizationStatus(state: .denied), calendarStore: store,
+            now: { fixture.now })
+
+        do {
+            _ = try await handler.run(
+                config: configURL.path, apply: false, explain: true, cleanupLegacy: false,
+                onOutput: { line in await progressiveOutput.record(line) })
+        } catch let error as ReconcileCalendarsError {
+            try expect((await progressiveOutput.values()).isEmpty, "Failed explanation should emit no partial output")
+            try expect(
+                error.description.contains("Enable full access for CalRelay in System Settings"),
+                "Explanation access failure should include recovery guidance")
+            for forbidden in ["hub-1", "acme-1", "acme-source-1", "Client Planning"] {
+                try expect(!error.description.contains(forbidden), "Explanation failure should omit \(forbidden)")
+            }
+            try expect(await store.listCalendarsCallCount() == 0, "Denied explanation should stop before store access")
+            return
+        }
+
+        throw TestFailure("Expected explanation access failure")
+    }
+
+    private static func testMissingConfigurationFailsBeforeCalendarAccess() async throws {
+        let fixture = reconciliationFixture()
+        let missingPath = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
+        let store = CommandHandlerCalendarStore(calendars: [fixture.hubCalendar, fixture.workCalendar])
+        let handler = ReconcileCommandHandler(
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { fixture.now })
+
+        do {
+            _ = try await handler.run(config: missingPath, apply: false, explain: false, cleanupLegacy: false)
+        } catch let error as MissingConfigurationFileError {
+            try expect(
+                error.selectedFile.displayPath == missingPath, "Missing explicit path should retain its display value")
+            try expect(
+                await store.listCalendarsCallCount() == 0, "Missing configuration should fail before Calendar access")
+            return
+        }
+
+        throw TestFailure("Expected missing configuration failure")
+    }
+
+    private static func testStructurallyInvalidConfigurationFailsBeforeCalendarAccess() async throws {
+        let fixture = reconciliationFixture()
+        let invalidYAML = canonicalSettingsYAML(legacyMarkers: []).replacingOccurrences(
+            of: "personalPrefix: \"[ME]\"", with: "personalPrefix: \"invalid\"")
+        let configURL = try writeTemporaryConfigFile(contents: invalidYAML)
+        let store = CommandHandlerCalendarStore(calendars: [fixture.hubCalendar, fixture.workCalendar])
+        let handler = ReconcileCommandHandler(
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { fixture.now })
+
+        do {
+            _ = try await handler.run(config: configURL.path, apply: false, explain: false, cleanupLegacy: false)
+        } catch is YAMLCalendarRelaySettingsError {
+            try expect(
+                await store.listCalendarsCallCount() == 0, "Invalid configuration should fail before Calendar access")
+            return
+        }
+
+        throw TestFailure("Expected structurally invalid configuration failure")
+    }
+
+    private static func testCleanupRequiresLegacyMarkersBeforeCalendarAccess() async throws {
+        let fixture = reconciliationFixture()
+        let configURL = try writeTemporaryConfigFile()
+        let store = CommandHandlerCalendarStore(calendars: [fixture.hubCalendar, fixture.workCalendar])
+        let handler = ReconcileCommandHandler(
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { fixture.now })
+
+        do {
+            _ = try await handler.run(config: configURL.path, apply: false, explain: false, cleanupLegacy: true)
+        } catch let error as CalendarCleanupError {
+            try expect(error == .legacyMarkersRequired, "Cleanup should require at least one legacy marker")
+            try expect(
+                await store.listCalendarsCallCount() == 0, "Missing legacy markers should fail before Calendar access")
+            return
+        }
+
+        throw TestFailure("Expected cleanup to require legacy markers")
+    }
+
+    private static func testOrdinaryModesUseOrdinaryAccessWindow() async throws {
+        let fixture = reconciliationFixture()
+        let configURL = try writeTemporaryConfigFile()
+        let calendar = utcCalendar()
+        let expected = OrdinaryReconciliationWindow.calculate(
+            referenceDate: fixture.now, calendar: calendar, syncWindowDays: 1)
+
+        let dryRunStore = CommandHandlerCalendarStore(calendars: [fixture.hubCalendar, fixture.workCalendar])
+        _ = try await ReconcileCommandHandler(
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: dryRunStore, now: { fixture.now },
+            calendar: calendar
+        ).run(config: configURL.path, apply: false, explain: false, cleanupLegacy: false)
+        try expect(
+            await dryRunStore.eventRequestWindows() == [expected, expected],
+            "Ordinary dry-run should use the ordinary access window")
+
+        let applyStore = CommandHandlerCalendarStore(calendars: [fixture.hubCalendar, fixture.workCalendar])
+        _ = try await ReconcileCommandHandler(
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: applyStore, now: { fixture.now },
+            calendar: calendar
+        ).run(config: configURL.path, apply: true, explain: false, cleanupLegacy: false)
+        try expect(
+            await applyStore.eventRequestWindows() == [expected, expected],
+            "Ordinary apply should use one ordinary preflight snapshot without verification")
+
+        let explainStore = CommandHandlerCalendarStore(calendars: [fixture.hubCalendar, fixture.workCalendar])
+        _ = try await ReconcileCommandHandler(
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: explainStore, now: { fixture.now },
+            calendar: calendar
+        ).run(config: configURL.path, apply: false, explain: true, cleanupLegacy: false)
+        try expect(
+            await explainStore.eventRequestWindows() == [expected, expected],
+            "Ordinary explanation should use the ordinary access window")
+    }
+
+    private static func testCleanupModesUseCleanupAccessWindow() async throws {
+        let fixture = reconciliationFixture()
+        let configURL = try writeTemporaryConfigFile(legacyMarkers: ["[OLD]"])
+        let calendar = utcCalendar()
+        let expected = LegacyCleanupWindow.calculate(referenceDate: fixture.now, calendar: calendar)
+
+        let dryRunStore = CommandHandlerCalendarStore(calendars: [fixture.hubCalendar, fixture.workCalendar])
+        _ = try await ReconcileCommandHandler(
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: dryRunStore, now: { fixture.now },
+            calendar: calendar
+        ).run(config: configURL.path, apply: false, explain: false, cleanupLegacy: true)
+        try expect(
+            await dryRunStore.eventRequestWindows() == [expected, expected],
+            "Cleanup dry-run should use the complete cleanup window")
+
+        let applyStore = CommandHandlerCalendarStore(calendars: [fixture.hubCalendar, fixture.workCalendar])
+        _ = try await ReconcileCommandHandler(
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: applyStore, now: { fixture.now },
+            calendar: calendar
+        ).run(config: configURL.path, apply: true, explain: false, cleanupLegacy: true)
+        try expect(
+            await applyStore.eventRequestWindows() == [expected, expected, expected, expected],
+            "Cleanup apply should repeat the complete cleanup window for verification")
     }
 
     private static func testOrdinaryMigrationPendingFailsBeforeCalendarAccess() async throws {
@@ -326,6 +493,7 @@ enum ReconcileCommandHandlerTests {
             !output.contains("globally retired") && !output.contains("retired everywhere"),
             "Cleanup output should not claim global marker retirement")
         try expect((await store.deletedEvents()).isEmpty, "Cleanup dry-run should not delete events")
+        try expect((await store.createdEvents()).isEmpty, "Cleanup dry-run should never create ordinary projections")
     }
 
     private static func testCleanupDryRunNoMatchUsesLoadedSnapshotScope() async throws {
@@ -394,6 +562,71 @@ enum ReconcileCommandHandlerTests {
         try expect(
             await store.deletedEvents().map(\.id) == [CalendarEventReference(providerIdentifier: "legacy-1")],
             "Cleanup apply should delete the planned event")
+        try expect((await store.createdEvents()).isEmpty, "Cleanup apply should never create ordinary projections")
+    }
+
+    private static func testCleanupApplyFailureOnlyConfirmsCompletedActionsAndStaysPrivate() async throws {
+        let fixture = reconciliationFixture()
+        let hub = CalendarIdentity(
+            id: fixture.hubCalendar.id, title: fixture.hubCalendar.title, sourceTitle: fixture.hubCalendar.sourceTitle)
+        let first = CalendarEvent(
+            id: "private-hub-event", calendar: hub, title: "[SECRET_OLD] Hub Review",
+            start: Date(timeIntervalSince1970: 10_100), end: Date(timeIntervalSince1970: 10_200), isAllDay: false,
+            availability: .busy, status: .confirmed)
+        let second = CalendarEvent(
+            id: "private-work-first", calendar: fixture.workEvent.calendar, title: "[SECRET_OLD] Work First",
+            start: Date(timeIntervalSince1970: 10_300), end: Date(timeIntervalSince1970: 10_400), isAllDay: false,
+            availability: .busy, status: .confirmed)
+        let later = CalendarEvent(
+            id: "private-work-later", calendar: fixture.workEvent.calendar, title: "[SECRET_OLD] Work Later",
+            start: Date(timeIntervalSince1970: 10_500), end: Date(timeIntervalSince1970: 10_600), isAllDay: false,
+            availability: .busy, status: .confirmed)
+        let configURL = try writeTemporaryConfigFile(legacyMarkers: ["[SECRET_OLD]"])
+        let store = CommandHandlerCalendarStore(
+            calendars: [fixture.hubCalendar, fixture.workCalendar],
+            eventsByCalendarID: [fixture.hubCalendar.id: [first], fixture.workCalendar.id: [later, second]],
+            failMutationNumber: 2)
+        let progressiveOutput = CommandOutputRecorder()
+        let handler = ReconcileCommandHandler(
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { fixture.now })
+
+        do {
+            _ = try await handler.run(
+                config: configURL.path, apply: true, explain: false, cleanupLegacy: true,
+                onOutput: { line in await progressiveOutput.record(line) })
+        } catch let error as CalendarCleanupError {
+            guard case .mutationFailed(let partial) = error else {
+                throw TestFailure("Expected cleanup mutation failure, got \(error)")
+            }
+            let lines = await progressiveOutput.values()
+            try expect(lines.count == 2, "Failed cleanup should retain its fresh plan and one successful confirmation")
+            try expect(lines[0].contains("Fresh cleanup plan before mutation"), "Cleanup should review the fresh plan")
+            try expect(lines[1] == "Confirmed delete for Hub.", "Only the successful deletion should be confirmed")
+            try expect(partial.confirmedActionCount == 1, "Partial cleanup result should count only confirmed deletion")
+            try expect(
+                partial.failedRole == .work(name: "ACME", declarationIndex: 0),
+                "Failure should identify the configured role")
+            try expect(partial.failureCategory == .deleteFailed, "Cleanup failure should identify delete category")
+            try expect(await store.mutationAttemptCount() == 2, "Cleanup should stop before the later deletion")
+            try expect(
+                await store.deletedEvents().map(\.id) == [
+                    CalendarEventReference(providerIdentifier: "private-hub-event")
+                ], "Confirmed deletion should remain applied without rollback")
+            let description = error.description
+            try expect(description.contains("partially applied"), "Cleanup failure should report partial application")
+            try expect(
+                description.contains("No rollback was attempted"), "Cleanup failure should give recovery guidance")
+            for forbidden in [
+                "[SECRET_OLD]", "private-hub-event", "private-work-first", "private-work-later", "Hub Review",
+                "Work First", "Work Later", "hub-1", "acme-1"
+            ] {
+                try expect(
+                    !description.contains(forbidden), "Cleanup failure should omit prohibited detail: \(forbidden)")
+            }
+            return
+        }
+
+        throw TestFailure("Expected cleanup apply mutation failure")
     }
 
     private static func testCleanupApplyNoMatchUsesVerificationSnapshotScope() async throws {
@@ -495,6 +728,12 @@ enum ReconcileCommandHandlerTests {
               sourceTitle: "Microsoft"
               calendarTitle: "Beta Work"
         """
+    }
+
+    private static func utcCalendar() -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
     }
 
     private static func expectOutputOrder(_ values: [String], in output: String, message: String) throws {

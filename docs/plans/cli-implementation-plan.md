@@ -6,9 +6,9 @@
 - **Related accepted contracts:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), [`../specs/configuration-spec.md`](../specs/configuration-spec.md), and [`../specs/reconciliation-spec.md`](../specs/reconciliation-spec.md).
 - **Readiness:** Ready. Required outcomes, sequencing, architectural boundaries, privacy constraints, and validation are specific enough to execute without an unresolved product decision.
 - **Progress date:** September 21, 2026.
-- **Implementation state:** Partial. The command hierarchy, shared application use cases, preflight behavior, planning, mutation execution, cleanup verification, explanation, and initial CLI tests exist. This plan closes conformance and evidence gaps instead of rebuilding the CLI.
+- **Implementation state:** Automated implementation and validation complete through `CLI-P06`; separately authorized live EventKit validation remains pending in `CLI-P07`.
 - **Execution approach:** Implement small CLI-facing vertical slices, add focused deterministic evidence with each slice, then add process-level coverage and complete the repository gates.
-- **Workspace constraint:** Preserve the pre-existing staged deletion of `docs/plans/calendar-access-implementation-plan.md`. Do not restore, modify, stage, or otherwise include it in CLI implementation work.
+- **Workspace constraint:** Preserve pre-existing staged CLI implementation and test changes. The deletion of `docs/plans/calendar-access-implementation-plan.md` mentioned by an earlier plan checkpoint was not present when `CLI-P06` began and was not recreated or modified.
 
 ## Outcome
 
@@ -209,7 +209,7 @@ Run `swift run CalRelayKitTests ReconcileCommandHandlerTests`, `CalendarCleanupA
 
 **Completion evidence (September 21, 2026):** Passed `swift run CalRelayKitTests ReconcileCommandHandlerTests`, `swift run CalRelayKitTests CalendarCleanupAccessTests`, and `swift run CalRelayKitTests CalendarAccessPrivacyTests`.
 
-### - [ ] CLI-P04 — Complete deterministic handler and acceptance evidence
+### - [x] CLI-P04 — Complete deterministic handler and acceptance evidence
 
 Expand fake-backed coverage so every CLI acceptance check has deterministic evidence or an explicitly manual-only checkpoint.
 
@@ -235,23 +235,45 @@ Expand fake-backed coverage so every CLI acceptance check has deterministic evid
 - Explanation performs no mutation, covers every loaded input and planned action, shares the ordered action sequence with dry-run, and emits no partial success output or IDs on failure.
 - Cleanup remains delete-only and does not run ordinary projection or current-marker reconciliation.
 
-#### - [ ] CLI-P04-AC1 — Map `CLI-AC-01` through `CLI-AC-06`
+#### - [x] CLI-P04-AC1 — Map `CLI-AC-01` through `CLI-AC-06`
 
 Record deterministic tests for discovery, config check, flag validation, preflight selection, cleanup-only behavior, and ordinary/cleanup no-change success.
 
-#### - [ ] CLI-P04-AC2 — Map `CLI-AC-07` through `CLI-AC-11`
+#### - [x] CLI-P04-AC2 — Map `CLI-AC-07` through `CLI-AC-11`
 
 Record handler or process evidence for binary success semantics, stream routing, partial mutation, explanation equivalence/privacy, configuration ordering, and non-prompting access failures.
 
-#### - [ ] CLI-P04-AC3 — Map `CLI-AC-12` through `CLI-AC-15`
+#### - [x] CLI-P04-AC3 — Map `CLI-AC-12` through `CLI-AC-15`
 
 Record deterministic evidence for cleanup details and verification, direct cleanup apply, all detailed execution-order requirements, and ordinary non-interactive local completion without verification.
 
-#### - [ ] CLI-P04-V1 — Pass the focused deterministic acceptance set
+#### - [x] CLI-P04-V1 — Pass the focused deterministic acceptance set
 
 Run the exact registered suites needed by the acceptance map and keep any unavailable real EventKit evidence explicitly pending rather than reporting it as passed.
 
-### - [ ] CLI-P05 — Add deterministic process-level stream and status tests
+**Deterministic acceptance map (September 21, 2026):**
+
+| CLI acceptance check | Deterministic evidence completed in or retained for this slice | Remaining boundary |
+| --- | --- | --- |
+| `CLI-AC-01` | `CalendarListCommandHandlerTests`, `CalendarAuthorizationTests`, and `CalRelayCLISmokeTests` prove empty-inventory executable success on stdout with status `0`. | Live EventKit inventory remains `CLI-P07`. |
+| `CLI-AC-02` | `ConfigurationFileSelectionTests`, `ConfigCheckCommandHandlerTests`, `CalendarAccessPreflightTests`, and `CalRelayCLISmokeTests` prove ready and migration-pending process status and streams. | Live EventKit preflight remains `CLI-P07`. |
+| `CLI-AC-03` | `CalRelayCLISmokeTests` proves both invalid combinations fail on stderr before configuration access. | None for deterministic process evidence. |
+| `CLI-AC-04` | `ConfigCheckCommandHandlerTests`, `ReconcileCommandHandlerTests`, `CalendarAccessPreflightTests`, `CalendarCleanupAccessTests` | Live EventKit preflight remains `CLI-P07`. |
+| `CLI-AC-05` | `ReconcileCommandHandlerTests`, `CalendarCleanupAccessTests`, and `CalRelayCLISmokeTests` prove cleanup dry-run, direct apply, no-match, and successful deletion processes. | Live EventKit cleanup remains `CLI-P07`. |
+| `CLI-AC-06` | `ReconcileCommandHandlerTests`, `CalendarMutationExecutorTests`, and `CalRelayCLISmokeTests` prove ordinary and cleanup no-change processes return `0` with truthful stdout. | None for deterministic process evidence. |
+| `CLI-AC-07` | `CalRelayCLISmokeTests` proves binary status semantics and successful-result versus failure-diagnostic stdout/stderr routing with semantic assertions. | None. |
+| `CLI-AC-08` | `ReconcileCommandHandlerTests`, `CalendarMutationExecutorTests`, `CalendarAccessPrivacyTests`, and `CalRelayCLISmokeTests` prove ordinary and cleanup partial-process routing, stop-on-first-failure, and no-rollback guidance. | Live provider failure behavior remains `CLI-P07`. |
+| `CLI-AC-09` | `ReconcileCommandHandlerTests`, `CalRelayContractTests`, and `CalRelayCLISmokeTests` prove successful and failed explanation streams, complete sections, approved success IDs, non-mutation, and shared ordered actions. | Live EventKit explanation remains `CLI-P07`. |
+| `CLI-AC-10` | `ConfigurationFileSelectionTests`, `ConfigCheckCommandHandlerTests`, `ReconcileCommandHandlerTests`, and `CalRelayCLISmokeTests` prove missing and invalid selected configuration process failures. | None. |
+| `CLI-AC-11` | `CalendarAuthorizationTests`, `CalendarAccessPreflightTests`, `ConfigCheckCommandHandlerTests`, `ReconcileCommandHandlerTests`, and `CalRelayCLISmokeTests` prove actionable privacy-safe access failure on stderr with nonzero status. | Real macOS authorization states remain `CLI-P07`. |
+| `CLI-AC-12` | `ReconcileCommandHandlerTests`, `CalendarCleanupAccessTests`, `CalendarAccessPrivacyTests`, and `CalRelayCLISmokeTests` prove cleanup review, local-scope success, privacy, progressive confirmation, and failure streams. | Live EventKit cleanup remains `CLI-P07`. |
+| `CLI-AC-13` | `ReconcileCommandHandlerTests`, `CalendarCleanupAccessTests`, and `CalRelayCLISmokeTests` prove direct cleanup `--apply` reviews the fresh plan and proceeds non-interactively. | Live EventKit cleanup remains `CLI-P07`. |
+| `CLI-AC-14` | `ReconcileCommandHandlerTests`, `CalendarCleanupAccessTests`, `CalRelayContractTests`, and `CalRelayCLISmokeTests` prove ordinary dry-run, explanation, and cleanup process rows follow execution order. | None. |
+| `CLI-AC-15` | `ReconcileCommandHandlerTests`, `CalendarMutationExecutorTests`, `CalRelayContractTests`, and `CalRelayCLISmokeTests` prove direct ordinary apply confirmations, success, partial failure, and no post-apply verification claim. | Live provider behavior remains `CLI-P07`. |
+
+**Completion evidence (September 21, 2026):** Passed the exact registered suites `ConfigurationFileSelectionTests`, `CalendarListCommandHandlerTests`, `ConfigCheckCommandHandlerTests`, `ReconcileCommandHandlerTests`, `CalendarAuthorizationTests`, `CalendarAccessPreflightTests`, `CalendarCleanupAccessTests`, `CalendarMutationExecutorTests`, `CalendarAccessPrivacyTests`, `CalRelayContractTests`, and `CalRelayCLISmokeTests`.
+
+### - [x] CLI-P05 — Add deterministic process-level stream and status tests
 
 Test the actual executable without granting tests live Calendar access by introducing the smallest safe CLI-owned composition seam.
 
@@ -277,23 +299,25 @@ Test the actual executable without granting tests live Calendar access by introd
 - Add no public flag and make no change to production command help.
 - Keep process assertions semantic: status zero versus nonzero, expected stream, required sections, prohibited details, and relative row order rather than complete presentation snapshots.
 
-#### - [ ] CLI-P05-AC1 — Prove representative successful processes
+#### - [x] CLI-P05-AC1 — Prove representative successful processes
 
 Process tests cover empty inventory, ready config check, ordinary no-change apply, cleanup no-match dry-run/apply, and all four help commands with status `0`, successful results on stdout, and no failure diagnostics on stderr.
 
-#### - [ ] CLI-P05-AC2 — Prove validation, configuration, and access failures
+#### - [x] CLI-P05-AC2 — Prove validation, configuration, and access failures
 
 Process tests cover incompatible flags before configuration access, missing or invalid selected configuration, migration pending, and unavailable Calendar access with nonzero status, actionable privacy-safe stderr, and no false stdout success result.
 
-#### - [ ] CLI-P05-AC3 — Prove progressive output under partial failure
+#### - [x] CLI-P05-AC3 — Prove progressive output under partial failure
 
 Ordinary and cleanup process scenarios retain only confirmations for completed actions on stdout, write the privacy-safe partial or verification failure plus recovery guidance to stderr, return nonzero, stop later mutations, and perform no rollback.
 
-#### - [ ] CLI-P05-V1 — Pass the executable smoke suite through the custom runner
+#### - [x] CLI-P05-V1 — Pass the executable smoke suite through the custom runner
 
 Run `swift run CalRelayKitTests CalRelayCLISmokeTests` after ensuring the debug CLI executable is available, then confirm the same suite passes within `make check`.
 
-### - [ ] CLI-P06 — Align documentation and complete automated validation
+**Completion evidence (September 21, 2026):** `CalRelayCLISmokeTests` executes the debug `calrelay` binary against fixed fake-composed scenarios and covers all four help commands, empty inventory, ready and migration-pending config checks, missing and invalid configuration, unavailable Calendar access, ordinary no-change and ordered-action dry-run/apply/explanation, cleanup no-match and successful direct apply, and ordinary/cleanup partial mutation failures. Focused `swift-format` and SwiftLint checks passed. A release build passed and its executable contained none of the process-test activation or fixed-scenario strings.
+
+### - [x] CLI-P06 — Align documentation and complete automated validation
 
 Update project references only where observable behavior or validation workflow changes, then run the complete code/tooling handoff gate.
 
@@ -316,17 +340,19 @@ Update project references only where observable behavior or validation workflow 
 - Keep the README brief and link to canonical detail.
 - Make all four specification-listed help commands explicit smoke checks in the repository gate without replacing process-level tests.
 
-#### - [ ] CLI-P06-AC1 — Align project references and validation entry points
+#### - [x] CLI-P06-AC1 — Align project references and validation entry points
 
 Referenced commands, paths, cleanup workflow, and help checks match the implementation and accepted contracts without introducing a competing behavior source of truth.
 
-#### - [ ] CLI-P06-AC2 — Preserve documentation and workspace hygiene
+#### - [x] CLI-P06-AC2 — Preserve documentation and workspace hygiene
 
 Documentation contains no sensitive local data, all referenced repository paths exist, agent-created changes remain unstaged, and the unrelated staged plan deletion remains untouched.
 
-#### - [ ] CLI-P06-V1 — Pass complete automated gates
+#### - [x] CLI-P06-V1 — Pass complete automated gates
 
 Run `make format-check`, `make check`, the four explicit CLI help invocations, and `git --no-pager diff HEAD --check`. Report any skipped or pre-existing failure accurately.
+
+**Completion evidence (September 21, 2026):** `docs/configuration.md` now demonstrates relative, supported home-relative, and absolute overrides and documents zero-inclusive cleanup role/count summaries plus transient review details. `docs/manual-validation.md` now checks those summaries, local point-in-time success wording, and manual tombstone removal guidance. `docs/development.md` and `Makefile` now identify and execute all four specification-listed help smoke checks. `swift run CalRelayKitTests CalRelayCLISmokeTests`, `make format-check`, `make check`, all four explicit help commands, referenced-path checks, and `git --no-pager diff HEAD --check` completed successfully. `make format-check` retained the repository's existing warning-only formatter diagnostics; SwiftLint reported zero violations. Agent-created `CLI-P06` changes remained unstaged, and the pre-existing staged CLI changes were left untouched.
 
 ### - [ ] CLI-P07 — Complete authorized live validation and final handoff
 
@@ -437,26 +463,26 @@ Do not use `swift test`; this repository uses the `CalRelayKitTests` executable 
 
 ### Deterministic acceptance coverage
 
-- [ ] CLI-P04 — Complete deterministic handler and acceptance evidence
-- [ ] CLI-P04-AC1 — Map `CLI-AC-01` through `CLI-AC-06`
-- [ ] CLI-P04-AC2 — Map `CLI-AC-07` through `CLI-AC-11`
-- [ ] CLI-P04-AC3 — Map `CLI-AC-12` through `CLI-AC-15`
-- [ ] CLI-P04-V1 — Pass the focused deterministic acceptance set
+- [x] CLI-P04 — Complete deterministic handler and acceptance evidence
+- [x] CLI-P04-AC1 — Map `CLI-AC-01` through `CLI-AC-06`
+- [x] CLI-P04-AC2 — Map `CLI-AC-07` through `CLI-AC-11`
+- [x] CLI-P04-AC3 — Map `CLI-AC-12` through `CLI-AC-15`
+- [x] CLI-P04-V1 — Pass the focused deterministic acceptance set
 
 ### Process-level coverage
 
-- [ ] CLI-P05 — Add deterministic process-level stream and status tests
-- [ ] CLI-P05-AC1 — Prove representative successful processes
-- [ ] CLI-P05-AC2 — Prove validation, configuration, and access failures
-- [ ] CLI-P05-AC3 — Prove progressive output under partial failure
-- [ ] CLI-P05-V1 — Pass the executable smoke suite through the custom runner
+- [x] CLI-P05 — Add deterministic process-level stream and status tests
+- [x] CLI-P05-AC1 — Prove representative successful processes
+- [x] CLI-P05-AC2 — Prove validation, configuration, and access failures
+- [x] CLI-P05-AC3 — Prove progressive output under partial failure
+- [x] CLI-P05-V1 — Pass the executable smoke suite through the custom runner
 
 ### Documentation and automated gate
 
-- [ ] CLI-P06 — Align documentation and complete automated validation
-- [ ] CLI-P06-AC1 — Align project references and validation entry points
-- [ ] CLI-P06-AC2 — Preserve documentation and workspace hygiene
-- [ ] CLI-P06-V1 — Pass complete automated gates
+- [x] CLI-P06 — Align documentation and complete automated validation
+- [x] CLI-P06-AC1 — Align project references and validation entry points
+- [x] CLI-P06-AC2 — Preserve documentation and workspace hygiene
+- [x] CLI-P06-V1 — Pass complete automated gates
 
 ### Live validation and handoff
 
@@ -467,7 +493,7 @@ Do not use `swift test`; this repository uses the `CalRelayKitTests` executable 
 ## Handoff
 
 - **Plan readiness:** Ready.
-- **Next executable task:** `CLI-P04` — complete deterministic handler and acceptance evidence.
+- **Next executable task:** `CLI-P07` — complete separately authorized live EventKit validation and final handoff, or record the missing authorization or harmless-calendar environment as an explicit blocker.
 - **Blocking product decisions:** None.
 - **Conditional final checkpoint:** `CLI-P07` requires explicit authorization and suitable harmless dedicated calendars; it does not block automated implementation and validation through `CLI-P06`.
 - **Deferred enhancements:** machine-readable output, new public commands or flags, stable failure-code categories, cross-process locking, provider APIs, and automatic marker-retirement editing remain outside this plan.

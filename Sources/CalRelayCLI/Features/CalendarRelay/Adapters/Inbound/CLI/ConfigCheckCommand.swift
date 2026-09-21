@@ -8,10 +8,11 @@ struct ConfigCheckCommand: AsyncParsableCommand {
     @Option(name: .long, help: "Override path to the CalRelay YAML configuration file.") var config: String?
 
     func run() async throws {
-        let authorization = EventKitCalendarAuthorizationStatus()
-        let calendarStore = EventKitCalendarStore(authorizationStatus: authorization)
+        let composition = CalendarCLIComposition.current()
         print(
-            try await ConfigCheckCommandHandler(authorizationStatus: authorization, calendarStore: calendarStore).run(
-                config: config))
+            try await ConfigCheckCommandHandler(
+                authorizationStatus: composition.authorizationStatus, calendarStore: composition.calendarStore,
+                now: composition.now, calendar: composition.calendar
+            ).run(config: config))
     }
 }

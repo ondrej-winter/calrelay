@@ -15,7 +15,7 @@ actor CommandHandlerCalendarStore: CalendarStorePort {
     private var recordedCreates: [CalendarEventProjection] = []
     private var recordedDeletes: [CalendarEventIdentity] = []
     private var listCalendarsCalls = 0
-    private var recordedEventRequests: [PhysicalCalendarReference] = []
+    private var recordedEventRequests: [(calendarID: PhysicalCalendarReference, window: CalendarAccessWindow)] = []
     private let failMutationNumber: Int?
     private var mutationAttempts = 0
 
@@ -34,7 +34,7 @@ actor CommandHandlerCalendarStore: CalendarStorePort {
     }
 
     func events(in calendar: CalendarIdentity, from start: Date, to end: Date) async throws -> [CalendarEvent] {
-        recordedEventRequests.append(calendar.id)
+        recordedEventRequests.append((calendar.id, CalendarAccessWindow(start: start, end: end)))
         return eventsByCalendarID[calendar.id, default: []]
     }
 
@@ -55,7 +55,11 @@ actor CommandHandlerCalendarStore: CalendarStorePort {
 
     func listCalendarsCallCount() -> Int { listCalendarsCalls }
 
-    func eventRequestCalendarIDs() -> [PhysicalCalendarReference] { recordedEventRequests }
+    func eventRequestCalendarIDs() -> [PhysicalCalendarReference] { recordedEventRequests.map(\.calendarID) }
+
+    func eventRequestWindows() -> [CalendarAccessWindow] { recordedEventRequests.map(\.window) }
+
+    func mutationAttemptCount() -> Int { mutationAttempts }
 
     private func recordMutationAttempt() throws {
         mutationAttempts += 1

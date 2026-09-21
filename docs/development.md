@@ -26,7 +26,7 @@ make app
 make commit
 ```
 
-`make check` runs linting, a SwiftPM build, the deterministic SwiftPM executable test runner, and a CLI help smoke check. The underlying commands remain ordinary SwiftPM commands and can still be run directly when debugging a specific step:
+`make check` runs linting, a SwiftPM build, the deterministic SwiftPM executable test runner, and help smoke checks for the root command, calendar inventory, configuration readiness, and reconciliation. The underlying commands remain ordinary SwiftPM commands and can still be run directly when debugging a specific step:
 
 ```sh
 make format-check
@@ -35,6 +35,9 @@ make lint
 make build
 make test
 swift run calrelay --help
+swift run calrelay calendars --help
+swift run calrelay config check --help
+swift run calrelay reconcile --help
 ```
 
 `make format-check` and `make format` use the repository `swift-format` configuration. The formatter is available as a separate target so a future formatting-only change can adopt it without mixing mechanical formatting churn into feature work.

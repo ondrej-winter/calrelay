@@ -165,7 +165,7 @@ Use only harmless, dedicated test calendars. Cleanup is a broad deletion workflo
    swift run calrelay reconcile --config calrelay.yml --explain
    ```
 
-5. Preview the cleanup-only plan and confirm it reports local dates `D - 2` through `D + 365`, uses positive-overlap membership, selects only exact `[RETIRED_TEST]` marker matches, plans no creates, and shows each selected event's title, configured role, and time or all-day range without EventKit IDs, selectors, calendar titles, or marker values. Confirm rows follow hub-first then declaration-ordered work-calendar execution order:
+5. Preview the cleanup-only plan and confirm it reports local dates `D - 2` through `D + 365`, uses positive-overlap membership, selects only exact `[RETIRED_TEST]` marker matches, and plans no creates. Confirm the summary lists every configured role, including roles with zero matches, with per-role and total selected-deletion counts. Confirm each transient review row shows the selected event's title, configured role, and time or all-day range without EventKit IDs, selectors, calendar titles, or marker values, and that rows follow hub-first then declaration-ordered work-calendar execution order:
 
    ```sh
    swift run calrelay reconcile --config calrelay.yml --cleanup-legacy
@@ -177,7 +177,7 @@ Use only harmless, dedicated test calendars. Cleanup is a broad deletion workflo
    swift run calrelay reconcile --config calrelay.yml --cleanup-legacy --apply
    ```
 
-7. Confirm apply reports success only after a complete bounded-range verification snapshot, then run cleanup dry-run again and confirm it reports no local matches without claiming global or historical marker retirement.
+7. Confirm apply reports success only after a complete bounded-range verification snapshot, states that the result is local and point-in-time, and directs you to remove the tombstone manually only after migration is complete for the topology. Then run cleanup dry-run again and confirm it reports no local matches without claiming global or historical marker retirement.
 8. Create a matching event older than `D - 2` and confirm cleanup makes no claim to cover or remove it.
 9. Create a historical malformed title shape that cannot satisfy the current exact marker grammar and confirm cleanup does not select it; remove it manually from the harmless test calendar.
 10. Remove `[RETIRED_TEST]` from `legacyMarkers`, run config check, and confirm ordinary readiness can succeed again.
