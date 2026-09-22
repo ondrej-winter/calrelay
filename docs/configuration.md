@@ -256,7 +256,7 @@ swift run calrelay reconcile --cleanup-legacy --apply
 
 Before adding a marker to `legacyMarkers`, retire it from every current work-marker and personal-marker role in every active configuration sharing the hub. CalRelay cannot verify this global prerequisite.
 
-Account for machines that are dormant, retired, or temporarily offline. Before any such machine reconnects, update it to the current topology and pass normal readiness so it cannot recreate the retired assignment.
+Account for writers on machines that are dormant, decommissioned, or temporarily offline. Before any such writer reconnects or resumes automation, update it to the current topology, remove or replace every stale marker assignment, and pass normal readiness. Do not let an old configuration publish even temporarily, because it can recreate artifacts under the retired marker.
 
 In the app, **Dry Run Legacy Cleanup** shows the bounded range, deletion count, and each selected event's title with its leading legacy marker omitted, configured role, and time or all-day range transiently in execution order. Close the review without mutation, or start **Run Legacy Cleanup…** for a new review with separate explicit confirmation. App cleanup uses the same bounded plan, complete-topology preflight, exact marker selection, and post-apply verification as the CLI. Confirmation is one-use and applies only to the fresh ordered executable plan; scheduling authorization never authorizes cleanup. EventKit IDs, selectors, calendar titles, and explicit marker values remain hidden, and review details are never persisted or logged.
 
@@ -272,7 +272,7 @@ Cleanup accepts only the current exact marker grammar. Historical events using a
 
 Cleanup deletes exact returned occurrences only. Manually inspect and remove a recurring series that can produce `[OLD]` occurrences beyond the bounded cleanup range; one successful bounded cleanup does not prove that the series cannot recreate the marker later.
 
-A retired marker may be reused as a current work or personal marker only after operators manually verify that no matching artifact remains anywhere it could exist, including the shared hub, every current or removed work calendar, historical events outside the cleanup range, and future occurrences from recurring series. Operators must also ensure that no dormant writer can reconnect with the old assignment. CalRelay cannot perform or prove this global verification.
+A retired marker may be reused as a current work or personal marker only after operators manually verify that no matching artifact remains anywhere it could exist, including the shared hub, every current or removed work calendar, historical events outside the cleanup range, and future occurrences from recurring series. Operators must also ensure that every dormant writer has adopted the current topology or is permanently prevented from reconnecting, so none can republish the old assignment. CalRelay cannot perform or prove this global verification.
 
 ## Validation and safety notes
 

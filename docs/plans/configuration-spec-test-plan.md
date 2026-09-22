@@ -6,7 +6,7 @@
 - **Related accepted contracts:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), [`../specs/projection-and-safety-spec.md`](../specs/projection-and-safety-spec.md), [`../specs/routing-spec.md`](../specs/routing-spec.md), [`../specs/reconciliation-spec.md`](../specs/reconciliation-spec.md), [`../specs/cli-spec.md`](../specs/cli-spec.md), and [`../specs/macos-app-spec.md`](../specs/macos-app-spec.md).
 - **Readiness:** Ready. The required outcomes, test boundaries, expected evidence, sequencing, and validation commands are specific enough to execute without an unresolved product decision.
 - **Progress date:** September 22, 2026.
-- **Implementation state:** In progress. `CFG-P01` through `CFG-P06` are complete with focused schema, path-selection, fresh file-provider, runtime-readiness, migration-gate, bounded-cleanup, fresh app-loading, configuration-race, authorization-revocation, semantic-identity, policy-version, resolved-topology, and persistence-privacy coverage plus repository validation; `CFG-P07` is the next executable slice.
+- **Implementation state:** In progress. `CFG-P01` through `CFG-P07` are complete with focused schema, path-selection, fresh file-provider, runtime-readiness, migration-gate, bounded-cleanup, fresh app-loading, configuration-race, authorization-revocation, semantic-identity, policy-version, resolved-topology, persistence-privacy, and operator-documentation coverage plus repository validation; `CFG-P08` is the next executable slice.
 - **Execution approach:** Add focused deterministic contract evidence for uncovered behavior, preserve useful existing suites, fix only defects exposed by specification-derived tests, then run the complete repository gate.
 
 ## Outcome
@@ -362,7 +362,7 @@ Run the exact affected suites and record current evidence for semantic equality,
 
 **Evidence (September 22, 2026):** Added `CalendarConfigurationIdentityTests` through the public opaque standing-authorization binding and registered it in the custom runner. The matrix proves equivalent YAML representation, omitted versus explicit defaults, diagnostic-name changes, and legacy-marker ordering preserve identity; every mutation-relevant setting change alters identity; ordered physical topology and continuity changes alter identity; and reconciliation-policy version changes invalidate the binding while presentation-only changes do not. Persistence tests now also verify the versioned digest-only stored shape plus privacy-safe binding, physical-reference, status, automatic-result, notification, and failure output. No production behavior defect was exposed; only an adjacent policy-version maintenance note was added. The focused command `swift run CalRelayKitTests CalendarConfigurationIdentityTests CalendarAutomationPersistenceTests CalendarStandingAuthorizationTests CalendarAutomaticReconciliationTests` passed. `make format-check` and `make check` passed; the former retained existing warning-only repository formatting diagnostics, and the latter reported zero lint violations with existing non-failing local linker search-path warnings.
 
-### - [ ] CFG-P07 — Verify migration and retired-marker documentation contracts
+### - [x] CFG-P07 — Verify migration and retired-marker documentation contracts
 
 Review the project-facing configuration guide semantically rather than snapshotting whole paragraphs. Edit only if an accepted operator obligation is absent, ambiguous, or contradicted.
 
@@ -372,17 +372,19 @@ Review the project-facing configuration guide semantically rather than snapshott
 
 - `docs/configuration.md`
 
-#### - [ ] CFG-P07-AC1 — Verify active-topology retirement, removed-calendar handling, and exact-only cleanup guidance
+#### - [x] CFG-P07-AC1 — Verify active-topology retirement, removed-calendar handling, and exact-only cleanup guidance
 
 Documentation requires retiring a tombstoned marker from every active configuration sharing the hub, manually handling removed calendars and non-exact historical artifacts, and never treating fuzzy, raw-prefix, or heuristic deletion as available.
 
-#### - [ ] CFG-P07-AC2 — Verify dormant-writer, recurring-series, global-verification, and reuse guidance
+#### - [x] CFG-P07-AC2 — Verify dormant-writer, recurring-series, global-verification, and reuse guidance
 
 Documentation requires dormant writers to adopt the current topology and pass readiness before reconnecting, manual removal of future-producing recurring series, global artifact verification before marker reuse, and prevention of stale republishing.
 
-#### - [ ] CFG-P07-V1 — Validate documentation references and diff hygiene
+#### - [x] CFG-P07-V1 — Validate documentation references and diff hygiene
 
 Verify every referenced path and command, then run `git --no-pager diff HEAD --check`. Do not invent a Markdown formatter; none is configured.
+
+**Evidence (September 22, 2026):** Semantic review confirmed that `docs/configuration.md` already requires retiring each tombstoned marker from every active configuration sharing the hub, manually handling artifacts in removed calendars and non-exact historical forms, avoiding fuzzy or heuristic deletion, removing future-producing recurring series, and completing manual global artifact verification before marker reuse. The dormant-writer guidance was tightened to require adoption of the current topology, removal or replacement of stale marker assignments, normal readiness before reconnection or resumed automation, and explicit prevention of even temporary stale republishing. No runtime test was added because these are operator-managed prerequisites that CalRelay cannot prove. Referenced local documentation paths exist, `swift run calrelay reconcile --help` confirms the documented cleanup and apply options, and `git --no-pager diff HEAD --check` passed.
 
 ### - [ ] CFG-P08 — Integrate suites and complete repository validation
 
@@ -547,10 +549,10 @@ Apply the conditions in `CFG-P08-V4`; do not run real EventKit or real-calendar 
 
 ### Documentation
 
-- [ ] CFG-P07 — Verify migration and retired-marker documentation contracts
-- [ ] CFG-P07-AC1 — Verify active-topology retirement, removed-calendar handling, and exact-only cleanup guidance
-- [ ] CFG-P07-AC2 — Verify dormant-writer, recurring-series, global-verification, and reuse guidance
-- [ ] CFG-P07-V1 — Validate documentation references and diff hygiene
+- [x] CFG-P07 — Verify migration and retired-marker documentation contracts
+- [x] CFG-P07-AC1 — Verify active-topology retirement, removed-calendar handling, and exact-only cleanup guidance
+- [x] CFG-P07-AC2 — Verify dormant-writer, recurring-series, global-verification, and reuse guidance
+- [x] CFG-P07-V1 — Validate documentation references and diff hygiene
 
 ### Integration and final validation
 
@@ -565,4 +567,4 @@ Apply the conditions in `CFG-P08-V4`; do not run real EventKit or real-calendar 
 
 ## Next executable work
 
-Continue with `CFG-P07`: verify the migration and retired-marker operator documentation contracts, edit only if an accepted obligation is absent or ambiguous, and validate documentation references plus diff hygiene.
+Continue with `CFG-P08`: review final acceptance-check traceability and architecture boundaries, confirm every suite remains registered and focusable through the custom runner, then run the complete repository validation and final diff-hygiene gate.
