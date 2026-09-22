@@ -193,12 +193,8 @@ public final class EventKitCalendarStore: CalendarStorePort, @unchecked Sendable
                 id: candidate.eventIdentifier ?? candidate.calendarItemIdentifier,
                 calendarID: candidate.calendar.calendarIdentifier, occurrenceDate: candidate.occurrenceDate)
         }
-        let matchingIndices = EventKitExactEventOccurrenceSelector.matchingCandidateIndices(
+        let matchingIndex = try EventKitExactEventOccurrenceResolver.resolveCandidateIndex(
             for: event, in: candidateValues)
-
-        guard let matchingIndex = matchingIndices.first else { throw EventKitCalendarStoreError.eventNotFound(event) }
-
-        guard matchingIndices.count == 1 else { throw EventKitCalendarStoreError.eventAmbiguous(event) }
 
         return candidates[matchingIndex]
     }

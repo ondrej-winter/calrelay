@@ -12,14 +12,22 @@ public struct EventKitEventOccurrenceCandidate: Equatable, Sendable {
     }
 }
 
-public enum EventKitExactEventOccurrenceSelector {
-    public static func matchingCandidateIndices(
+public enum EventKitExactEventOccurrenceResolver {
+    public static func resolveCandidateIndex(
         for identity: CalendarEventIdentity, in candidates: [EventKitEventOccurrenceCandidate]
-    ) -> [Int] {
-        candidates.indices.filter { index in
+    ) throws -> Int {
+        let matchingIndices = candidates.indices.filter { index in
             let candidate = candidates[index]
             return candidate.id == identity.id && candidate.calendarID == identity.calendar.id
                 && candidate.occurrenceDate == identity.occurrenceDate
         }
+
+        guard let matchingIndex = matchingIndices.first else {
+            throw EventKitCalendarStoreError.eventNotFound(identity)
+        }
+
+        guard matchingIndices.count == 1 else { throw EventKitCalendarStoreError.eventAmbiguous(identity) }
+
+        return matchingIndex
     }
 }

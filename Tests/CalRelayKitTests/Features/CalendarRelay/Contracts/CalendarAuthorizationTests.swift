@@ -8,8 +8,6 @@ enum CalendarAuthorizationTests {
         try await testInventoryRequiresFullAccessWithoutRequesting()
         try await testInventoryReturnsEmptySuccessfulInventory()
         try testOpaqueProviderReferencesPreserveIdentityWithoutStringExposure()
-        try testExactOccurrenceSelectionUsesOriginalOccurrenceDate()
-        try testExactOccurrenceSelectionRejectsAmbiguousCandidates()
     }
 
     private static func testSetupRequestsOnlyWhenAuthorizationIsNotDetermined() async throws {
@@ -84,42 +82,8 @@ enum CalendarAuthorizationTests {
             "Event references should not expose provider identifiers through descriptions")
     }
 
-    private static func testExactOccurrenceSelectionUsesOriginalOccurrenceDate() throws {
-        let occurrenceDate = Date(timeIntervalSince1970: 10_000)
-        let identity = CalendarEventIdentity(
-            id: "series-1", calendar: calendarIdentity(), occurrenceDate: occurrenceDate,
-            lookupStart: Date(timeIntervalSince1970: 1_000), lookupEnd: Date(timeIntervalSince1970: 100_000))
-        let candidates = [
-            EventKitEventOccurrenceCandidate(
-                id: "series-1", calendarID: "calendar-1", occurrenceDate: Date(timeIntervalSince1970: 9_000)),
-            EventKitEventOccurrenceCandidate(id: "series-1", calendarID: "calendar-1", occurrenceDate: occurrenceDate)
-        ]
-
-        let matches = EventKitExactEventOccurrenceSelector.matchingCandidateIndices(for: identity, in: candidates)
-
-        try expect(matches == [1], "Detached occurrence lookup should use the stable original occurrence date")
-    }
-
-    private static func testExactOccurrenceSelectionRejectsAmbiguousCandidates() throws {
-        let occurrenceDate = Date(timeIntervalSince1970: 10_000)
-        let identity = CalendarEventIdentity(
-            id: "series-1", calendar: calendarIdentity(), occurrenceDate: occurrenceDate,
-            lookupStart: Date(timeIntervalSince1970: 1_000), lookupEnd: Date(timeIntervalSince1970: 100_000))
-        let candidate = EventKitEventOccurrenceCandidate(
-            id: "series-1", calendarID: "calendar-1", occurrenceDate: occurrenceDate)
-
-        let matches = EventKitExactEventOccurrenceSelector.matchingCandidateIndices(
-            for: identity, in: [candidate, candidate])
-
-        try expect(matches.count == 2, "The adapter should be able to detect an ambiguous exact occurrence lookup")
-    }
-
     private static func calendar() -> RelayCalendar {
         RelayCalendar(id: "calendar-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: true)
-    }
-
-    private static func calendarIdentity() -> CalendarIdentity {
-        CalendarIdentity(id: "calendar-1", title: "Personal Work", sourceTitle: "iCloud")
     }
 
     private static func expect(_ condition: Bool, _ message: String) throws {

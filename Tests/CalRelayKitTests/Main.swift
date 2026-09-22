@@ -49,6 +49,9 @@ import Foundation
         if filters.isEmpty || filters.contains("CalendarAuthorizationTests") {
             try await CalendarAuthorizationTests.runAll()
         }
+        if filters.isEmpty || filters.contains("EventKitExactEventOccurrenceResolverTests") {
+            try ExactEventOccurrenceResolverTests.runAll()
+        }
         if filters.isEmpty || filters.contains("CalendarNoPromptContractTests") {
             try await CalendarNoPromptContractTests.runAll()
         }

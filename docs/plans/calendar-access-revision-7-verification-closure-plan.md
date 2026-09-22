@@ -57,10 +57,10 @@ Any production correction discovered by the planned tests must:
 | `ACCESS-01` — Permission ownership and authorization states | Implemented | **Partially direct.** `CalendarAuthorizationTests` proves setup requests only for `.notDetermined`, and `CalendarNoPromptContractTests` plus `CalendarAutomaticReconciliationTests` prove inventory, config check, ordinary CLI and app operations, cleanup, standing authorization, automatic ordinary runs, retries, and revocation never request. | Add app permission-metadata checks in `CAV-04`. |
 | `ACCESS-02` — Calendar discovery | Implemented | **Directly tested.** Configuration-independent inventory, empty success, CLI IDs and writability, app ID omission, and separation from configured readiness are covered. | None; retain the existing tests. |
 | `ACCESS-03` — Ordinary configured-topology readiness | Implemented | **Directly tested.** Shared preflight covers authorization, missing, ambiguous, colliding, unreadable, and read-only roles; ordered reads, aggregation, no-prompt behavior, and no-mutation gates are covered across reusable, CLI, manual-app, and automatic paths. | None; retain the existing tests. |
-| `ACCESS-04` — Legacy-cleanup preflight | Implemented | **Directly tested.** Complete-range reads, all-role gating, no-prompt behavior, ordered verification, remaining-match failure, verification-read failure, and no rollback are covered. | Add exact recurring-occurrence adapter closure in `CAV-02`. |
+| `ACCESS-04` — Legacy-cleanup preflight | Implemented | **Directly tested.** Complete-range reads, all-role gating, no-prompt behavior, ordered verification, remaining-match failure, verification-read failure, no rollback, and exact recurring-occurrence resolution are covered. | None. |
 | `ACCESS-05` — Failure after mutation begins | Implemented | **Directly tested.** Ordered confirmation, stop-on-first-failure, partial counts, no rollback, empty ordinary success, and no ordinary verification reread are covered. | None. |
 | `ACCESS-06` — Privacy-safe diagnostics and cleanup review | Implemented | **Partially direct.** Partial failures, cleanup failures, app inventory, cleanup review, automatic state, notification output, and persistence have tests, but the identifier allowlist and denylist are distributed across suites and are not uniformly sentinel-backed. | Consolidate and strengthen assertions in `CAV-03`. |
-| `ACCESS-07` — EventKit boundary | Implemented | **Partially direct.** Opaque physical identities, ordered snapshots, exact candidate filtering, reviewed-action identity, and topology binding are tested. The EventKit store's throwing zero-match and ambiguous-match decision remains inferred from private integration code. | Add the deterministic throwing resolver seam and exact failure matrix in `CAV-02`. |
+| `ACCESS-07` — EventKit boundary | Implemented | **Directly tested.** Opaque physical identities, ordered snapshots, reviewed-action identity, topology binding, and the deterministic exact-occurrence zero/one/many decision consumed by `EventKitCalendarStore` are covered. | None. |
 
 ## Acceptance-check traceability
 
@@ -77,13 +77,13 @@ Any production correction discovered by the planned tests must:
 | `ACCESS-AC-09` | **Partially direct** | CLI inventory and explanation, cleanup review, failure, and app-inventory tests | Strengthen the explicit ID allowlist and the readiness, failure, cleanup, app, and persistence denylist with recognizable sentinels. |
 | `ACCESS-AC-10` | **Directly tested** | Fake-backed custom runner and framework-free domain and application APIs | None. All new tests must remain deterministic, fake-backed, offline, and independent of live EventKit access. |
 | `ACCESS-AC-11` | **Partially direct** | `CalendarAutomationPersistenceTests`, cleanup presentation tests, and attention-state tests | Expand the common prohibited-value corpus to include both event and calendar identifiers, then verify persisted and app-facing output against it. |
-| `ACCESS-AC-12` | **Partially direct** | Candidate-matching tests prove exact and ambiguous matching | Missing and ambiguous exact matches do not directly assert the throwing decision consumed by `EventKitCalendarStore`; exact success should also prove no neighboring-occurrence substitution. |
+| `ACCESS-AC-12` | **Directly tested** | `testResolvesOnlyTheExactPlannedOccurrence`, `testMissingExactOccurrenceThrowsEventNotFound`, and `testDuplicateExactCandidatesThrowEventAmbiguous` in `EventKitExactEventOccurrenceResolverTests` | None. |
 | `ACCESS-AC-13` | **Directly tested** | Ordinary, cleanup, cleanup-verification, and automatic ordered-read tests | None. |
 | `ACCESS-AC-14` | **Directly tested** | `CalendarReviewedActionTests`, configuration identity, standing authorization, and opaque-reference tests | None. |
 | `ACCESS-AC-15` | **Directly tested** | Mutation executor, CLI ordinary apply, cleanup verification, manual apply, and automatic reconciliation tests | None. |
 
 No acceptance check is entirely uncovered. The remaining gaps are bounded parts
-of `ACCESS-AC-01`, `ACCESS-AC-09`, `ACCESS-AC-11`, and `ACCESS-AC-12`.
+of `ACCESS-AC-01`, `ACCESS-AC-09`, and `ACCESS-AC-11`.
 
 ## Execution summary
 
@@ -93,7 +93,7 @@ each changes
 `/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay/Tests/CalRelayKitTests/Main.swift`
 to avoid overlapping suite-registration edits.
 
-The next executable task is `CAV-02`. No task is blocked.
+The next executable task is `CAV-03`. No task is blocked.
 
 ## Detailed tasks
 
@@ -180,7 +180,7 @@ that existing evidence.
     CalendarAutomaticReconciliationTests
   ```
 
-### [ ] CAV-02 — Test the exact recurring-occurrence resolution decision
+### [x] CAV-02 — Test the exact recurring-occurrence resolution decision
 
 **Dependencies:** None.
 
@@ -229,16 +229,16 @@ that controls deletion.
 
 #### Acceptance and verification
 
-- [ ] **CAV-02-AC1:** The exact planned recurring occurrence resolves
+- [x] **CAV-02-AC1:** The exact planned recurring occurrence resolves
   successfully.
-- [ ] **CAV-02-AC2:** A missing exact occurrence fails with `eventNotFound`.
-- [ ] **CAV-02-AC3:** An ambiguous exact occurrence fails with
+- [x] **CAV-02-AC2:** A missing exact occurrence fails with `eventNotFound`.
+- [x] **CAV-02-AC3:** An ambiguous exact occurrence fails with
   `eventAmbiguous`.
-- [ ] **CAV-02-AC4:** `EventKitCalendarStore` consumes the tested resolver rather
+- [x] **CAV-02-AC4:** `EventKitCalendarStore` consumes the tested resolver rather
   than retaining separate untested selection logic.
-- [ ] **CAV-02-AC5:** No EventKit framework type crosses into domain or
+- [x] **CAV-02-AC5:** No EventKit framework type crosses into domain or
   application APIs.
-- [ ] **CAV-02-V1:** The focused suites pass:
+- [x] **CAV-02-V1:** The focused suites pass:
 
   ```sh
   cd '/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay' && \
