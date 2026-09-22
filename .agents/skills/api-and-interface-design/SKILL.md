@@ -2,13 +2,14 @@
 name: api-and-interface-design
 description: Design or review stable APIs and interfaces that are explicit, compatible, and hard to misuse. Use when creating or changing HTTP, event, library, module, CLI, component, schema, configuration, plugin, or other durable integration contracts.
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
   dependencies:
     tools: []
     skills:
       - name: deprecation-and-migration
         purpose: Plan breaking interface changes, consumer migration, compatibility support, and removal.
         required: false
+        relationship: handoff
 ---
 
 # API and Interface Design

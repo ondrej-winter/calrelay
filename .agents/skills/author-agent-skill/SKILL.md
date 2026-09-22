@@ -2,7 +2,7 @@
 name: author-agent-skill
 description: Create, update, or review Agent Skill directories and SKILL.md files for valid frontmatter, structure, portability, progressive disclosure, and validation readiness.
 metadata:
-  version: "1.2.3"
+  version: "1.3.0"
   dependencies:
     tools: []
     skills: []
@@ -101,33 +101,50 @@ Every skill must declare its dependencies in `metadata.dependencies`, even when 
 dependency list is empty. Use dependency metadata to make hidden assumptions
 visible before an agent follows the skill.
 
-Document tool dependencies at the tool level. Include required command-line
-programs, agent tools, external services, permissions, or runtime capabilities
-that the skill expects. Prefer a list of objects when details matter:
+Document tool dependencies as runtime capabilities. Include required command-line
+execution, version control, browser access, source retrieval, independent review,
+external services, permissions, or other capabilities the skill expects. Use the
+owning catalog's canonical capability vocabulary when one exists. Prefer a list
+of objects when details matter:
 
 ```md
 metadata:
   version: "1.0.0"
   dependencies:
     tools:
-      - name: git
+      - name: version-control
         purpose: Inspect repository history and changed files.
         required: false
-      - name: python
+      - name: shell-execution
         purpose: Run local validation scripts.
         required: false
     skills:
       - name: run-local-quality-gate
         purpose: Validate formatting, linting, tests, and builds before handoff.
         required: false
+        relationship: verification
 ```
 
 Use `metadata.dependencies.tools: []` when the skill has no known tool, command,
 permission, service, or runtime dependency.
 
+Set `required: true` when the skill cannot produce its stated outcome without the
+dependency. Set it to `false` only for a conditional dependency or when the skill
+documents a usable fallback.
+
 Document referenced skills under `metadata.dependencies.skills` when the skill
-hands off to, combines with, or expects awareness of another skill. The referenced
-skill name should match that skill's frontmatter `name`. Use an empty list when
+routes to, hands off to, verifies with, or expects awareness of another skill. The
+referenced skill name should match that skill's frontmatter `name`. When the
+owning catalog defines relationship semantics, add its supported relationship
+field. This collection uses:
+
+- `route`: select the referenced skill when its own trigger matches
+- `handoff`: transfer a defined part of the workflow when instructed
+- `verification`: use the referenced skill to gather evidence
+- `awareness`: coordinate with its constraints without automatic activation
+
+An optional referenced skill is not recursively activated merely because it is
+listed. Its trigger or an explicit handoff must be present. Use an empty list when
 there are no referenced skills.
 
 If the target agent format supports pre-approved tool declarations, add
@@ -258,6 +275,11 @@ commands passed, and any validation that was skipped with the reason.
   empty list
 - `metadata.dependencies.skills` is present and lists referenced skills or an
   empty list
+- dependency `required` values distinguish mandatory execution from conditional
+  use or a documented fallback
+- when the owning catalog defines relationship semantics, each referenced skill
+  declares a valid relationship and optional references are not treated as
+  recursively activated
 - `allowed-tools`, when present, is consistent with documented tool dependencies
 - unsupported frontmatter fields are absent
 - supported optional frontmatter fields are correctly shaped and necessary

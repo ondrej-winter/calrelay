@@ -2,19 +2,22 @@
 name: performance-optimization
 description: Optimizes software performance using measurement-driven diagnosis, targeted fixes, and regression guards. Use when performance requirements exist, users or monitoring report slow behavior, a regression is suspected, or profiling reveals bottlenecks that need fixing.
 metadata:
-  version: "1.2.0"
+  version: "1.4.1"
   dependencies:
     tools: []
     skills:
       - name: add-observability
         purpose: Add measurement, profiling, metrics, tracing, or logs needed to diagnose and verify performance changes.
         required: false
+        relationship: handoff
       - name: debugging-and-error-recovery
         purpose: Reproduce and root-cause performance regressions that present as failures or broken behavior.
         required: false
+        relationship: handoff
       - name: shipping-and-launch
         purpose: Plan safe rollout, monitoring, and rollback for performance-sensitive changes.
         required: false
+        relationship: awareness
 ---
 
 # Performance Optimization
@@ -141,90 +144,13 @@ Common bottleneck categories:
 | Intermittent slowness         | Contention, retries, saturation, cold starts, or external dependency variance    | Compare traces across fast and slow cases     |
 | Poor perceived responsiveness | Blocking user-visible work or delaying first useful output                       | Measure the user-visible milestone directly   |
 
-### Step 3: Fix common anti-patterns
+### Step 3: Fix the identified bottleneck
 
 Prefer removing unnecessary work before adding caches or complex infrastructure.
-The examples below are technology-neutral patterns; adapt them to the project
-language, framework, and runtime.
-
-#### Repeated dependent reads
-
-Avoid one dependency or storage call per item when the data can be fetched in a
-single bounded operation.
-
-```text
-Avoid:
-1. Fetch records.
-2. For each record, fetch related data with another call.
-
-Prefer:
-1. Fetch records and required related data in one query, join, batch request, or
-   preloaded lookup.
-2. Preserve limits so the result size remains bounded.
-```
-
-#### Unbounded data processing
-
-Do not load or process all records when the user or operation needs only a subset.
-
-```python
-# Avoid: unbounded work for every call.
-records = repository.list_all_records()
-
-# Prefer: explicit limit and cursor or page boundary.
-records = repository.list_records(limit=50, cursor=next_cursor)
-```
-
-#### Repeated expensive computation
-
-Compute expensive values once per required scope and reuse them only while the
-inputs remain valid.
-
-```python
-# Avoid: repeated computation in a hot loop.
-for item in items:
-    score = calculate_expensive_score(config, item)
-    publish(score)
-
-# Prefer: precompute shared inputs or move invariant work outside the loop.
-prepared_config = prepare_scoring_config(config)
-for item in items:
-    score = calculate_score(prepared_config, item)
-    publish(score)
-```
-
-#### Missing bounds on caches or queues
-
-Caches and queues should have clear bounds, invalidation, and fallback behavior.
-
-```text
-Avoid:
-- unlimited cache growth
-- stale data with no invalidation path
-- queues with no backpressure or dead-letter handling
-
-Prefer:
-- maximum size or time-to-live
-- explicit invalidation conditions
-- metrics for hit rate, evictions, depth, age, and failures
-```
-
-#### Oversized artifacts or payloads
-
-Send, store, or load only what the operation needs.
-
-```text
-Check for:
-- unused fields in responses or messages
-- large media, documents, archives, or generated artifacts
-- unnecessary dependency bundles or plugin loading
-- repeated serialization of the same data
-
-Prefer:
-- field selection or projections
-- pagination, streaming, compression, or chunking
-- lazy loading for expensive optional features
-```
+Common targets include repeated dependent reads, unbounded processing, repeated
+expensive computation, unbounded caches or queues, and oversized artifacts or
+payloads. Apply only the pattern supported by the measurements. For detailed
+technology-neutral examples, see `references/optimization-patterns.md`.
 
 ### Step 4: Verify the fix
 
@@ -272,27 +198,11 @@ Use placeholders for project-specific commands:
 <quality_gate_command>
 ```
 
-## Web-specific examples
+## Domain-specific guidance
 
-When optimizing browser-based user experiences, web metrics may be the right
-target. Treat them as domain-specific examples, not universal performance goals.
-
-Common Core Web Vitals thresholds:
-
-| Metric                         | Good    | Needs improvement | Poor    |
-| ------------------------------ | ------- | ----------------- | ------- |
-| LCP, Largest Contentful Paint  | ≤ 2.5s  | ≤ 4.0s            | > 4.0s  |
-| INP, Interaction to Next Paint | ≤ 200ms | ≤ 500ms           | > 500ms |
-| CLS, Cumulative Layout Shift   | ≤ 0.1   | ≤ 0.25            | > 0.25  |
-
-Web-specific investigation examples:
-
-- first load: network waterfall, server response time, render-blocking resources,
-  asset size, font loading, and image dimensions
-- interaction delay: main-thread work, expensive rendering, long tasks, event
-  handlers, and unnecessary UI updates
-- navigation or data loading: request waterfalls, cache behavior, streaming, and
-  user-visible loading states
+Load domain guidance only when it matches the measured system. For browser-facing
+work, see `references/web-performance.md` for web metrics and investigation
+examples.
 
 ## Performance budgets
 
@@ -314,8 +224,12 @@ benchmarking tool.
 
 ## See also
 
-For a concise planning and verification checklist, see
-`references/performance-checklist.md`.
+- For a concise planning and verification checklist, see
+  `references/performance-checklist.md`.
+- For common bottleneck-removal patterns, see
+  `references/optimization-patterns.md`.
+- For browser-specific metrics and investigation prompts, see
+  `references/web-performance.md`.
 
 ## Common rationalizations
 

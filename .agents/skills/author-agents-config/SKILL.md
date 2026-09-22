@@ -2,22 +2,24 @@
 name: author-agents-config
 description: Initialize, audit, update, or synchronize a repository's coding-agent instructions and client adapters. Use for AGENTS.md, scoped instructions, CLAUDE.md, .clinerules, .cline/rules, Copilot instructions, or migrations between agent configuration layouts. Keep shared policy canonical and adapters minimal. Not for authoring reusable SKILL.md capabilities, defining agent personas, ordinary application changes, or configuring runtime permissions.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   dependencies:
     tools:
-      - name: git
+      - name: version-control
         purpose: Inspect the working tree, tracked configuration, history, and symlink-related changes when available.
         required: false
-      - name: web access
+      - name: source-retrieval
         purpose: Verify current client discovery and configuration behavior against authoritative documentation.
         required: false
     skills:
       - name: author-agent-skill
         purpose: Extract or revise reusable Agent Skills when an authorized configuration migration requires it.
         required: false
+        relationship: handoff
       - name: source-driven-development
         purpose: Verify version-sensitive client integration behavior against authoritative sources.
         required: false
+        relationship: verification
 ---
 
 # Author agents config

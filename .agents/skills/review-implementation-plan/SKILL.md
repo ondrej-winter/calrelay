@@ -2,16 +2,18 @@
 name: review-implementation-plan
 description: Review and update an existing implementation plan for completeness, ambiguity, sequencing, risks, dependencies, validation, readiness labeling, and handoff before coding.
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
   dependencies:
     tools: []
     skills:
       - name: spec-driven-development
         purpose: Clarify requirements, success criteria, assumptions, and scope boundaries before reviewing a plan.
         required: false
+        relationship: handoff
       - name: planning-and-task-breakdown
         purpose: Decompose clear requirements into ordered, verifiable implementation tasks before reviewing a plan.
         required: false
+        relationship: handoff
 ---
 
 # Review Implementation Plan

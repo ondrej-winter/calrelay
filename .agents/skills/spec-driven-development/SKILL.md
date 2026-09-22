@@ -2,22 +2,26 @@
 name: spec-driven-development
 description: Create, review, or revise a canonical specification with observable requirements, scope boundaries, acceptance checks, and explicit unresolved decisions. Use when requirements are incomplete, conflicting, spread across sources, or need a durable agreement before planning or changing implementation.
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
   dependencies:
     tools: []
     skills:
       - name: planning-and-task-breakdown
         purpose: Derive ordered, verifiable implementation tasks from settled requirements.
         required: false
+        relationship: handoff
       - name: review-implementation-plan
         purpose: Check a derived plan's scope, sequencing, and verification before implementation.
         required: false
+        relationship: verification
       - name: interview-me
         purpose: Resolve uncertainty about the user's underlying intent when focused clarification is insufficient.
         required: false
+        relationship: handoff
       - name: idea-refine
         purpose: Explore options when the intent is understood but the concept or scope is undecided.
         required: false
+        relationship: handoff
 ---
 
 # Spec-Driven Development

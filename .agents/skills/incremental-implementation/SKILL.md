@@ -2,13 +2,14 @@
 name: incremental-implementation
 description: Guide agents to deliver changes incrementally. Use when implementing a feature or change that touches more than one file, when a task feels too large to land in one step, or before writing a large amount of code at once.
 metadata:
-  version: "2.0.0"
+  version: "2.1.0"
   dependencies:
     tools: []
     skills:
       - name: test-driven-development
         purpose: Apply test-first RED-GREEN-REFACTOR execution within behavior-changing increments.
         required: false
+        relationship: handoff
 ---
 
 # Incremental Implementation

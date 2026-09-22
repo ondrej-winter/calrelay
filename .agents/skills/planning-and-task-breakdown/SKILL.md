@@ -2,16 +2,18 @@
 name: planning-and-task-breakdown
 description: Create or revise an implementation plan from clear requirements, with ordered tasks, acceptance criteria, dependencies, verification, and progress tracking. Use when scope needs decomposition, sequencing is uncertain, or work must be coordinated across agents or sessions.
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
   dependencies:
     tools: []
     skills:
       - name: spec-driven-development
         purpose: Clarify requirements, success criteria, and scope boundaries before task breakdown.
         required: false
+        relationship: handoff
       - name: review-implementation-plan
         purpose: Review sequencing, dependencies, risks, and validation strategy after drafting a plan.
         required: false
+        relationship: verification
 ---
 
 # Planning and Task Breakdown

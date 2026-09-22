@@ -2,13 +2,14 @@
 name: hexagonal-vertical-slices
 description: Design, review, or refactor systems that use hexagonal architecture organized by vertical feature slices, keeping business logic isolated from frameworks and infrastructure.
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   dependencies:
     tools: []
     skills:
       - name: api-and-interface-design
         purpose: Use when a port, public API, event contract, or other durable boundary needs detailed contract design.
         required: false
+        relationship: handoff
 ---
 
 # Hexagonal Vertical Slices

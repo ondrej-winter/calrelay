@@ -2,10 +2,10 @@
 name: run-local-quality-gate
 description: Discover and run the project's local formatting, linting, static analysis, test, and build checks before handoff.
 metadata:
-  version: "1.2.1"
+  version: "1.3.0"
   dependencies:
     tools:
-      - name: shell
+      - name: shell-execution
         purpose: Discover and run the project's configured quality commands.
         required: true
     skills: []

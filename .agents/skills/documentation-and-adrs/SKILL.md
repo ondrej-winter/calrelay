@@ -2,16 +2,18 @@
 name: documentation-and-adrs
 description: Decide whether durable documentation is needed, choose the right documentation artifact, and route ADR or project documentation work to the appropriate specialized skill.
 metadata:
-  version: "1.2.3"
+  version: "1.3.0"
   dependencies:
     tools: []
     skills:
       - name: write-adr
         purpose: Record durable architectural, product, data, security, or workflow decisions when an ADR is warranted.
         required: false
+        relationship: route
       - name: update-project-docs
         purpose: Update project-facing documentation after visible behavior, configuration, operation, or workflow changes.
         required: false
+        relationship: route
 ---
 
 # Documentation and ADRs

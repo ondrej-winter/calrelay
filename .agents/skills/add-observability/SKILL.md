@@ -2,25 +2,30 @@
 name: add-observability
 description: Add logs, metrics, traces, profiling, or operational notes when a workflow needs better runtime visibility or measurable evidence without unsupported performance claims.
 metadata:
-  version: "1.2.0"
+  version: "1.3.0"
   dependencies:
     tools: []
     skills:
       - name: debugging-and-error-recovery
         purpose: Reproduce, localize, and fix active failures before adding observability around them.
         required: false
+        relationship: handoff
       - name: performance-optimization
         purpose: Diagnose and optimize known or suspected performance bottlenecks after measurement signals exist.
         required: false
+        relationship: handoff
       - name: security-and-hardening
         purpose: Review telemetry collection, redaction, retention, and access when signals may contain sensitive data.
         required: false
+        relationship: verification
       - name: shipping-and-launch
         purpose: Include observability in rollout, monitoring, and rollback-readiness planning.
         required: false
+        relationship: awareness
       - name: update-project-docs
         purpose: Document operational signals, dashboards, alerts, or troubleshooting notes affected by observability changes.
         required: false
+        relationship: handoff
 ---
 
 # Add Observability

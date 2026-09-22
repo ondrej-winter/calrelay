@@ -2,9 +2,12 @@
 name: source-driven-development
 description: Grounds implementation decisions in authoritative sources. Use when building with external APIs, libraries, frameworks, platforms, standards, or tools where current documented behavior matters.
 metadata:
-  version: "1.1.1"
+  version: "1.2.0"
   dependencies:
-    tools: []
+    tools:
+      - name: source-retrieval
+        purpose: Access authoritative local or remote documentation, dependency source, standards, schemas, or command references.
+        required: true
     skills: []
 ---
 

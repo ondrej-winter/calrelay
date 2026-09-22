@@ -2,9 +2,12 @@
 name: doubt-driven-development
 description: Cross-examine non-trivial decisions with a fresh, adversarial review loop before they stand, especially when correctness, safety, migration risk, or unfamiliar code makes overconfidence costly.
 metadata:
-  version: "1.1.2"
+  version: "1.2.0"
   dependencies:
-    tools: []
+    tools:
+      - name: independent-review
+        purpose: Obtain a fresh-context or independent adversarial review of the isolated artifact and contract.
+        required: false
     skills: []
 ---
 
@@ -40,8 +43,8 @@ not recursively spawn more reviewers.
 
 For orchestration details, see `references/orchestration-patterns.md`.
 
-If fresh-context review is unavailable, use a degraded self-review fallback only
-when necessary and label it as degraded.
+If the optional `independent-review` capability is unavailable, use a degraded
+self-review fallback only when necessary and label it as degraded.
 
 ## Steps
 

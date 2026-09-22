@@ -2,25 +2,30 @@
 name: interview-me
 description: Reduce uncertainty about a user's underlying intent through a formal XY-problem gate plus a hypothesis, confidence, evidence, and information-gain interview loop. Use when an ask is underspecified, solution-led, or has material unresolved trade-offs before idea refinement, specification, planning, or implementation.
 metadata:
-  version: "1.3.0"
+  version: "1.5.0"
   dependencies:
     tools: []
     skills:
       - name: idea-refine
         purpose: Refine confirmed intent when the outcome is known but concept, options, or MVP boundary remain uncertain.
         required: false
+        relationship: handoff
       - name: spec-driven-development
         purpose: Convert confirmed intent into concrete requirements, scope, and acceptance criteria.
         required: false
+        relationship: handoff
       - name: planning-and-task-breakdown
         purpose: Break accepted requirements into ordered implementation tasks after specification.
         required: false
+        relationship: handoff
       - name: doubt-driven-development
         purpose: Adversarially review a decision or downstream artifact after intent has been established.
         required: false
+        relationship: verification
       - name: source-driven-development
         purpose: Verify external, framework, or version-specific facts that affect a clarified decision.
         required: false
+        relationship: verification
 ---
 
 # Interview Me
@@ -116,17 +121,8 @@ Decrease it when the user contradicts the model or reveals a competing objective
 State the best current hypothesis, confidence, and missing variables before asking
 for implementation details. A hypothesis must be specific enough to be wrong.
 
-```text
-STATED SOLUTION (Y): Build a dashboard for metrics.
-UNDERLYING OUTCOME (X): Track active experiments and decide which need attention; hypothesized.
-XY-RISK: High — the user, decision, and success signal for the dashboard are unconfirmed.
-HYPOTHESIS: You need a personal view of active experiments and their early results; a dashboard is a candidate interface, not a confirmed requirement.
-CONFIDENCE: 30% — the user, desired decision, success signal, and data boundary are unknown.
-EVIDENCE: The request asks for a dashboard for metrics.
-HIGH-IMPACT UNKNOWNS: Who uses it; which decision it supports; what metrics matter; what is out of scope.
-NEXT QUESTION: Who needs to make which recurring decision with this information?
-GUESS: You are the primary user, because the request names neither a shared audience nor a reporting obligation.
-```
+Use the operating-model fields above. For a worked initial model, see
+`references/interview-examples.md`.
 
 Do not invent evidence. Label inferences as guesses and user statements as
 evidence.
@@ -168,15 +164,8 @@ non-manipulative. It is a test of the model, not an attempt to steer the user
 toward a preferred answer. Do not batch questions. Wait for the answer before
 selecting the next highest-value unknown.
 
-For example, do not ask `Q: What should the dashboard do?` after a long
-discussion. Instead, ask:
-
-```text
-CONTEXT: You requested a dashboard for support leads. It is confirmed that they review support work daily; it is still unknown whether their main goal is faster ticket triage or identifying recurring product issues.
-WHY THIS MATTERS: These goals require different data, workflows, and success measures.
-Q: Which of those two decisions should the dashboard help a support lead make first?
-GUESS: Faster triage is likely the first priority because the dashboard is intended for daily use, but please reject that if recurring-issue analysis is more valuable.
-```
+Prefer a focused contrast between plausible outcomes over a broad question.
+See `references/interview-examples.md` for worked question patterns.
 
 ### 3. Update from evidence
 
@@ -190,14 +179,8 @@ After each answer:
 
 Challenge ambiguous labels such as "scalable", "clean", "modern", or "best
 practice" by asking for the decision, threshold, failure mode, or trade-off they
-represent. When convention may be masking preference, ask:
-
-```text
-CONTEXT: The request names a conventional solution, but the decision it should enable remains unconfirmed.
-WHY THIS MATTERS: Confirming the desired result keeps the conventional solution from becoming an untested requirement.
-Q: If you did not need to justify the conventional solution, what result would you actually choose?
-GUESS: The outcome matters more than preserving the named solution, because the request describes an artifact rather than a decision it enables.
-```
+represent. When convention may be masking preference, ask what result the user
+would choose if the named solution were not required.
 
 When a user delegates a material choice with "whatever you think is best," record
 the delegation as evidence, present the relevant options and consequences, then ask
