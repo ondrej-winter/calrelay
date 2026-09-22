@@ -10,6 +10,7 @@ enum CalendarStandingAuthorizationTests {
         try await testUnavailableAccessSuspendsWithoutErasingMatchingAuthorization()
         try await testMigrationAndAccessFailuresCannotGrantAuthorization()
         try await testObservedConfigurationChangeImmediatelyRevokesAuthorization()
+        try await testObservedConfigurationChangeInvalidatesOpenReview()
     }
 
     private static func testObservedConfigurationChangeImmediatelyRevokesAuthorization() async throws {
@@ -36,6 +37,28 @@ enum CalendarStandingAuthorizationTests {
             "An observed file change should immediately revoke standing authorization")
         try expect(persisted.schedulingPreference == .enabled, "Revocation should preserve the scheduling preference")
         try expect(await store.listCalendarsCallCount() == 0, "Immediate revocation should not inspect Calendar state")
+        try expect(
+            try await useCase.validateCurrentAuthorization() == .notGranted,
+            "Returning to the earlier A identity after an observed A-to-B-to-A transition must not reactivate its grant")
+    }
+
+    private static func testObservedConfigurationChangeInvalidatesOpenReview() async throws {
+        let fixture = StandingAuthorizationFixture()
+        let stateStore = StandingStateStore()
+        let useCase = fixture.useCase(
+            provider: StandingSettingsProvider(settings: fixture.settings()), calendarStore: fixture.store(),
+            stateStore: stateStore)
+        let review = try await useCase.review()
+
+        try await useCase.invalidateAuthorizationForObservedConfigurationChange()
+
+        do {
+            _ = try await useCase.confirm(reviewID: review.id)
+            throw TestFailure("An observed selected-file change must invalidate an open standing-authorization review")
+        } catch CalendarStandingAuthorizationError.reviewRequired {}
+        try expect(
+            (await stateStore.currentState()).standingAuthorization == nil,
+            "An invalidated open review must not persist standing authorization")
     }
 
     private static func testGrantRequiresFreshSuccessfulReviewAndExplicitConfirmation() async throws {
@@ -63,6 +86,7 @@ enum CalendarStandingAuthorizationTests {
         try expect(persisted.schedulingPreference == .enabled, "First grant should enable scheduled reconciliation")
         try expect(persisted.standingAuthorization != nil, "Confirmation should persist only the opaque binding")
         try expect(await store.listCalendarsCallCount() == 2, "Confirmation should repeat the complete dry run")
+        try expect(await provider.callCount() == 2, "Review and confirmation should each load current settings")
         try expect(await store.mutationCount() == 0, "Granting standing authorization must not apply the reviewed plan")
     }
 
@@ -285,14 +309,17 @@ private struct StandingAuthorizationFixture {
 
 private actor StandingSettingsProvider: CalendarRelaySettingsProvider {
     private var settings: CalendarRelaySettings
+    private var calls = 0
 
     init(settings: CalendarRelaySettings) { self.settings = settings }
 
     func loadSettings() async throws -> LoadedCalendarRelaySettings {
-        LoadedCalendarRelaySettings(displayPath: "test-configuration", settings: settings)
+        calls += 1
+        return LoadedCalendarRelaySettings(displayPath: "test-configuration", settings: settings)
     }
 
     func replace(_ settings: CalendarRelaySettings) { self.settings = settings }
+    func callCount() -> Int { calls }
 }
 
 private struct StandingAuthorizationStatus: CalendarAuthorizationStatusPort {

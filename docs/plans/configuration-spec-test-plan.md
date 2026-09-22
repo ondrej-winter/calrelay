@@ -5,8 +5,8 @@
 - **Requirements basis:** [`../specs/configuration-spec.md`](../specs/configuration-spec.md), revision 8, accepted September 17, 2026.
 - **Related accepted contracts:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), [`../specs/projection-and-safety-spec.md`](../specs/projection-and-safety-spec.md), [`../specs/routing-spec.md`](../specs/routing-spec.md), [`../specs/reconciliation-spec.md`](../specs/reconciliation-spec.md), [`../specs/cli-spec.md`](../specs/cli-spec.md), and [`../specs/macos-app-spec.md`](../specs/macos-app-spec.md).
 - **Readiness:** Ready. The required outcomes, test boundaries, expected evidence, sequencing, and validation commands are specific enough to execute without an unresolved product decision.
-- **Progress date:** September 21, 2026.
-- **Implementation state:** In progress. `CFG-P01`, `CFG-P02`, and `CFG-P03` are complete with focused schema, path-selection, fresh file-provider, runtime-readiness, and migration-gate coverage plus repository validation; `CFG-P04` is the next executable slice.
+- **Progress date:** September 22, 2026.
+- **Implementation state:** In progress. `CFG-P01` through `CFG-P05` are complete with focused schema, path-selection, fresh file-provider, runtime-readiness, migration-gate, bounded-cleanup, fresh app-loading, configuration-race, and authorization-revocation coverage plus repository validation; `CFG-P06` is the next executable slice.
 - **Execution approach:** Add focused deterministic contract evidence for uncovered behavior, preserve useful existing suites, fix only defects exposed by specification-derived tests, then run the complete repository gate.
 
 ## Outcome
@@ -278,7 +278,7 @@ Run the cleanup access, manual cleanup, command-handler, and CLI smoke suites an
 
 **Evidence (September 22, 2026):** Existing production behavior required no changes. Deterministic fake-backed coverage now proves both daylight-saving directions, the moving `D - 2` through `D + 365` local-date range, exact-touch exclusion, positive-overlap inclusion with complete returned intervals, exact cleanup-only marker selection across the complete declaration-ordered topology, unconfigured-calendar exclusion, complete post-delete verification over the same range, remaining-match and read-failure handling without rollback, and truthful app/CLI/process local point-in-time claims. The focused command `swift run CalRelayKitTests CalendarCleanupAccessTests CalendarManualCleanupTests ReconcileCommandHandlerTests CalRelayCLISmokeTests` passed. `make format-check` and `make check` also passed; the former retained existing non-blocking repository-wide warnings.
 
-### - [ ] CFG-P05 — Complete app fresh-loading and configuration-race tests
+### - [x] CFG-P05 — Complete app fresh-loading and configuration-race tests
 
 Prove that observation only invalidates state, every status or run performs its own fresh load, and a selected-file change before the first mutation cannot reuse an earlier authorization even when the file later returns to an old identity.
 
@@ -295,21 +295,23 @@ Prove that observation only invalidates state, every status or run performs its 
 - `Tests/CalRelayKitTests/Features/CalendarRelay/Contracts/CalendarAutomaticReconciliationTests.swift`
 - `Tests/CalRelayKitTests/Features/CalendarRelay/Contracts/CalendarStandingAuthorizationTests.swift`
 
-#### - [ ] CFG-P05-AC1 — Prove status and every app operation load fresh settings
+#### - [x] CFG-P05-AC1 — Prove status and every app operation load fresh settings
 
 Provider call-count and scripted-result tests prove configuration status, manual dry-run, manual apply review and confirmation, cleanup review and confirmation, standing-authorization review, and automatic attempts load and validate the current selected-file result without a cached fallback.
 
-#### - [ ] CFG-P05-AC2 — Prove file observation is invalidation-only and safely coalesced
+#### - [x] CFG-P05-AC2 — Prove file observation is invalidation-only and safely coalesced
 
 Creation, in-place edit, atomic replacement, and removal prompt refresh; observation carries no settings payload; open reviews are invalidated; changes during an active operation coalesce into one fresh follow-up refresh rather than interrupting the active mutation.
 
-#### - [ ] CFG-P05-AC3 — Prove pre-mutation changes and A-to-B-to-A transitions cannot reuse authorization
+#### - [x] CFG-P05-AC3 — Prove pre-mutation changes and A-to-B-to-A transitions cannot reuse authorization
 
 Scripted valid-A to changed-B, missing, invalid, or migration-pending transitions abort before the first mutation and consume the confirmation; restoring A after B does not reactivate an earlier standing grant until a new successful review and renewal.
 
-#### - [ ] CFG-P05-V1 — Pass focused observation, status, manual, and automatic suites
+#### - [x] CFG-P05-V1 — Pass focused observation, status, manual, and automatic suites
 
 Run the exact affected suites and record current evidence that every configuration race suppresses mutation.
+
+**Evidence (September 22, 2026):** Existing production behavior required no changes. Deterministic fake-backed coverage now proves fresh settings loads for status, manual dry-run, manual apply review and confirmation, cleanup confirmation, standing-authorization review and confirmation, and automatic attempts; invalidation of open reviews; confirmation consumption after a configuration-race failure; coalescing of repeated configuration-recovery requests; pre-mutation changed, missing, invalid, and migration-pending failures without mutation; immediate standing-authorization revocation; and A-to-B-to-A non-reactivation. The focused command `swift run CalRelayKitTests CalendarControlPanelStatusTests CalendarManualDryRunTests CalendarManualApplySafetyTests CalendarManualCleanupFailureTests CalendarStandingAuthorizationTests CalendarAutomaticReconciliationTests CalendarAutomationCoordinationTests` passed. `make format-check` and `make check` also passed; the former retained existing non-blocking repository-wide warnings, and the latter emitted non-failing local linker search-path warnings.
 
 ### - [ ] CFG-P06 — Complete semantic identity, policy, topology, and privacy tests
 

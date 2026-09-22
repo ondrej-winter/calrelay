@@ -10,7 +10,8 @@ enum CalendarAutomaticReconciliationTests {
         try await testMissingStandingAuthorizationPerformsNoMutation()
         try await testReadyEmptyPlanUpdatesSuccessWithoutMutation()
         try await testBindingMismatchRevokesAuthorizationWithoutMutation()
-        try await testObservedConfigurationChangeBeforeMutationRevokesAuthorization()
+        try await testPreMutationConfigurationTransitionsFailClosed()
+        try await testObservedAtoBtoATransitionBeforeMutationRevokesAuthorization()
         try await testAuthorizationRevocationBeforeMutationPreservesMatchingGrant()
         try await testPartialMutationPersistsOnlyAggregateConfirmedCounts()
         try await testDisabledSchedulingFailsClosedEvenWithStandingAuthorization()
@@ -22,9 +23,10 @@ enum CalendarAutomaticReconciliationTests {
 
     private static func testFreshAuthorizedAttemptAppliesAndPersistsAggregateSuccess() async throws {
         let fixture = AutomaticReconciliationFixture()
+        let provider = CountingAutomaticSettingsProvider(settings: fixture.settings)
         let stateStore = AutomaticStateStore(state: fixture.authorizedState())
         let store = fixture.storeWithSourceEvent()
-        let useCase = fixture.useCase(calendarStore: store, stateStore: stateStore)
+        let useCase = fixture.useCase(settingsProvider: provider, calendarStore: store, stateStore: stateStore)
 
         let result = try await useCase.run()
 
@@ -33,6 +35,7 @@ enum CalendarAutomaticReconciliationTests {
             result.confirmedCounts == CalendarAutomationMutationCounts(confirmedCreates: 1, confirmedDeletes: 0),
             "Automatic success should disclose only aggregate confirmed counts")
         try expect(await store.mutationCount() == 1, "The fresh authorized plan should be applied once")
+        try expect(await provider.callCount() == 2, "An automatic attempt should load and recheck current settings")
         try expect(await store.listCalendarsCallCount() == 1, "Automatic preflight should load one fresh inventory")
         try expect(
             await store.eventRequestCalendarIDs() == [fixture.hub.id, fixture.work.id],
@@ -214,7 +217,50 @@ enum CalendarAutomaticReconciliationTests {
             "A mismatched binding should be removed rather than silently reactivated")
     }
 
-    private static func testObservedConfigurationChangeBeforeMutationRevokesAuthorization() async throws {
+    private static func testPreMutationConfigurationTransitionsFailClosed() async throws {
+        let fixture = AutomaticReconciliationFixture()
+        let changedSettings = CalendarRelaySettings(
+            hubCalendar: fixture.settings.hubCalendar, personalPrefix: "[CHANGED]",
+            syncWindowDays: fixture.settings.syncWindowDays, workCalendars: fixture.settings.workCalendars,
+            legacyMarkers: [])
+        let migrationSettings = CalendarRelaySettings(
+            hubCalendar: fixture.settings.hubCalendar, personalPrefix: fixture.settings.personalPrefix,
+            syncWindowDays: fixture.settings.syncWindowDays, workCalendars: fixture.settings.workCalendars,
+            legacyMarkers: ["[OLD]"])
+        let scenarios: [AutomaticPreMutationConfigScenario] = [
+            AutomaticPreMutationConfigScenario(
+                name: "changed", finalLoad: .success(changedSettings), expectedOutcome: .standingAuthorizationRequired),
+            AutomaticPreMutationConfigScenario(
+                name: "missing", finalLoad: .failure(.missing(displayPath: "test")),
+                expectedOutcome: .configurationUnavailable),
+            AutomaticPreMutationConfigScenario(
+                name: "invalid", finalLoad: .failure(.invalid(displayPath: "test")),
+                expectedOutcome: .configurationUnavailable),
+            AutomaticPreMutationConfigScenario(
+                name: "migration pending", finalLoad: .success(migrationSettings), expectedOutcome: .migrationPending)
+        ]
+
+        for scenario in scenarios {
+            let provider = ScriptedAutomaticSettingsProvider(loads: [.success(fixture.settings), scenario.finalLoad])
+            let stateStore = AutomaticStateStore(state: fixture.authorizedState())
+            let store = fixture.storeWithSourceEvent()
+
+            let result = try await fixture.useCase(
+                settingsProvider: provider, calendarStore: store, stateStore: stateStore
+            ).run()
+
+            try expect(
+                result.outcome == scenario.expectedOutcome,
+                "The \(scenario.name) pre-mutation transition should fail closed with its safe outcome")
+            try expect(await provider.callCount() == 2, "The \(scenario.name) case should reach the fresh pre-mutation read")
+            try expect(await store.mutationCount() == 0, "The \(scenario.name) transition must prevent every mutation")
+            try expect(
+                (await stateStore.currentState()).standingAuthorization == nil,
+                "The \(scenario.name) transition must consume the prior standing authorization")
+        }
+    }
+
+    private static func testObservedAtoBtoATransitionBeforeMutationRevokesAuthorization() async throws {
         let fixture = AutomaticReconciliationFixture()
         let changes = CalendarConfigurationChangeTracker()
         let provider = ChangingAutomaticSettingsProvider(settings: fixture.settings, changes: changes)
@@ -228,11 +274,11 @@ enum CalendarAutomaticReconciliationTests {
 
         try expect(
             result.outcome == .standingAuthorizationRequired,
-            "An observed selected-file change should invalidate the automatic attempt")
-        try expect(await store.mutationCount() == 0, "An observed selected-file change must prevent mutation")
+            "An observed A-to-B-to-A selected-file transition should invalidate the automatic attempt")
+        try expect(await store.mutationCount() == 0, "An observed A-to-B-to-A transition must prevent mutation")
         try expect(
             (await stateStore.currentState()).standingAuthorization == nil,
-            "Observed selected-file change should revoke the prior grant")
+            "Returning to the earlier identity must not reactivate the prior grant")
     }
 
     private static func testAuthorizationRevocationBeforeMutationPreservesMatchingGrant() async throws {
@@ -509,6 +555,27 @@ private struct AutomaticConfigurationFailureScenario {
     let name: String
     let provider: any CalendarRelaySettingsProvider
     let expectedOutcome: CalendarAutomationOutcomeCategory
+}
+
+private struct AutomaticPreMutationConfigScenario {
+    let name: String
+    let finalLoad: Result<CalendarRelaySettings, CalendarRelaySettingsProviderError>
+    let expectedOutcome: CalendarAutomationOutcomeCategory
+}
+
+private actor ScriptedAutomaticSettingsProvider: CalendarRelaySettingsProvider {
+    private var loads: [Result<CalendarRelaySettings, CalendarRelaySettingsProviderError>]
+    private var calls = 0
+
+    init(loads: [Result<CalendarRelaySettings, CalendarRelaySettingsProviderError>]) { self.loads = loads }
+
+    func loadSettings() async throws -> LoadedCalendarRelaySettings {
+        calls += 1
+        guard !loads.isEmpty else { throw TestFailure("Unexpected automatic settings read") }
+        return LoadedCalendarRelaySettings(displayPath: "test-configuration", settings: try loads.removeFirst().get())
+    }
+
+    func callCount() -> Int { calls }
 }
 
 private struct FailingAutomaticSettingsProvider: CalendarRelaySettingsProvider {

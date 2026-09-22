@@ -5,6 +5,7 @@ enum CalendarControlPanelStatusTests {
     static func runAll() async throws {
         try await testMissingConfigurationPrecedesAuthorizationAndCalendarAccess()
         try await testInvalidConfigurationPrecedesAuthorizationAndCalendarAccess()
+        try await testEveryStatusRunLoadsCurrentSettingsWithoutFallback()
         try await testUnavailableAuthorizationPrecedesTopologyWithoutPrompting()
         try await testTopologyFailurePrecedesMigrationPending()
         try await testMigrationPendingRequiresReadyTopology()
@@ -39,6 +40,34 @@ enum CalendarControlPanelStatusTests {
         try expect(status.readinessState == .notChecked, "Invalid configuration should prevent readiness checks")
         try expect(await authorization.callCount() == 0, "Invalid configuration should prevent authorization access")
         try expect(await store.listCalendarsCallCount() == 0, "Invalid configuration should prevent EventKit access")
+    }
+
+    private static func testEveryStatusRunLoadsCurrentSettingsWithoutFallback() async throws {
+        let displayPath = "~/.config/calrelay/config.yaml"
+        let provider = ScriptedStatusSettingsProvider(results: [
+            .success(LoadedCalendarRelaySettings(displayPath: displayPath, settings: settings())),
+            .failure(.missing(displayPath: displayPath)),
+            .failure(.invalid(displayPath: displayPath))
+        ])
+        let authorization = CountingAuthorizationStatus(state: .fullAccess)
+        let store = CommandHandlerCalendarStore(calendars: readyCalendars())
+        let useCase = useCase(provider: provider, authorization: authorization, store: store)
+
+        let ready = try await useCase.run()
+        let missing = try await useCase.run()
+        let invalid = try await useCase.run()
+
+        try expect(ready.primaryState == .ready, "The first status run should use the initial valid file")
+        try expect(
+            missing.primaryState == .configurationMissing,
+            "A later missing file must replace, not fall back to, the earlier valid status")
+        try expect(
+            invalid.primaryState == .configurationInvalid,
+            "A later invalid file must replace, not fall back to, the earlier valid status")
+        try expect(await provider.callCount() == 3, "Every status run should load the selected file afresh")
+        try expect(
+            await store.listCalendarsCallCount() == 1,
+            "Missing and invalid follow-up status runs must stop before Calendar access")
     }
 
     private static func testUnavailableAuthorizationPrecedesTopologyWithoutPrompting() async throws {
@@ -108,7 +137,8 @@ enum CalendarControlPanelStatusTests {
     }
 
     private static func useCase(
-        provider: FakeSettingsProvider, authorization: CountingAuthorizationStatus, store: CommandHandlerCalendarStore
+        provider: any CalendarRelaySettingsProvider, authorization: CountingAuthorizationStatus,
+        store: CommandHandlerCalendarStore
     ) -> CalendarControlPanelStatusUseCase {
         CalendarControlPanelStatusUseCase(
             settingsProvider: provider, authorizationStatus: authorization, calendarStore: store,
@@ -143,6 +173,23 @@ enum CalendarControlPanelStatusTests {
     private static func expect(_ condition: Bool, _ message: String) throws {
         guard condition else { throw TestFailure(message) }
     }
+}
+
+private actor ScriptedStatusSettingsProvider: CalendarRelaySettingsProvider {
+    private var results: [Result<LoadedCalendarRelaySettings, CalendarRelaySettingsProviderError>]
+    private var calls = 0
+
+    init(results: [Result<LoadedCalendarRelaySettings, CalendarRelaySettingsProviderError>]) {
+        self.results = results
+    }
+
+    func loadSettings() async throws -> LoadedCalendarRelaySettings {
+        calls += 1
+        guard !results.isEmpty else { throw TestFailure("Unexpected status settings read") }
+        return try results.removeFirst().get()
+    }
+
+    func callCount() -> Int { calls }
 }
 
 private actor FakeSettingsProvider: CalendarRelaySettingsProvider {

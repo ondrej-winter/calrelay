@@ -61,6 +61,10 @@ extension CalendarManualCleanupTests {
                 confirmedDeletions: 0, category: .configurationUnavailable)
             {}
             try expect(await store.deletedEvents().isEmpty, "Never mutate with stale or invalid configuration")
+            do {
+                _ = try await useCase.confirm(reviewID: review.id)
+                throw TestFailure("A configuration-race failure must consume cleanup confirmation")
+            } catch CalendarManualCleanupError.reviewRequired {}
         }
     }
 

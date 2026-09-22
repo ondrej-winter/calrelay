@@ -4,6 +4,7 @@ import Foundation
 enum CalendarManualDryRunTests {
     static func runAll() async throws {
         try await testDryRunLoadsFreshSettingsAndReturnsAggregateCountsWithoutMutation()
+        try await testLaterMissingConfigurationDoesNotUsePreviousValidSettings()
         try await testMigrationPendingFailsBeforeCalendarAccess()
         try testFormatterReportsOnlyAggregateCounts()
     }
@@ -29,6 +30,33 @@ enum CalendarManualDryRunTests {
         try expect(await provider.callCount() == 2, "Manual dry run should load fresh settings for each invocation")
         try expect((await store.createdEvents()).isEmpty, "Manual dry run should not create events")
         try expect((await store.deletedEvents()).isEmpty, "Manual dry run should not delete events")
+    }
+
+    private static func testLaterMissingConfigurationDoesNotUsePreviousValidSettings() async throws {
+        let fixture = dryRunFixture()
+        let provider = ScriptedManualDryRunSettingsProvider(loads: [
+            .success(fixture.settings),
+            .failure(.missing(displayPath: "~/.config/calrelay/config.yaml"))
+        ])
+        let store = CommandHandlerCalendarStore(
+            calendars: [fixture.hubCalendar, fixture.workCalendar],
+            eventsByCalendarID: [fixture.workCalendar.id: [fixture.workEvent]])
+        let useCase = CalendarManualDryRunUseCase(
+            settingsProvider: provider, authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store,
+            now: { fixture.now }, calendar: utcCalendar())
+
+        _ = try await useCase.run()
+        do {
+            _ = try await useCase.run()
+            throw TestFailure("A missing selected file must replace the earlier valid dry-run configuration")
+        } catch CalendarRelaySettingsProviderError.missing {}
+
+        try expect(await provider.callCount() == 2, "Each manual dry run should load the selected file afresh")
+        try expect(
+            await store.listCalendarsCallCount() == 1,
+            "The later missing configuration should stop before a second Calendar preflight")
+        try expect((await store.createdEvents()).isEmpty, "Fresh-load failure must not create events")
+        try expect((await store.deletedEvents()).isEmpty, "Fresh-load failure must not delete events")
     }
 
     private static func testMigrationPendingFailsBeforeCalendarAccess() async throws {
@@ -96,6 +124,22 @@ enum CalendarManualDryRunTests {
     private static func expect(_ condition: Bool, _ message: String) throws {
         guard condition else { throw TestFailure(message) }
     }
+}
+
+private actor ScriptedManualDryRunSettingsProvider: CalendarRelaySettingsProvider {
+    private var loads: [Result<CalendarRelaySettings, CalendarRelaySettingsProviderError>]
+    private var calls = 0
+
+    init(loads: [Result<CalendarRelaySettings, CalendarRelaySettingsProviderError>]) { self.loads = loads }
+
+    func loadSettings() async throws -> LoadedCalendarRelaySettings {
+        calls += 1
+        guard !loads.isEmpty else { throw TestFailure("Unexpected manual dry-run settings read") }
+        return LoadedCalendarRelaySettings(
+            displayPath: "~/.config/calrelay/config.yaml", settings: try loads.removeFirst().get())
+    }
+
+    func callCount() -> Int { calls }
 }
 
 private actor CountingManualDryRunSettingsProvider: CalendarRelaySettingsProvider {

@@ -39,6 +39,9 @@ enum CalendarAutomationCoordinationTests {
             coordinator.request(.configurationRecovery) == .coalesced,
             "A selected-file change must not interrupt an active automatic attempt")
         try expect(
+            coordinator.request(.configurationRecovery) == .coalesced,
+            "Repeated selected-file changes should remain one fresh recovery follow-up")
+        try expect(
             coordinator.request(.automaticReconciliation) == .coalesced,
             "A later trigger should remain pending behind configuration recovery")
         try expect(

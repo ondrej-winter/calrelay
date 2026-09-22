@@ -14,9 +14,13 @@ extension CalendarManualApplyTests {
     private static func testConfigurationChangesBeforeFirstMutationAbort() async throws {
         let fixture = ManualApplyFixture()
         let changed = fixture.settingsWith(prefix: "[CHANGED]")
-        for finalLoad in [
-            Result.success(changed), .failure(CalendarRelaySettingsProviderError.invalid(displayPath: "test"))
-        ] {
+        let finalLoads: [Result<CalendarRelaySettings, CalendarRelaySettingsProviderError>] = [
+            .success(changed),
+            .failure(.missing(displayPath: "test")),
+            .failure(.invalid(displayPath: "test")),
+            .success(fixture.settingsWith(prefix: "[WORK]", legacyMarkers: ["[RETIRED]"]))
+        ]
+        for finalLoad in finalLoads {
             let provider = ScriptedManualApplySettingsProvider(loads: [
                 .success(fixture.settings), .success(fixture.settings), finalLoad
             ])
@@ -25,8 +29,9 @@ extension CalendarManualApplyTests {
             let review = try await useCase.review()
             do {
                 _ = try await useCase.confirm(reviewID: review.id)
-                throw TestFailure("Changed or invalid configuration must prevent mutation")
-            } catch CalendarManualApplyError.configurationChanged {} catch CalendarRelaySettingsProviderError.invalid {}
+                throw TestFailure("Changed, missing, invalid, or migration-pending configuration must prevent mutation")
+            } catch CalendarManualApplyError.configurationChanged {} catch CalendarRelaySettingsProviderError.missing {
+            } catch CalendarRelaySettingsProviderError.invalid {}
             try expect(await store.createdEvents().isEmpty, "Configuration race must prevent every mutation")
             do {
                 _ = try await useCase.confirm(reviewID: review.id)
