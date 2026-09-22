@@ -112,7 +112,7 @@ This baseline is based on source inspection only. A checkbox remains open until 
 
 ## Detailed work plan
 
-### - [ ] CFG-P01 — Complete strict schema, marker, window, and structural selector tests
+### - [x] CFG-P01 — Complete strict schema, marker, window, and structural selector tests
 
 Add focused loader and validation coverage without duplicating parser logic. Prefer a dedicated `CalendarConfigurationSchemaTests` suite when the added matrix would make `CalRelayContractTests` harder to navigate; otherwise keep tightly related baseline tests in the existing suite.
 
@@ -136,27 +136,27 @@ Add focused loader and validation coverage without duplicating parser logic. Pre
 - Reject unknown and duplicate keys independently at the root, hub selector, work entry, and work selector levels.
 - Seed prohibited synthetic values into invalid input and prove normalized errors do not echo them.
 
-#### - [ ] CFG-P01-AC1 — Prove the exact schema and privacy-safe structural failures
+#### - [x] CFG-P01-AC1 — Prove the exact schema and privacy-safe structural failures
 
 Tests accept only the documented fields and nesting, apply both optional defaults, preserve ordered sequences, accept representation-only YAML variants, and reject every unknown, duplicate, missing, malformed, or wrong-type structure without echoing raw YAML or seeded private values.
 
-#### - [ ] CFG-P01-AC2 — Prove complete marker grammar and pairwise uniqueness
+#### - [x] CFG-P01-AC2 — Prove complete marker grammar and pairwise uniqueness
 
 Tests accept representative values matching `\[[A-Za-z0-9_-]+\]`, treat `[ACME]` and `[acme]` as distinct, reject empty, partial, embedded, whitespace-bearing, punctuation-bearing, multi-marker, and non-ASCII forms, and cover personal/work, work/work, personal/legacy, work/legacy, and legacy/legacy duplicates.
 
-#### - [ ] CFG-P01-AC3 — Prove `syncWindowDays` defaults, boundaries, and types
+#### - [x] CFG-P01-AC3 — Prove `syncWindowDays` defaults, boundaries, and types
 
 Tests accept omission as `100`, accept `1` and `365`, and reject zero, negative integers, `366`, fractional numbers, strings, booleans, and null before calendar-store access.
 
-#### - [ ] CFG-P01-AC4 — Prove structural selector collision diagnostics
+#### - [x] CFG-P01-AC4 — Prove structural selector collision diagnostics
 
 Tests reject exact hub/work and work/work source-title/calendar-title tuple collisions, identify all conflicting roles and declaration indexes, keep case-different tuples structurally distinct, and allow distinct tuples to proceed to runtime preflight.
 
-#### - [ ] CFG-P01-V1 — Pass focused schema and validation suites
+#### - [x] CFG-P01-V1 — Pass focused schema and validation suites
 
 Run the exact registered schema-related suite names and record a pass only after the new tests have executed successfully through `CalRelayKitTests`.
 
-### - [ ] CFG-P02 — Complete configuration selection and fresh file-provider tests
+### - [x] CFG-P02 — Complete configuration selection and fresh file-provider tests
 
 Separate path-resolution mechanics from selected-file loading. Add provider-level evidence for missing, unreadable, invalid, replaced, and repeatedly loaded files without relying on process-global home or working-directory state.
 
@@ -180,19 +180,19 @@ Separate path-resolution mechanics from selected-file loading. Add provider-leve
 - Unreadable, non-UTF-8, and structurally invalid files become privacy-safe invalid-provider results.
 - Repeated calls reread the selected path; valid-to-missing, valid-to-invalid, and valid-to-migration-pending transitions never return previous settings.
 
-#### - [ ] CFG-P02-AC1 — Prove canonical and explicit path semantics
+#### - [x] CFG-P02-AC1 — Prove canonical and explicit path semantics
 
 Tests cover the default path, absolute and relative overrides, supported current-user tilde expansion, and literal handling of unsupported expansion forms with stable display paths.
 
-#### - [ ] CFG-P02-AC2 — Prove missing and invalid file precedence without side effects
+#### - [x] CFG-P02-AC2 — Prove missing and invalid file precedence without side effects
 
 Tests show that missing, unreadable, and invalid selected files fail before parsing-dependent use-case work or calendar access, provide the required guidance without raw content, create nothing, and search nowhere else.
 
-#### - [ ] CFG-P02-AC3 — Prove every provider call loads the selected file afresh
+#### - [x] CFG-P02-AC3 — Prove every provider call loads the selected file afresh
 
 Tests change or remove the selected file between calls and prove the provider returns the current missing, invalid, valid, or migration-pending result rather than any cached last-known-valid settings.
 
-#### - [ ] CFG-P02-V1 — Pass focused path and file-provider suites
+#### - [x] CFG-P02-V1 — Pass focused path and file-provider suites
 
 Run `ConfigurationFileSelectionTests` and the exact registered provider-suite name, then record current passing evidence.
 
