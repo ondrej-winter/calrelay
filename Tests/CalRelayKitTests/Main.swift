@@ -94,6 +94,9 @@ import Foundation
     }
 
     private static func runContractSuites(filters: Set<String>) async throws {
+        if filters.isEmpty || filters.contains("RoutingSpecificationTests") {
+            try await RoutingSpecificationTests.runAll()
+        }
         if filters.isEmpty || filters.contains("CalRelayContractTests") { try await CalRelayContractTests.runAll() }
         if filters.isEmpty || filters.contains("CalRelayCLISmokeTests") { try CalRelayCLISmokeTests.runAll() }
     }

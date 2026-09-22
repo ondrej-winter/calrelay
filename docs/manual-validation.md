@@ -144,7 +144,13 @@ Use harmless dedicated calendars and representative test events for these checks
 1. Inventory every active CalRelay configuration sharing the hub and confirm every current work and personal marker is globally unique.
 2. Confirm no physical work calendar is actively managed by more than one computer and the machines' configured work-calendar sets are disjoint.
 3. Document that CalRelay cannot verify these cross-computer invariants and that violating them can suppress, duplicate, or delete blockers.
-4. If testing concurrent processes on harmless calendars, run app and CLI apply concurrently and confirm neither claims atomic isolation; use a later fresh dry run to observe and repair any temporary duplicate or missing projection.
+4. Configure two harmless test machines with different `syncWindowDays` values, system time zones, or both. Create one source interval that positively overlaps both independently computed windows and confirm it reaches the receiving work calendar through the shared hub. Create another interval that overlaps only the publishing machine's window and confirm the receiving machine does not route it. Do not infer topology-wide coverage from either machine's longer horizon.
+5. Create a non-cancelled manually authored valid marked event such as `[EXTERNAL_TEST] Example` in the shared test hub without registering that marker on the receiving machine. Confirm the receiver routes it unchanged to every local work calendar and does not delete or expire the hub event on later runs. Cancel it and confirm it remains preserved in the hub but no longer routes.
+6. To rehearse transfer of one physical work calendar, stop and update the old writer before starting the replacement writer. Confirm the same marker may follow the same physical calendar. If the marker changes, complete the marker-retirement procedure before treating the former marker as reusable.
+7. To rehearse work-calendar removal, remove a harmless work calendar from every active configuration and confirm remaining cleanup cannot inspect it. Manually inspect that removed calendar and remove obsolete marked projections.
+8. To rehearse hub replacement, transfer original unmarked test-hub events outside CalRelay, update every active configuration, and manually inspect and clean the former hub. During a staggered cutover, confirm machines using different hubs are partitioned and do not exchange blockers; neither hub is topology-wide authoritative during that interval.
+9. Before reconnecting a retired or long-offline test writer, update it to the current topology and require normal readiness to succeed. Confirm it cannot briefly resume with a retired marker assignment.
+10. If testing concurrent processes on harmless calendars, run app and CLI apply concurrently and confirm neither claims atomic isolation; use a later fresh dry run to observe and repair any temporary duplicate or missing projection.
 
 ## Marker migration cleanup check
 
@@ -178,9 +184,13 @@ Use only harmless, dedicated test calendars. Cleanup is a broad deletion workflo
    ```
 
 7. Confirm apply reports success only after a complete bounded-range verification snapshot, states that the result is local and point-in-time, and directs you to remove the tombstone manually only after migration is complete for the topology. Then run cleanup dry-run again and confirm it reports no local matches without claiming global or historical marker retirement.
-8. Create a matching event older than `D - 2` and confirm cleanup makes no claim to cover or remove it.
-9. Create a historical malformed title shape that cannot satisfy the current exact marker grammar and confirm cleanup does not select it; remove it manually from the harmless test calendar.
-10. Remove `[RETIRED_TEST]` from `legacyMarkers`, run config check, and confirm ordinary readiness can succeed again.
+8. While `[RETIRED_TEST]` remains configured as a tombstone on the cleaner, allow a harmless not-yet-migrated test writer to publish `[RETIRED_TEST] Recreated` into the shared hub. Confirm the cleaner sees the recreated artifact, repeat cleanup, and confirm the repeated run removes it locally without claiming that future recreation is impossible.
+9. Stop and update the stale writer to the current topology before allowing it to reconnect again. Confirm normal readiness succeeds without the retired assignment.
+10. Create a matching event older than `D - 2` and confirm cleanup makes no claim to cover or remove it.
+11. Create a historical malformed title shape that cannot satisfy the current exact marker grammar and confirm cleanup does not select it; remove it manually from the harmless test calendar.
+12. Create or identify a recurring test series capable of producing `[RETIRED_TEST]` occurrences beyond the bounded cleanup range. Confirm cleanup deletes only returned matching occurrences, then manually remove or update the future-producing series before considering retirement complete.
+13. Before reusing `[RETIRED_TEST]`, manually verify that no matching artifact remains in the shared hub, any current or removed work calendar, history outside the cleanup range, or future recurring occurrences, and that every dormant writer has adopted the current topology or is permanently prevented from reconnecting. Treat bounded cleanup success alone as insufficient evidence for reuse.
+14. Remove `[RETIRED_TEST]` from `legacyMarkers`, run config check, and confirm ordinary readiness can succeed again.
 
 ### Implemented app cleanup checks
 
