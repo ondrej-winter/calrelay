@@ -37,7 +37,8 @@ rather than falling back to live composition.
 
 `make ui-test` remains separate from `make check` until the Xcode lane has proved
 stable enough for an explicit pre-merge or default-gate decision. Real macOS and
-EventKit integration continue to be validated through `docs/manual-validation.md`.
+EventKit integration continue to require explicit local validation with harmless,
+dedicated test calendars.
 
 ## Consequences
 

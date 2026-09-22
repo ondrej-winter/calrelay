@@ -25,8 +25,8 @@ task procedures in `.agents/skills/`, and Cline-specific mechanics in
 - Repository-specific rules here take precedence over generic reusable skills.
   Follow `.clinerules/` for Cline-only execution mechanics.
 - Use `docs/development.md` for toolchain and commands,
-  `docs/repository-layout.md` for navigation, `docs/configuration.md` for user
-  configuration, and `docs/manual-validation.md` for real EventKit validation.
+  `docs/repository-layout.md` for navigation, and `docs/configuration.md` for
+  user configuration.
 
 ## Working discipline
 

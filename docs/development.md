@@ -97,4 +97,4 @@ Open the built app when you need macOS Calendar permission and EventKit visibili
 open .build/CalRelay.app
 ```
 
-For app-backed EventKit validation with harmless local test calendars, see [`manual-validation.md`](manual-validation.md).
+Real EventKit validation is explicit local work. Use only harmless, dedicated test calendars and never treat live calendar mutation as an ordinary automated check.

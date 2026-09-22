@@ -1,6 +1,6 @@
 # CalRelay repository layout
 
-This page describes the main source and test areas in the repository. The root `README.md` stays intentionally brief and links here for navigation details.
+This page describes the main source, test, and documentation areas in the repository. The root `README.md` stays intentionally brief and links here for navigation details.
 
 ## Source targets
 
@@ -19,9 +19,7 @@ This page describes the main source and test areas in the repository. The root `
 
 ## Documentation
 
+- `docs/development.md`: canonical requirements, build, test, formatting, linting, and package workflow.
 - `docs/configuration.md`: YAML schema, selector semantics, CLI reconciliation commands, and safety notes.
-- `docs/manual-validation.md`: app-backed EventKit validation recipe for local writable test calendars.
+- `docs/specs/`: accepted feature-owned product and behavior contracts. Start with `docs/specs/README.md` for the canonical index and historical migration map.
 - `docs/adr/`: durable architecture and lifecycle decisions. Start with `docs/adr/README.md`.
-- `docs/specs/`: feature-owned product and behavior specifications. Start with `docs/specs/README.md` for the canonical index and legacy-spec migration map.
-- `docs/ideas/`: original ideas and exploratory notes.
-- `docs/plans/`: implementation plans.

@@ -293,5 +293,3 @@ A retired marker may be reused as a current work or personal marker only after o
 - When two or more managed events satisfy one expected visible key, CalRelay deletes every existing duplicate before attempting one replacement create rather than choosing one survivor. Replacement failure may temporarily leave no blocker until a later successful reconciliation.
 - Ordinary apply reports success after every ordered action is confirmed and performs no post-apply verification read. A ready empty plan is also successful. Provider read lag may cause a later fresh run to repeat actions; CalRelay trusts each fresh snapshot and relies on later convergence.
 - Current-marker and legacy projections older than the moving two-date lookback may remain indefinitely.
-
-For app-backed EventKit validation checks, see [`docs/manual-validation.md`](manual-validation.md).

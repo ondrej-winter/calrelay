@@ -12,7 +12,7 @@ This directory contains the accepted, capability-owned product and behavior cont
 - [`cli-spec.md`](cli-spec.md): `calrelay` discovery, config check, ordinary dry-run/apply/explanation, legacy cleanup, and CLI-facing diagnostics.
 - [`macos-app-spec.md`](macos-app-spec.md): the control panel, manual sync and cleanup, standing authorization, launch-at-login, scheduling, freshness, recovery state, user notifications, and closed-app boundary.
 
-Together, these documents define the current EventKit MVP. The original idea remains at [`../ideas/calrelay-eventkit-mvp.md`](../ideas/calrelay-eventkit-mvp.md).
+Together, these documents define the current EventKit MVP.
 
 ## Historical specification migrations
 
