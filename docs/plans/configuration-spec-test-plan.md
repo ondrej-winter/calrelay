@@ -6,7 +6,7 @@
 - **Related accepted contracts:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), [`../specs/projection-and-safety-spec.md`](../specs/projection-and-safety-spec.md), [`../specs/routing-spec.md`](../specs/routing-spec.md), [`../specs/reconciliation-spec.md`](../specs/reconciliation-spec.md), [`../specs/cli-spec.md`](../specs/cli-spec.md), and [`../specs/macos-app-spec.md`](../specs/macos-app-spec.md).
 - **Readiness:** Ready. The required outcomes, test boundaries, expected evidence, sequencing, and validation commands are specific enough to execute without an unresolved product decision.
 - **Progress date:** September 22, 2026.
-- **Implementation state:** In progress. `CFG-P01` through `CFG-P07` are complete with focused schema, path-selection, fresh file-provider, runtime-readiness, migration-gate, bounded-cleanup, fresh app-loading, configuration-race, authorization-revocation, semantic-identity, policy-version, resolved-topology, persistence-privacy, and operator-documentation coverage plus repository validation; `CFG-P08` is the next executable slice.
+- **Implementation state:** Complete. `CFG-P01` through `CFG-P08` provide focused schema, path-selection, fresh file-provider, runtime-readiness, migration-gate, bounded-cleanup, fresh app-loading, configuration-race, authorization-revocation, semantic-identity, policy-version, resolved-topology, persistence-privacy, operator-documentation, integration, and repository-validation evidence.
 - **Execution approach:** Add focused deterministic contract evidence for uncovered behavior, preserve useful existing suites, fix only defects exposed by specification-derived tests, then run the complete repository gate.
 
 ## Outcome
@@ -386,7 +386,7 @@ Verify every referenced path and command, then run `git --no-pager diff HEAD --c
 
 **Evidence (September 22, 2026):** Semantic review confirmed that `docs/configuration.md` already requires retiring each tombstoned marker from every active configuration sharing the hub, manually handling artifacts in removed calendars and non-exact historical forms, avoiding fuzzy or heuristic deletion, removing future-producing recurring series, and completing manual global artifact verification before marker reuse. The dormant-writer guidance was tightened to require adoption of the current topology, removal or replacement of stale marker assignments, normal readiness before reconnection or resumed automation, and explicit prevention of even temporary stale republishing. No runtime test was added because these are operator-managed prerequisites that CalRelay cannot prove. Referenced local documentation paths exist, `swift run calrelay reconcile --help` confirms the documented cleanup and apply options, and `git --no-pager diff HEAD --check` passed.
 
-### - [ ] CFG-P08 — Integrate suites and complete repository validation
+### - [x] CFG-P08 — Integrate suites and complete repository validation
 
 Register any new suites, run focused evidence after each task, then execute the complete gate. Keep live EventKit validation outside this plan unless separately authorized with harmless dedicated calendars.
 
@@ -398,33 +398,37 @@ Register any new suites, run focused evidence after each task, then execute the 
 - All source or test files changed by earlier tasks
 - `docs/configuration.md` if `CFG-P07` required changes
 
-#### - [ ] CFG-P08-AC1 — Preserve deterministic architecture and safety boundaries
+#### - [x] CFG-P08-AC1 — Preserve deterministic architecture and safety boundaries
 
 Review changed APIs and imports to confirm domain and application code remain independent of Yams, filesystem path resolution, EventKit types, SwiftUI, and live OS services; all default tests remain isolated, offline, fake-backed, and non-mutating.
 
-#### - [ ] CFG-P08-AC2 — Register and focus every new suite through the custom runner
+#### - [x] CFG-P08-AC2 — Register and focus every new suite through the custom runner
 
 Every new suite has `runAll()`, is registered in `Tests/CalRelayKitTests/Main.swift`, and can be selected by its exact registered name without preventing the unfiltered complete runner from executing it.
 
-#### - [ ] CFG-P08-AC3 — Complete final traceability and handoff evidence
+#### - [x] CFG-P08-AC3 — Complete final traceability and handoff evidence
 
 Every `CONFIG-AC-01` through `CONFIG-AC-18` row points to passing automated evidence or a completed documentation check, unresolved failures remain open, and the handoff records exact commands, results, limitations, and any specification conflict.
 
-#### - [ ] CFG-P08-V1 — Pass `make format-check`
+#### - [x] CFG-P08-V1 — Pass `make format-check`
 
 Run the repository formatting check and report warning-only diagnostics separately from failures.
 
-#### - [ ] CFG-P08-V2 — Pass `make check`
+#### - [x] CFG-P08-V2 — Pass `make check`
 
 Run linting, build, the complete deterministic executable test runner, and configured CLI help smoke checks through the canonical repository gate.
 
-#### - [ ] CFG-P08-V3 — Pass final diff hygiene
+#### - [x] CFG-P08-V3 — Pass final diff hygiene
 
 Run `git --no-pager diff HEAD --check` after all edits and confirm agent-created changes remain unstaged unless an exact Git operation was requested.
 
-#### - [ ] CFG-P08-V4 — Run conditional app validation when applicable
+#### - [x] CFG-P08-V4 — Run conditional app validation when applicable
 
 Run `make app` if app sources, app resources, or the app-bundle script changed. Run `make ui-test` only if app presentation, accessibility contracts, fake UI composition, or the UI-test harness changed. Otherwise record each command as not applicable with the reason rather than as a pass.
+
+**Evidence (September 22, 2026):** Final review confirmed that Yams remains confined to the inbound configuration adapter, EventKit remains confined to its outbound adapter, and domain/application code gained no filesystem-path, EventKit, SwiftUI, AppKit, ArgumentParser, or live-service dependency. The default deterministic test target contains no EventKit store usage. Every suite listed below has `runAll()`, is registered by exact name in `Tests/CalRelayKitTests/Main.swift`, passed when focused, and also ran through the unfiltered executable test runner. The acceptance-check table maps every `CONFIG-AC-01` through `CONFIG-AC-18` requirement to completed `CFG-P01` through `CFG-P08` automated or documentation evidence, with no unresolved failure or specification conflict.
+
+Focused commands passed for `CalendarConfigurationSchemaTests`, `CalRelayContractTests`, `ConfigurationFileSelectionTests`, `FileCalendarRelaySettingsProviderTests`, `CalendarAccessPreflightTests`, `CalendarCleanupAccessTests`, `CalendarConfigurationObservationTests`, `CalendarConfigurationIdentityTests`, `CalendarAutomationPersistenceTests`, `CalendarStandingAuthorizationTests`, `CalendarAutomaticReconciliationTests`, `ConfigCheckCommandHandlerTests`, and `CalRelayCLISmokeTests` using `swift run CalRelayKitTests <ExactRegisteredSuiteName>`. `make format-check` passed with existing warning-only repository formatting diagnostics. `make check` passed with zero SwiftLint violations, successful builds, the complete deterministic runner, and all configured CLI help smoke checks; it retained existing non-failing local linker search-path warnings. `git --no-pager diff HEAD --check` passed and the final documentation change remains unstaged. `make app` and `make ui-test` were not applicable because no app source, app resource, app-bundle script, presentation/accessibility contract, fake UI composition, or UI-test harness changed. No live EventKit or real-calendar validation was run.
 
 ## Focused validation commands
 
@@ -446,7 +450,7 @@ swift run CalRelayKitTests ConfigCheckCommandHandlerTests
 swift run CalRelayKitTests CalRelayCLISmokeTests
 ```
 
-`CalendarConfigurationSchemaTests`, `FileCalendarRelaySettingsProviderTests`, and `CalendarConfigurationIdentityTests` are proposed names, not currently registered commands. Use them only if those suites are created and registered; otherwise use the existing owning suite name.
+`CalendarConfigurationSchemaTests`, `FileCalendarRelaySettingsProviderTests`, and `CalendarConfigurationIdentityTests` were created and are registered commands.
 
 ## Final validation commands
 
@@ -556,15 +560,15 @@ Apply the conditions in `CFG-P08-V4`; do not run real EventKit or real-calendar 
 
 ### Integration and final validation
 
-- [ ] CFG-P08 — Integrate suites and complete repository validation
-- [ ] CFG-P08-AC1 — Preserve deterministic architecture and safety boundaries
-- [ ] CFG-P08-AC2 — Register and focus every new suite through the custom runner
-- [ ] CFG-P08-AC3 — Complete final traceability and handoff evidence
-- [ ] CFG-P08-V1 — Pass `make format-check`
-- [ ] CFG-P08-V2 — Pass `make check`
-- [ ] CFG-P08-V3 — Pass final diff hygiene
-- [ ] CFG-P08-V4 — Run conditional app validation when applicable
+- [x] CFG-P08 — Integrate suites and complete repository validation
+- [x] CFG-P08-AC1 — Preserve deterministic architecture and safety boundaries
+- [x] CFG-P08-AC2 — Register and focus every new suite through the custom runner
+- [x] CFG-P08-AC3 — Complete final traceability and handoff evidence
+- [x] CFG-P08-V1 — Pass `make format-check`
+- [x] CFG-P08-V2 — Pass `make check`
+- [x] CFG-P08-V3 — Pass final diff hygiene
+- [x] CFG-P08-V4 — Run conditional app validation when applicable
 
 ## Next executable work
 
-Continue with `CFG-P08`: review final acceptance-check traceability and architecture boundaries, confirm every suite remains registered and focusable through the custom runner, then run the complete repository validation and final diff-hygiene gate.
+The configuration specification test plan is complete. Continue only through a new accepted specification revision or a separately approved follow-up plan.
