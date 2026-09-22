@@ -13,6 +13,7 @@ enum CalendarAutomaticReconciliationTests {
         try await testPreMutationConfigurationTransitionsFailClosed()
         try await testObservedAtoBtoATransitionBeforeMutationRevokesAuthorization()
         try await testAuthorizationRevocationBeforeMutationPreservesMatchingGrant()
+        try await testAuthorizationRevocationBetweenAttemptsDoesNotRequestAgain()
         try await testPartialMutationPersistsOnlyAggregateConfirmedCounts()
         try await testDisabledSchedulingFailsClosedEvenWithStandingAuthorization()
         try await testTransientReadFailureSchedulesBoundedFreshRetry()
@@ -98,6 +99,11 @@ enum CalendarAutomaticReconciliationTests {
                 try expect(
                     await authorization.requestCount() == 0,
                     "Automatic \(kind) must never request Calendar access for \(state)")
+                if state != .fullAccess {
+                    try expect(
+                        await store.mutationCount() == 0,
+                        "Automatic \(kind) must not mutate when Calendar access is unavailable")
+                }
             }
         }
     }
@@ -297,6 +303,25 @@ enum CalendarAutomaticReconciliationTests {
         try expect(
             (await stateStore.currentState()).standingAuthorization != nil,
             "Temporary unavailable access should preserve a still-matching standing grant")
+    }
+
+    private static func testAuthorizationRevocationBetweenAttemptsDoesNotRequestAgain() async throws {
+        let fixture = AutomaticReconciliationFixture()
+        let authorization = RequestCapableAutomaticAuthorization(state: .fullAccess)
+        let stateStore = AutomaticStateStore(state: fixture.authorizedState())
+        let store = fixture.storeWithSourceEvent()
+        let useCase = fixture.useCase(authorization: authorization, calendarStore: store, stateStore: stateStore)
+
+        let first = try await useCase.run()
+        await authorization.replace(.denied)
+        let revoked = try await useCase.run()
+
+        try expect(first.outcome == .applied, "The first authorized automatic attempt should proceed")
+        try expect(
+            revoked.outcome == .calendarAccessUnavailable,
+            "A later automatic attempt should report revoked Calendar access")
+        try expect(await store.mutationCount() == 1, "The revoked attempt must not add another calendar mutation")
+        try expect(await authorization.requestCount() == 0, "Revocation between attempts must not request access again")
     }
 
     private static func testPartialMutationPersistsOnlyAggregateConfirmedCounts() async throws {
@@ -518,7 +543,7 @@ private actor ChangingAutomaticSettingsProvider: CalendarRelaySettingsProvider {
 }
 
 private actor RequestCapableAutomaticAuthorization: CalendarAuthorizationStatusPort, CalendarFullAccessRequestPort {
-    private let state: CalendarAuthorizationState
+    private var state: CalendarAuthorizationState
     private var requests = 0
 
     init(state: CalendarAuthorizationState) { self.state = state }
@@ -530,6 +555,7 @@ private actor RequestCapableAutomaticAuthorization: CalendarAuthorizationStatusP
         return state == .fullAccess
     }
 
+    func replace(_ state: CalendarAuthorizationState) { self.state = state }
     func requestCount() -> Int { requests }
 }
 
