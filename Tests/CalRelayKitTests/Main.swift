@@ -33,6 +33,9 @@ import Foundation
         if filters.isEmpty || filters.contains("CalendarConfigurationSchemaTests") {
             try CalendarConfigurationSchemaTests.runAll()
         }
+        if filters.isEmpty || filters.contains("CalendarConfigurationIdentityTests") {
+            try CalendarConfigurationIdentityTests.runAll()
+        }
         if filters.isEmpty || filters.contains("OrdinaryReconciliationWindowTests") {
             try OrdinaryReconciliationWindowTests.runAll()
         }

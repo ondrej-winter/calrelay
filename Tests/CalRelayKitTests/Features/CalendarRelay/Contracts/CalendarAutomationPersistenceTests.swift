@@ -4,6 +4,7 @@ import Foundation
 enum CalendarAutomationPersistenceTests {
     static func runAll() async throws {
         try testBindingIsSemanticVersionedAndOpaque()
+        try testRuntimeDescriptionsAndAttentionOutputRemainOpaque()
         try await testPersistentStateRoundTripsWithoutDisclosingSensitiveInputs()
         try await testCorruptAndUnsupportedStateRecoversWithoutAuthorization()
     }
@@ -39,6 +40,35 @@ enum CalendarAutomationPersistenceTests {
         try expect(
             binding.description == "<opaque-standing-authorization-binding>",
             "Opaque authorization identity must not expose its digest or inputs")
+        try expect(
+            binding.debugDescription == binding.description,
+            "Opaque authorization debug output must not expose its digest or inputs")
+    }
+
+    private static func testRuntimeDescriptionsAndAttentionOutputRemainOpaque() throws {
+        let binding = CalendarStandingAuthorizationBinding.derive(
+            settings: sensitiveSettings(), resolvedCalendars: physicalCalendars(), policyVersion: .current)
+        let notification = CalendarAutomationAttentionNotification(reason: .standingAuthorizationRequired)
+        let status = CalendarAutomationOperationalStatus(
+            lastAttemptAt: Date(timeIntervalSince1970: 1_000), latestOutcome: .standingAuthorizationRequired,
+            confirmedCounts: .zero, retryState: .none,
+            freshness: CalendarAutomationFreshnessMetadata(lastSuccessAt: nil, nextNominalRunAt: nil))
+        let result = CalendarAutomaticReconciliationResult(
+            outcome: .standingAuthorizationRequired, confirmedCounts: .zero, retryState: .none)
+        let outputs = [
+            binding.description, binding.debugDescription,
+            physicalCalendars().map(\.description).joined(separator: "\n"),
+            physicalCalendars().map(\.debugDescription).joined(separator: "\n"), notification.title, notification.body,
+            String(reflecting: status), String(reflecting: result),
+            String(reflecting: CalendarAutomaticReconciliationError.schedulingNotEnabled)
+        ]
+
+        for output in outputs {
+            try expect(!output.contains("v1:"), "Runtime output must not display an opaque identity value")
+            for prohibited in prohibitedValues() {
+                try expect(!output.contains(prohibited), "Runtime output disclosed prohibited value: \(prohibited)")
+            }
+        }
     }
 
     private static func testPersistentStateRoundTripsWithoutDisclosingSensitiveInputs() async throws {
@@ -62,6 +92,16 @@ enum CalendarAutomationPersistenceTests {
         try expect(await store.loadState() == state, "Allowlisted automation state should round-trip")
         guard let data = fixture.defaults.data(forKey: fixture.key), let payload = String(data: data, encoding: .utf8)
         else { throw TestFailure("Expected encoded automation state") }
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let storedState = root["state"] as? [String: Any],
+            let storedBinding = storedState["standingAuthorization"] as? String
+        else { throw TestFailure("Expected an opaque standing-authorization value") }
+        let prefix = "v1:"
+        let digest = storedBinding.dropFirst(prefix.count)
+        try expect(
+            storedBinding.hasPrefix(prefix) && digest.count == 64
+                && digest.allSatisfy({ $0.isHexDigit && !$0.isUppercase }),
+            "Persisted authorization must use only the versioned opaque digest representation")
         for prohibited in prohibitedValues() {
             try expect(!payload.contains(prohibited), "Persisted state disclosed prohibited value: \(prohibited)")
         }

@@ -6,7 +6,7 @@
 - **Related accepted contracts:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), [`../specs/projection-and-safety-spec.md`](../specs/projection-and-safety-spec.md), [`../specs/routing-spec.md`](../specs/routing-spec.md), [`../specs/reconciliation-spec.md`](../specs/reconciliation-spec.md), [`../specs/cli-spec.md`](../specs/cli-spec.md), and [`../specs/macos-app-spec.md`](../specs/macos-app-spec.md).
 - **Readiness:** Ready. The required outcomes, test boundaries, expected evidence, sequencing, and validation commands are specific enough to execute without an unresolved product decision.
 - **Progress date:** September 22, 2026.
-- **Implementation state:** In progress. `CFG-P01` through `CFG-P05` are complete with focused schema, path-selection, fresh file-provider, runtime-readiness, migration-gate, bounded-cleanup, fresh app-loading, configuration-race, and authorization-revocation coverage plus repository validation; `CFG-P06` is the next executable slice.
+- **Implementation state:** In progress. `CFG-P01` through `CFG-P06` are complete with focused schema, path-selection, fresh file-provider, runtime-readiness, migration-gate, bounded-cleanup, fresh app-loading, configuration-race, authorization-revocation, semantic-identity, policy-version, resolved-topology, and persistence-privacy coverage plus repository validation; `CFG-P07` is the next executable slice.
 - **Execution approach:** Add focused deterministic contract evidence for uncovered behavior, preserve useful existing suites, fix only defects exposed by specification-derived tests, then run the complete repository gate.
 
 ## Outcome
@@ -313,7 +313,7 @@ Run the exact affected suites and record current evidence that every configurati
 
 **Evidence (September 22, 2026):** Existing production behavior required no changes. Deterministic fake-backed coverage now proves fresh settings loads for status, manual dry-run, manual apply review and confirmation, cleanup confirmation, standing-authorization review and confirmation, and automatic attempts; invalidation of open reviews; confirmation consumption after a configuration-race failure; coalescing of repeated configuration-recovery requests; pre-mutation changed, missing, invalid, and migration-pending failures without mutation; immediate standing-authorization revocation; and A-to-B-to-A non-reactivation. The focused command `swift run CalRelayKitTests CalendarControlPanelStatusTests CalendarManualDryRunTests CalendarManualApplySafetyTests CalendarManualCleanupFailureTests CalendarStandingAuthorizationTests CalendarAutomaticReconciliationTests CalendarAutomationCoordinationTests` passed. `make format-check` and `make check` also passed; the former retained existing non-blocking repository-wide warnings, and the latter emitted non-failing local linker search-path warnings.
 
-### - [ ] CFG-P06 — Complete semantic identity, policy, topology, and privacy tests
+### - [x] CFG-P06 — Complete semantic identity, policy, topology, and privacy tests
 
 Add a focused identity matrix through the public opaque standing-authorization binding. Do not expose or persist internal semantic components merely to make them easier to test.
 
@@ -336,29 +336,31 @@ Add a focused identity matrix through the public opaque standing-authorization b
 - Changed topology: any physical calendar identity, role-to-calendar mapping, role order, or unprovable continuity.
 - Changed policy: any product-controlled version representing changed executable actions, exact targets, or order for identical configuration and snapshot inputs.
 
-#### - [ ] CFG-P06-AC1 — Prove representation-only equivalence and diagnostic-name insensitivity
+#### - [x] CFG-P06-AC1 — Prove representation-only equivalence and diagnostic-name insensitivity
 
 Equivalent YAML representations, omitted versus explicit defaults, diagnostic work-role renames, and legacy-marker set reordering derive the same opaque binding when policy and resolved topology are unchanged.
 
-#### - [ ] CFG-P06-AC2 — Prove every mutation-relevant configuration change alters identity
+#### - [x] CFG-P06-AC2 — Prove every mutation-relevant configuration change alters identity
 
 One-at-a-time changes to every mutation-relevant value, including work declaration order and legacy-marker set membership, derive a different binding and require fresh authorization.
 
-#### - [ ] CFG-P06-AC3 — Prove reconciliation-policy version binding and maintenance rules
+#### - [x] CFG-P06-AC3 — Prove reconciliation-policy version binding and maintenance rules
 
 Tests show a policy-version change invalidates prior authorization while presentation-only changes do not. The test or adjacent maintenance note couples the current policy identifier to representative executable targets and order so mutation-semantic changes require an explicit version review.
 
-#### - [ ] CFG-P06-AC4 — Prove ordered resolved-topology identity and continuity invalidation
+#### - [x] CFG-P06-AC4 — Prove ordered resolved-topology identity and continuity invalidation
 
 Tests bind the hub and declaration-ordered work roles to physical calendar identities, reject swapped or changed mappings and unproven continuity, and never use those identities as configuration selectors or visible ownership markers.
 
-#### - [ ] CFG-P06-AC5 — Prove opaque persistence and output reveal no prohibited inputs
+#### - [x] CFG-P06-AC5 — Prove opaque persistence and output reveal no prohibited inputs
 
 Round-trip persistence, descriptions, debug descriptions, status, and failure output contain none of the seeded raw YAML, selectors, calendar titles, markers, diagnostic names, raw EventKit calendar IDs, or reversible identity components.
 
-#### - [ ] CFG-P06-V1 — Pass focused identity, persistence, authorization, and automation suites
+#### - [x] CFG-P06-V1 — Pass focused identity, persistence, authorization, and automation suites
 
 Run the exact affected suites and record current evidence for semantic equality, invalidation, privacy, and persistence behavior.
+
+**Evidence (September 22, 2026):** Added `CalendarConfigurationIdentityTests` through the public opaque standing-authorization binding and registered it in the custom runner. The matrix proves equivalent YAML representation, omitted versus explicit defaults, diagnostic-name changes, and legacy-marker ordering preserve identity; every mutation-relevant setting change alters identity; ordered physical topology and continuity changes alter identity; and reconciliation-policy version changes invalidate the binding while presentation-only changes do not. Persistence tests now also verify the versioned digest-only stored shape plus privacy-safe binding, physical-reference, status, automatic-result, notification, and failure output. No production behavior defect was exposed; only an adjacent policy-version maintenance note was added. The focused command `swift run CalRelayKitTests CalendarConfigurationIdentityTests CalendarAutomationPersistenceTests CalendarStandingAuthorizationTests CalendarAutomaticReconciliationTests` passed. `make format-check` and `make check` passed; the former retained existing warning-only repository formatting diagnostics, and the latter reported zero lint violations with existing non-failing local linker search-path warnings.
 
 ### - [ ] CFG-P07 — Verify migration and retired-marker documentation contracts
 
@@ -527,21 +529,21 @@ Apply the conditions in `CFG-P08-V4`; do not run real EventKit or real-calendar 
 
 ### App freshness and races
 
-- [ ] CFG-P05 — Complete app fresh-loading and configuration-race tests
-- [ ] CFG-P05-AC1 — Prove status and every app operation load fresh settings
-- [ ] CFG-P05-AC2 — Prove file observation is invalidation-only and safely coalesced
-- [ ] CFG-P05-AC3 — Prove pre-mutation changes and A-to-B-to-A transitions cannot reuse authorization
-- [ ] CFG-P05-V1 — Pass focused observation, status, manual, and automatic suites
+- [x] CFG-P05 — Complete app fresh-loading and configuration-race tests
+- [x] CFG-P05-AC1 — Prove status and every app operation load fresh settings
+- [x] CFG-P05-AC2 — Prove file observation is invalidation-only and safely coalesced
+- [x] CFG-P05-AC3 — Prove pre-mutation changes and A-to-B-to-A transitions cannot reuse authorization
+- [x] CFG-P05-V1 — Pass focused observation, status, manual, and automatic suites
 
 ### Identity, policy, topology, and privacy
 
-- [ ] CFG-P06 — Complete semantic identity, policy, topology, and privacy tests
-- [ ] CFG-P06-AC1 — Prove representation-only equivalence and diagnostic-name insensitivity
-- [ ] CFG-P06-AC2 — Prove every mutation-relevant configuration change alters identity
-- [ ] CFG-P06-AC3 — Prove reconciliation-policy version binding and maintenance rules
-- [ ] CFG-P06-AC4 — Prove ordered resolved-topology identity and continuity invalidation
-- [ ] CFG-P06-AC5 — Prove opaque persistence and output reveal no prohibited inputs
-- [ ] CFG-P06-V1 — Pass focused identity, persistence, authorization, and automation suites
+- [x] CFG-P06 — Complete semantic identity, policy, topology, and privacy tests
+- [x] CFG-P06-AC1 — Prove representation-only equivalence and diagnostic-name insensitivity
+- [x] CFG-P06-AC2 — Prove every mutation-relevant configuration change alters identity
+- [x] CFG-P06-AC3 — Prove reconciliation-policy version binding and maintenance rules
+- [x] CFG-P06-AC4 — Prove ordered resolved-topology identity and continuity invalidation
+- [x] CFG-P06-AC5 — Prove opaque persistence and output reveal no prohibited inputs
+- [x] CFG-P06-V1 — Pass focused identity, persistence, authorization, and automation suites
 
 ### Documentation
 
@@ -563,4 +565,4 @@ Apply the conditions in `CFG-P08-V4`; do not run real EventKit or real-calendar 
 
 ## Next executable work
 
-Continue with `CFG-P05`: complete app fresh-loading, observation invalidation, and configuration-race coverage, then run the focused observation, status, manual, and automatic suites before changing another capability area.
+Continue with `CFG-P07`: verify the migration and retired-marker operator documentation contracts, edit only if an accepted obligation is absent or ambiguous, and validate documentation references plus diff hygiene.
