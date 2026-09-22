@@ -6,7 +6,7 @@
 - **Related accepted contracts:** [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md), [`../specs/projection-and-safety-spec.md`](../specs/projection-and-safety-spec.md), [`../specs/routing-spec.md`](../specs/routing-spec.md), [`../specs/reconciliation-spec.md`](../specs/reconciliation-spec.md), [`../specs/cli-spec.md`](../specs/cli-spec.md), and [`../specs/macos-app-spec.md`](../specs/macos-app-spec.md).
 - **Readiness:** Ready. The required outcomes, test boundaries, expected evidence, sequencing, and validation commands are specific enough to execute without an unresolved product decision.
 - **Progress date:** September 21, 2026.
-- **Implementation state:** In progress. `CFG-P01` and `CFG-P02` are complete with focused schema, path-selection, and fresh file-provider coverage plus full repository validation; `CFG-P03` is the next executable slice.
+- **Implementation state:** In progress. `CFG-P01`, `CFG-P02`, and `CFG-P03` are complete with focused schema, path-selection, fresh file-provider, runtime-readiness, and migration-gate coverage plus repository validation; `CFG-P04` is the next executable slice.
 - **Execution approach:** Add focused deterministic contract evidence for uncovered behavior, preserve useful existing suites, fix only defects exposed by specification-derived tests, then run the complete repository gate.
 
 ## Outcome
@@ -196,7 +196,7 @@ Tests change or remove the selected file between calls and prove the provider re
 
 Run `ConfigurationFileSelectionTests` and the exact registered provider-suite name, then record current passing evidence.
 
-### - [ ] CFG-P03 — Complete runtime readiness and migration-pending gates
+### - [x] CFG-P03 — Complete runtime readiness and migration-pending gates
 
 Use fake authorization and calendar-store ports to prove that structural success is not runtime readiness and that migration pending has intentionally different behavior for ordinary operations and config check.
 
@@ -206,28 +206,32 @@ Use fake authorization and calendar-store ports to prove that structural success
 
 - `Tests/CalRelayKitTests/Features/CalendarRelay/Contracts/CalendarAccessPreflightTests.swift`
 - `Tests/CalRelayKitTests/Features/CalendarRelay/Contracts/CalendarManualDryRunTests.swift`
+- `Tests/CalRelayKitTests/Features/CalendarRelay/Contracts/CalendarManualApplySafetyTests.swift`
+- `Tests/CalRelayKitTests/Features/CalendarRelay/Contracts/CalendarStandingAuthorizationTests.swift`
 - `Tests/CalRelayKitTests/Features/CalendarRelay/Contracts/CalendarAutomaticReconciliationTests.swift`
 - `Tests/CalRelayKitTests/Features/CalendarRelay/Adapters/Inbound/CLI/ReconcileCommandHandlerTests.swift`
 - `Tests/CalRelayKitTests/Features/CalendarRelay/Adapters/Inbound/CLI/ConfigCheckCommandHandlerTests.swift`
 - `Tests/CalRelayKitTests/CalRelayCLI/Features/CalendarRelay/Adapters/Inbound/CLI/CalRelayCLISmokeTests.swift`
 
-#### - [ ] CFG-P03-AC1 — Prove exact runtime selector resolution without ID fallback
+#### - [x] CFG-P03-AC1 — Prove exact runtime selector resolution without ID fallback
 
 Tests reject zero matches, multiple exact matches even when one is writable, unreadable or read-only roles, and two roles resolving to one physical calendar; a complete exact-match topology returns an ordered hub-then-declaration-ordered-work snapshot without mutation or EventKit-ID fallback.
 
-#### - [ ] CFG-P03-AC2 — Prove migration pending blocks every ordinary mutation path
+#### - [x] CFG-P03-AC2 — Prove migration pending blocks every ordinary mutation path
 
 Nonempty `legacyMarkers` block ordinary dry-run, apply, explanation, standing-authorization grant, and automatic scheduling after structural validation but before calendar event access or mutation, direct the operator to explicit cleanup, and never edit YAML.
 
-#### - [ ] CFG-P03-AC3 — Prove config check still preflights but never claims readiness
+#### - [x] CFG-P03-AC3 — Prove config check still preflights but never claims readiness
 
 Migration-pending config check performs ordinary topology preflight, aggregates safely determinable access failures, returns a nonzero process result, reports migration pending, makes no readiness claim, and performs no mutation.
 
-#### - [ ] CFG-P03-V1 — Pass focused readiness, migration, and process suites
+#### - [x] CFG-P03-V1 — Pass focused readiness, migration, and process suites
 
 Run the relevant access, manual, automatic, command-handler, and CLI smoke suites and record current passing evidence.
 
-### - [ ] CFG-P04 — Complete bounded cleanup coverage and verification tests
+**Evidence (September 21, 2026):** Existing production behavior required no changes. Deterministic fake-backed coverage now proves exact source-title/calendar-title selection without provider-ID fallback, duplicate-selector ambiguity regardless of writability, migration gates for ordinary CLI, manual apply and review, standing authorization, and scheduled reconciliation, persisted automatic gate outcomes, config-check aggregation, YAML preservation, and process output/status behavior. The focused command `swift run CalRelayKitTests CalendarAccessPreflightTests CalendarManualDryRunTests CalendarManualApplyTests CalendarStandingAuthorizationTests CalendarAutomaticReconciliationTests ReconcileCommandHandlerTests ConfigCheckCommandHandlerTests CalRelayCLISmokeTests` passed.
+
+### - [x] CFG-P04 — Complete bounded cleanup coverage and verification tests
 
 Strengthen boundary evidence around the one captured run context, positive-overlap membership, exact tombstone ownership, complete topology reads, and post-delete verification without expanding cleanup authority.
 
@@ -252,25 +256,27 @@ Strengthen boundary evidence around the one captured run context, positive-overl
 - Search hub first and then all configured work calendars in declaration order.
 - Select exact parsed legacy markers only; exclude current markers, raw starts-with forms, malformed separators, malformed brackets, empty marked titles, and unmarked events.
 
-#### - [ ] CFG-P04-AC1 — Prove the moving cleanup range and positive-overlap membership
+#### - [x] CFG-P04-AC1 — Prove the moving cleanup range and positive-overlap membership
 
 Tests calculate `D - 2` through `D + 365` inclusive from one captured local context, handle both daylight-saving directions, exercise exact-touch exclusion and positive-overlap inclusion, and retain complete event intervals.
 
-#### - [ ] CFG-P04-AC2 — Prove cleanup-only exact marker selection over the complete topology
+#### - [x] CFG-P04-AC2 — Prove cleanup-only exact marker selection over the complete topology
 
 Tests read every configured role in topology order and select only exact legacy-marker events, with no ordinary creates, current-marker deletes, fuzzy matching, malformed-shape deletion, or unconfigured-calendar claim.
 
-#### - [ ] CFG-P04-AC3 — Prove complete post-delete verification and no rollback
+#### - [x] CFG-P04-AC3 — Prove complete post-delete verification and no rollback
 
 Cleanup apply rereads the full range and topology after planned deletions, succeeds only on a no-match snapshot, fails on a remaining match or verification read error, preserves confirmed deletions, stops later mutation on failure, and does not roll back.
 
-#### - [ ] CFG-P04-AC4 — Prove truthful local point-in-time cleanup claims
+#### - [x] CFG-P04-AC4 — Prove truthful local point-in-time cleanup claims
 
 CLI and app success output state the bounded local point-in-time result and do not claim global retirement, historical coverage, removed-calendar coverage, recurring-series retirement, or protection against later recreation.
 
-#### - [ ] CFG-P04-V1 — Pass focused cleanup contract and process suites
+#### - [x] CFG-P04-V1 — Pass focused cleanup contract and process suites
 
 Run the cleanup access, manual cleanup, command-handler, and CLI smoke suites and record current passing evidence.
+
+**Evidence (September 22, 2026):** Existing production behavior required no changes. Deterministic fake-backed coverage now proves both daylight-saving directions, the moving `D - 2` through `D + 365` local-date range, exact-touch exclusion, positive-overlap inclusion with complete returned intervals, exact cleanup-only marker selection across the complete declaration-ordered topology, unconfigured-calendar exclusion, complete post-delete verification over the same range, remaining-match and read-failure handling without rollback, and truthful app/CLI/process local point-in-time claims. The focused command `swift run CalRelayKitTests CalendarCleanupAccessTests CalendarManualCleanupTests ReconcileCommandHandlerTests CalRelayCLISmokeTests` passed. `make format-check` and `make check` also passed; the former retained existing non-blocking repository-wide warnings.
 
 ### - [ ] CFG-P05 — Complete app fresh-loading and configuration-race tests
 
@@ -502,20 +508,20 @@ Apply the conditions in `CFG-P08-V4`; do not run real EventKit or real-calendar 
 
 ### Runtime readiness and migration
 
-- [ ] CFG-P03 — Complete runtime readiness and migration-pending gates
-- [ ] CFG-P03-AC1 — Prove exact runtime selector resolution without ID fallback
-- [ ] CFG-P03-AC2 — Prove migration pending blocks every ordinary mutation path
-- [ ] CFG-P03-AC3 — Prove config check still preflights but never claims readiness
-- [ ] CFG-P03-V1 — Pass focused readiness, migration, and process suites
+- [x] CFG-P03 — Complete runtime readiness and migration-pending gates
+- [x] CFG-P03-AC1 — Prove exact runtime selector resolution without ID fallback
+- [x] CFG-P03-AC2 — Prove migration pending blocks every ordinary mutation path
+- [x] CFG-P03-AC3 — Prove config check still preflights but never claims readiness
+- [x] CFG-P03-V1 — Pass focused readiness, migration, and process suites
 
 ### Legacy cleanup
 
-- [ ] CFG-P04 — Complete bounded cleanup coverage and verification tests
-- [ ] CFG-P04-AC1 — Prove the moving cleanup range and positive-overlap membership
-- [ ] CFG-P04-AC2 — Prove cleanup-only exact marker selection over the complete topology
-- [ ] CFG-P04-AC3 — Prove complete post-delete verification and no rollback
-- [ ] CFG-P04-AC4 — Prove truthful local point-in-time cleanup claims
-- [ ] CFG-P04-V1 — Pass focused cleanup contract and process suites
+- [x] CFG-P04 — Complete bounded cleanup coverage and verification tests
+- [x] CFG-P04-AC1 — Prove the moving cleanup range and positive-overlap membership
+- [x] CFG-P04-AC2 — Prove cleanup-only exact marker selection over the complete topology
+- [x] CFG-P04-AC3 — Prove complete post-delete verification and no rollback
+- [x] CFG-P04-AC4 — Prove truthful local point-in-time cleanup claims
+- [x] CFG-P04-V1 — Pass focused cleanup contract and process suites
 
 ### App freshness and races
 
@@ -555,4 +561,4 @@ Apply the conditions in `CFG-P08-V4`; do not run real EventKit or real-calendar 
 
 ## Next executable work
 
-Continue with `CFG-P03`: complete runtime readiness and migration-pending gates, then run the focused access, ordinary-operation, config-check, and process suites before changing another capability area.
+Continue with `CFG-P05`: complete app fresh-loading, observation invalidation, and configuration-race coverage, then run the focused observation, status, manual, and automatic suites before changing another capability area.

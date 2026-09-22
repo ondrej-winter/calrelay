@@ -418,20 +418,39 @@ enum ReconcileCommandHandlerTests {
     private static func testOrdinaryMigrationPendingFailsBeforeCalendarAccess() async throws {
         let fixture = reconciliationFixture()
         let configURL = try writeTemporaryConfigFile(legacyMarkers: ["[OLD]"])
-        let store = CommandHandlerCalendarStore(calendars: [fixture.hubCalendar, fixture.workCalendar])
-        let handler = ReconcileCommandHandler(
-            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { fixture.now })
+        let originalYAML = try String(contentsOf: configURL, encoding: .utf8)
+        let modes = [
+            (name: "dry run", apply: false, explain: false), (name: "apply", apply: true, explain: false),
+            (name: "explanation", apply: false, explain: true)
+        ]
 
-        do {
-            _ = try await handler.run(config: configURL.path, apply: false, explain: false, cleanupLegacy: false)
-        } catch let error as ReconcileCommandError {
-            try expect(error == .migrationPending, "Ordinary reconciliation should report migration pending")
+        for mode in modes {
+            let store = CommandHandlerCalendarStore(calendars: [fixture.hubCalendar, fixture.workCalendar])
+            let handler = ReconcileCommandHandler(
+                authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { fixture.now })
+
+            do {
+                _ = try await handler.run(
+                    config: configURL.path, apply: mode.apply, explain: mode.explain, cleanupLegacy: false)
+                throw TestFailure("Expected migration-pending ordinary " + mode.name + " failure")
+            } catch let error as ReconcileCommandError {
+                try expect(error == .migrationPending, "Ordinary " + mode.name + " should report migration pending")
+                try expect(
+                    error.description.contains("explicit legacy cleanup"),
+                    "Ordinary " + mode.name + " should direct the operator to explicit cleanup")
+                try expect(!error.description.contains("[OLD]"), "Migration failure should not disclose marker values")
+            }
+
             try expect(
-                await store.listCalendarsCallCount() == 0, "Migration pending should block before Calendar access")
-            return
+                await store.listCalendarsCallCount() == 0,
+                "Migration-pending ordinary " + mode.name + " should fail before Calendar access")
+            try expect(
+                await store.mutationAttemptCount() == 0,
+                "Migration-pending ordinary " + mode.name + " must not attempt mutation")
+            try expect(
+                try String(contentsOf: configURL, encoding: .utf8) == originalYAML,
+                "Migration-pending ordinary " + mode.name + " must not rewrite the selected YAML")
         }
-
-        throw TestFailure("Expected migration-pending ordinary reconciliation failure")
     }
 
     private static func testCleanupDryRunReportsCompleteRoleSummariesAndPrivateOrderedReview() async throws {
@@ -489,9 +508,7 @@ enum ReconcileCommandHandlerTests {
             "private-acme-first", "private-acme-all-day", "iCloud", "Google", "Microsoft", "Personal Work", "ACME Work",
             "Beta Work"
         ] { try expect(!output.contains(forbidden), "Cleanup output should omit prohibited detail: \(forbidden)") }
-        try expect(
-            !output.contains("globally retired") && !output.contains("retired everywhere"),
-            "Cleanup output should not claim global marker retirement")
+        try expectTruthfulCleanupScope(output)
         try expect((await store.deletedEvents()).isEmpty, "Cleanup dry-run should not delete events")
         try expect((await store.createdEvents()).isEmpty, "Cleanup dry-run should never create ordinary projections")
     }
@@ -552,6 +569,7 @@ enum ReconcileCommandHandlerTests {
         try expect(
             output.contains("post-mutation verification snapshot contained no matching legacy-marker events"),
             "Cleanup apply should scope no-match success to its verification snapshot")
+        try expectTruthfulCleanupScope(output)
         try expect(
             output.contains("Configuration was not changed") && output.contains("Remove legacyMarkers manually")
                 && output.contains("eventual-convergence migration is complete for your topology"),
@@ -674,6 +692,22 @@ enum ReconcileCommandHandlerTests {
 
         return CommandHandlerFixture(
             now: now, hubCalendar: hubCalendar, workCalendar: workCalendar, workEvent: workEvent)
+    }
+
+    private static func expectTruthfulCleanupScope(_ output: String) throws {
+        try expect(
+            output.localizedCaseInsensitiveContains("local")
+                && output.localizedCaseInsensitiveContains("point-in-time"),
+            "Cleanup output should state its local point-in-time scope")
+        for forbiddenClaim in [
+            "all calendars", "entire history", "globally retired", "retired everywhere", "recurring series removed",
+            "all recurring series retired", "removed calendars are covered", "covers removed calendars",
+            "cannot be recreated", "will not be recreated"
+        ] {
+            try expect(
+                !output.localizedCaseInsensitiveContains(forbiddenClaim),
+                "Cleanup output must not claim global, historical, recurring-series, or future-retirement scope")
+        }
     }
 
     private static func writeTemporaryConfigFile(legacyMarkers: [String] = []) throws -> URL {

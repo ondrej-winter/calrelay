@@ -5,6 +5,7 @@ enum ConfigCheckCommandHandlerTests {
     static func runAll() async throws {
         try await testConfigCheckReportsReadyTopologyWithoutMutation()
         try await testMigrationPendingConfigCheckStillRunsPreflightAndFails()
+        try await testMigrationPendingConfigCheckAggregatesPreflightFailuresWithoutReadinessClaim()
         try await testStructurallyInvalidConfigFailsBeforeCalendarAccess()
         try await testConfigCheckUsesOrdinaryAccessWindow()
         try await testUnavailableAccessIsActionableAndStopsBeforeStoreAccess()
@@ -49,6 +50,54 @@ enum ConfigCheckCommandHandlerTests {
         }
 
         throw TestFailure("Expected migration-pending config check failure")
+    }
+
+    private static func testMigrationPendingConfigCheckAggregatesPreflightFailuresWithoutReadinessClaim() async throws {
+        let configURL = try writeConfig(legacyMarkers: ["[OLD]"])
+        let originalYAML = try String(contentsOf: configURL, encoding: .utf8)
+        let hub = RelayCalendar(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: false)
+        let store = CommandHandlerCalendarStore(calendars: [hub])
+        let handler = ConfigCheckCommandHandler(
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store,
+            now: { configCheckFixture().now })
+
+        do {
+            _ = try await handler.run(config: configURL.path)
+            throw TestFailure("Expected migration-pending config check with access failures")
+        } catch let error as ConfigCheckCommandError {
+            guard case .migrationPendingWithPreflightFailures(let selectedPath, let issues) = error else {
+                throw TestFailure("Expected migration pending with aggregated preflight failures")
+            }
+            try expect(selectedPath == configURL.path, "Migration-pending failure should retain the selected path")
+            try expect(
+                issues.contains(
+                    .calendarReadOnly(
+                        role: .hub, selector: CalendarSelector(sourceTitle: "iCloud", calendarTitle: "Personal Work"))),
+                "Migration-pending config check should report the read-only hub")
+            try expect(
+                issues.contains(
+                    .calendarMissing(
+                        role: .work(name: "ACME", declarationIndex: 0),
+                        selector: CalendarSelector(sourceTitle: "Google", calendarTitle: "ACME Work"))),
+                "Migration-pending config check should report the missing work calendar")
+            try expect(
+                error.description.contains("migration pending")
+                    && error.description.contains("topology is not currently ready"),
+                "Migration-pending config check should report both migration and readiness failures")
+            try expect(
+                !error.description.contains("complete configured topology is currently ready"),
+                "Migration-pending config check must not make a readiness success claim")
+        }
+
+        try expect(await store.listCalendarsCallCount() == 1, "Migration-pending config check should run preflight")
+        try expect(
+            await store.eventRequestCalendarIDs() == [hub.id],
+            "Migration-pending config check should read every uniquely resolved role")
+        try expect((await store.createdEvents()).isEmpty, "Migration-pending config check must not create events")
+        try expect((await store.deletedEvents()).isEmpty, "Migration-pending config check must not delete events")
+        try expect(
+            try String(contentsOf: configURL, encoding: .utf8) == originalYAML,
+            "Migration-pending config check must not rewrite the selected YAML")
     }
 
     private static func testStructurallyInvalidConfigFailsBeforeCalendarAccess() async throws {

@@ -45,8 +45,18 @@ extension CalendarManualCleanupTests {
         ] { try expect(!output.contains(forbidden), "Review must omit IDs, calendar names, selectors and markers") }
         let success = CalendarManualCleanupFormatter.formatSuccess(confirmedDeletions: 3)
         try expect(
-            success.contains("point-in-time") && success.contains("Remove legacyMarkers manually"),
-            "Verified cleanup must not claim global retirement or automatic YAML editing")
+            success.contains("complete local range") && success.contains("point-in-time")
+                && success.contains("Remove legacyMarkers manually"),
+            "Verified cleanup must state its bounded local point-in-time result without automatic YAML editing")
+        for forbiddenClaim in [
+            "all calendars", "entire history", "globally retired", "retired everywhere", "recurring series removed",
+            "all recurring series retired", "removed calendars are covered", "covers removed calendars",
+            "cannot be recreated", "will not be recreated"
+        ] {
+            try expect(
+                !success.localizedCaseInsensitiveContains(forbiddenClaim),
+                "Verified app cleanup must not claim global, historical, recurring-series, or future-retirement scope")
+        }
         try expect(
             !success.contains("Example") && !success.contains("Work role"), "Completion retains no review details")
     }

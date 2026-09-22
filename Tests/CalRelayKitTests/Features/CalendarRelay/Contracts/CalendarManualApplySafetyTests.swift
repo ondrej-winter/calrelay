@@ -62,13 +62,41 @@ extension CalendarManualApplyTests {
             _ = try await useCase.confirm(reviewID: review.id)
             throw TestFailure("Cancelled review must not authorize mutation")
         } catch CalendarManualApplyError.reviewRequired {}
-        await provider.replace(fixture.settingsWith(prefix: "[WORK]", legacyMarkers: ["[RETIRED]"]))
+        try expect(await store.createdEvents().isEmpty, "Cancelled review must never mutate")
+
+        let applyProvider = ManualApplySettingsProvider(settings: fixture.settings)
+        let applyStore = fixture.store()
+        let applyUseCase = fixture.useCase(provider: applyProvider, store: applyStore)
+        let applyReview = try await applyUseCase.review()
+        await applyProvider.replace(fixture.settingsWith(prefix: "[WORK]", legacyMarkers: ["[RETIRED]"]))
         do {
-            _ = try await useCase.review()
-            throw TestFailure("Migration must block manual review")
+            _ = try await applyUseCase.confirm(reviewID: applyReview.id)
+            throw TestFailure("Migration must block confirmed manual apply")
         } catch ReconcileCalendarsError.migrationPending {}
-        try expect(await store.listCalendarsCallCount() == 1, "Migration must fail before Calendar access")
-        try expect(await store.createdEvents().isEmpty, "Cancel and migration must never mutate")
+        try expect(
+            await applyStore.listCalendarsCallCount() == 1,
+            "Migration-pending confirmation must fail before a fresh Calendar preflight")
+        try expect(await applyStore.createdEvents().isEmpty, "Migration-pending confirmation must not create")
+        try expect(await applyStore.deletedEvents().isEmpty, "Migration-pending confirmation must not delete")
+
+        let migrationProvider = ManualApplySettingsProvider(
+            settings: fixture.settingsWith(prefix: "[WORK]", legacyMarkers: ["[RETIRED]"]))
+        let migrationStore = fixture.store()
+        let migrationUseCase = fixture.useCase(provider: migrationProvider, store: migrationStore)
+        do {
+            _ = try await migrationUseCase.review()
+            throw TestFailure("Migration must block manual review")
+        } catch let error as ReconcileCalendarsError {
+            try expect(error == .migrationPending, "Manual review should preserve the shared migration-pending error")
+            try expect(
+                error.description.contains("explicit legacy cleanup"),
+                "Migration-pending manual review should direct the operator to explicit cleanup")
+        }
+        try expect(
+            await migrationStore.listCalendarsCallCount() == 0,
+            "Migration-pending manual review must fail before Calendar access")
+        try expect(await migrationStore.createdEvents().isEmpty, "Migration-pending manual review must not create")
+        try expect(await migrationStore.deletedEvents().isEmpty, "Migration-pending manual review must not delete")
     }
 
     private static func testDiagnosticOnlyConfigurationChangeDoesNotInvalidate() async throws {

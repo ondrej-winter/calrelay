@@ -5,6 +5,7 @@ enum CalendarAccessPreflightTests {
     static func runAll() async throws {
         try await testPreflightRejectsUnavailableAuthorizationBeforeStoreAccess()
         try await testPreflightAggregatesTopologyFailuresAndReadsResolvableRolesInOrder()
+        try await testPreflightDoesNotUseProviderIdentifierAsSelectorFallback()
         try await testReadyPreflightReturnsCompleteOrderedSnapshotWithoutMutation()
         try await testPreflightReportsAuthorizationLossDuringInventory()
     }
@@ -31,7 +32,7 @@ enum CalendarAccessPreflightTests {
         let ambiguousOne = RelayCalendar(
             id: "ambiguous-1", title: "Beta Work", sourceTitle: "Exchange", isWritable: true)
         let ambiguousTwo = RelayCalendar(
-            id: "ambiguous-2", title: "Beta Work", sourceTitle: "Exchange", isWritable: true)
+            id: "ambiguous-2", title: "Beta Work", sourceTitle: "Exchange", isWritable: false)
         let broken = RelayCalendar(id: "broken", title: "Gamma Work", sourceTitle: "CalDAV", isWritable: true)
         let ready = RelayCalendar(id: "ready", title: "Delta Work", sourceTitle: "Local", isWritable: true)
         let store = PreflightCalendarStore(
@@ -78,6 +79,28 @@ enum CalendarAccessPreflightTests {
                 PhysicalCalendarReference(providerIdentifier: "ready")
             ], "Preflight should read every uniquely resolved role hub-first and then in declaration order")
         try expect(await store.mutationCount() == 0, "Preflight must never mutate as a capability probe")
+    }
+
+    private static func testPreflightDoesNotUseProviderIdentifierAsSelectorFallback() async throws {
+        let calendars = [
+            RelayCalendar(id: "Hub", title: "Renamed Hub", sourceTitle: "Other", isWritable: true),
+            RelayCalendar(id: "ACME Work", title: "Renamed Work", sourceTitle: "Other", isWritable: true)
+        ]
+        let store = PreflightCalendarStore(calendars: calendars)
+        let useCase = CalendarAccessPreflightUseCase(
+            authorizationStatus: PreflightAuthorizationStatus(state: .fullAccess), calendarStore: store)
+
+        let result = try await useCase.run(settings: settings(), window: window())
+
+        let expected: [CalendarAccessPreflightIssue] = [
+            .calendarMissing(role: .hub, selector: selector("iCloud", "Hub")),
+            .calendarMissing(role: .work(name: "ACME", declarationIndex: 0), selector: selector("Google", "ACME Work"))
+        ]
+        try expect(result == .failed(expected), "Provider identifiers must not act as selector fallbacks")
+        try expect(
+            (await store.eventRequestCalendarIDs()).isEmpty,
+            "Roles missing by exact source/title matching should not be read through provider identifiers")
+        try expect(await store.mutationCount() == 0, "Selector resolution failure must remain non-mutating")
     }
 
     private static func testReadyPreflightReturnsCompleteOrderedSnapshotWithoutMutation() async throws {

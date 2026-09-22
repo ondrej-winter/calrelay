@@ -169,7 +169,15 @@ enum CalendarStandingAuthorizationTests {
         do {
             _ = try await migrationUseCase.review()
             throw TestFailure("Migration pending should prevent standing-authorization review")
-        } catch ReconcileCalendarsError.migrationPending {}
+        } catch let error as ReconcileCalendarsError {
+            try expect(error == .migrationPending, "Standing authorization should preserve migration pending")
+            try expect(
+                error.description.contains("explicit legacy cleanup"),
+                "Migration-pending authorization should direct the operator to explicit cleanup")
+        }
+        try expect(
+            await migrationStore.listCalendarsCallCount() == 0,
+            "Migration pending should block standing-authorization review before Calendar access")
 
         let deniedUseCase = fixture.useCase(
             provider: StandingSettingsProvider(settings: fixture.settings()), calendarStore: fixture.store(),
@@ -298,9 +306,9 @@ private actor StandingStateStore: CalendarAutomationStateStore {
 
     func loadState() async -> CalendarAutomationPersistentState { state }
     func saveState(_ state: CalendarAutomationPersistentState) async throws { self.state = state }
-    func updateState(
-        _ transform: @Sendable (CalendarAutomationPersistentState) -> CalendarAutomationPersistentState
-    ) async throws -> CalendarAutomationPersistentState {
+    func updateState(_ transform: @Sendable (CalendarAutomationPersistentState) -> CalendarAutomationPersistentState)
+        async throws -> CalendarAutomationPersistentState
+    {
         state = transform(state)
         return state
     }

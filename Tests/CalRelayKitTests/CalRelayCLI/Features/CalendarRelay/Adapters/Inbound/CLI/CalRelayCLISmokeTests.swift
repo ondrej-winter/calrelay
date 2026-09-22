@@ -15,6 +15,8 @@ enum CalRelayCLISmokeTests {
         try testCleanupNoMatchDryRunAndApplyUseStdoutAndZeroStatus()
         try testInvalidConfigurationUsesStderrAndNonzeroStatus()
         try testMigrationPendingConfigCheckUsesStderrAndNonzeroStatus()
+        try testMigrationPendingConfigCheckReportsPreflightFailures()
+        try testMigrationPendingOrdinaryModesUseStderrAndNonzeroStatus()
         try testUnavailableCalendarAccessUsesPrivateStderrAndNonzeroStatus()
         try testExplanationAndDryRunUseTheSameOrderedActions()
         try testDirectOrdinaryApplyConfirmsEachSuccessfulAction()
@@ -166,6 +168,7 @@ enum CalRelayCLISmokeTests {
         try expect(
             dryRun.stdout.contains("found no matching legacy-marker events in the loaded local snapshot"),
             "Cleanup no-match dry-run should report its local result on stdout")
+        try expectTruthfulCleanupScope(dryRun.stdout)
         try expect(apply.status == 0, "Cleanup no-match apply should return zero")
         try expect(apply.stderr.isEmpty, "Cleanup no-match apply should not write to stderr")
         try expect(
@@ -174,6 +177,7 @@ enum CalRelayCLISmokeTests {
         try expect(
             apply.stdout.contains("post-mutation verification snapshot contained no matching legacy-marker events"),
             "Cleanup no-match apply should report verified local success on stdout")
+        try expectTruthfulCleanupScope(apply.stdout)
     }
 
     private static func testInvalidConfigurationUsesStderrAndNonzeroStatus() throws {
@@ -206,6 +210,53 @@ enum CalRelayCLISmokeTests {
         try expect(
             !result.stderr.contains("complete configured topology is currently ready"),
             "Migration-pending config check should not print a readiness success statement")
+    }
+
+    private static func testMigrationPendingConfigCheckReportsPreflightFailures() throws {
+        let config = try writeConfig(legacyMarkers: ["[OLD]"])
+        let result = try runCalRelay(arguments: ["config", "check", "--config", config.path], scenario: "access-denied")
+
+        try expect(result.status != 0, "Migration-pending config check with access failure should return nonzero")
+        try expect(result.stdout.isEmpty, "Migration-pending access failure should not print success output")
+        try expect(
+            result.stderr.contains("migration pending") && result.stderr.contains("topology is not currently ready"),
+            "Migration-pending config check should report both migration and preflight failure")
+        try expect(
+            result.stderr.contains("Enable full access for CalRelay in System Settings"),
+            "Migration-pending config check should retain actionable preflight guidance")
+        try expect(
+            !result.stderr.contains("complete configured topology is currently ready"),
+            "Migration-pending config check must never claim readiness")
+    }
+
+    private static func testMigrationPendingOrdinaryModesUseStderrAndNonzeroStatus() throws {
+        let config = try writeConfig(legacyMarkers: ["[OLD]"])
+        let originalYAML = try String(contentsOf: config, encoding: .utf8)
+        let modes: [(name: String, arguments: [String])] = [
+            ("dry run", ["reconcile", "--config", config.path]),
+            ("apply", ["reconcile", "--apply", "--config", config.path]),
+            ("explanation", ["reconcile", "--explain", "--config", config.path])
+        ]
+
+        for mode in modes {
+            let result = try runCalRelay(arguments: mode.arguments, scenario: "ordinary-actions")
+
+            try expect(result.status != 0, "Migration-pending ordinary " + mode.name + " should return nonzero")
+            try expect(result.stdout.isEmpty, "Migration-pending ordinary " + mode.name + " should not print output")
+            try expect(
+                result.stderr.contains("blocked while legacyMarkers is nonempty")
+                    && result.stderr.contains("explicit legacy cleanup"),
+                "Migration-pending ordinary " + mode.name + " should direct the operator to cleanup")
+            try expect(!result.stderr.contains("[OLD]"), "Migration failure should not disclose marker values")
+            for forbidden in ["Dry-run mode", "Apply mode completed", "Input events", "Planned actions"] {
+                try expect(
+                    !result.stderr.contains(forbidden),
+                    "Migration-pending ordinary " + mode.name + " must not claim successful ordinary work")
+            }
+            try expect(
+                try String(contentsOf: config, encoding: .utf8) == originalYAML,
+                "Migration-pending ordinary " + mode.name + " must not rewrite the selected YAML")
+        }
     }
 
     private static func testUnavailableCalendarAccessUsesPrivateStderrAndNonzeroStatus() throws {
@@ -308,6 +359,7 @@ enum CalRelayCLISmokeTests {
                 "Confirmed delete for Work role ACME.",
                 "post-mutation verification snapshot contained no matching legacy-marker events"
             ], in: result.stdout, message: "Direct cleanup apply should review, confirm, then report verification")
+        try expectTruthfulCleanupScope(result.stdout)
         try expect(!result.stdout.contains("[OLD]"), "Cleanup review should omit the configured legacy marker")
         try expect(!result.stdout.contains("process-cleanup"), "Cleanup output should omit EventKit identifiers")
     }
@@ -418,6 +470,23 @@ enum CalRelayCLISmokeTests {
                 throw TestFailure("\(message): missing or out of order: \(value)")
             }
             searchStart = range.upperBound
+        }
+    }
+
+    private static func expectTruthfulCleanupScope(_ output: String) throws {
+        try expect(
+            output.localizedCaseInsensitiveContains("local")
+                && output.localizedCaseInsensitiveContains("point-in-time"),
+            "Cleanup process output should state its local point-in-time scope")
+        for forbiddenClaim in [
+            "all calendars", "entire history", "globally retired", "retired everywhere", "recurring series removed",
+            "all recurring series retired", "removed calendars are covered", "covers removed calendars",
+            "cannot be recreated", "will not be recreated"
+        ] {
+            try expect(
+                !output.localizedCaseInsensitiveContains(forbiddenClaim),
+                "Cleanup process output must not claim global, historical, recurring-series, or future-retirement scope"
+            )
         }
     }
 

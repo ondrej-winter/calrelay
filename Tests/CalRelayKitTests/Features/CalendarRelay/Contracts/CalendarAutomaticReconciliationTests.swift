@@ -40,8 +40,7 @@ enum CalendarAutomaticReconciliationTests {
         let persisted = await stateStore.currentState()
         try expect(persisted.operationalStatus.latestOutcome == .applied, "Applied outcome should persist")
         try expect(
-            persisted.operationalStatus.freshness.lastSuccessAt == fixture.now,
-            "Success should update freshness")
+            persisted.operationalStatus.freshness.lastSuccessAt == fixture.now, "Success should update freshness")
     }
 
     private static func testMissingStandingAuthorizationPerformsNoMutation() async throws {
@@ -131,8 +130,8 @@ enum CalendarAutomaticReconciliationTests {
                 name: "unreadable",
                 store: AutomaticCalendarStore(
                     calendars: [fixture.hub, fixture.work], eventsByCalendarID: [:],
-                    readFailureCalendarIDs: [fixture.work.id]),
-                expectedOutcome: .transientFailure, expectedReads: [fixture.hub.id, fixture.work.id])
+                    readFailureCalendarIDs: [fixture.work.id]), expectedOutcome: .transientFailure,
+                expectedReads: [fixture.hub.id, fixture.work.id])
         ]
 
         for scenario in scenarios {
@@ -173,26 +172,26 @@ enum CalendarAutomaticReconciliationTests {
                     settings: CalendarRelaySettings(
                         hubCalendar: fixture.settings.hubCalendar, personalPrefix: fixture.settings.personalPrefix,
                         syncWindowDays: fixture.settings.syncWindowDays, workCalendars: fixture.settings.workCalendars,
-                        legacyMarkers: ["[OLD]"])),
-                expectedOutcome: .migrationPending)
+                        legacyMarkers: ["[OLD]"])), expectedOutcome: .migrationPending)
         ]
 
         for scenario in cases {
             let store = fixture.storeWithSourceEvent()
+            let stateStore = AutomaticStateStore(state: fixture.authorizedState())
             let result = try await fixture.useCase(
-                settingsProvider: scenario.provider, calendarStore: store,
-                stateStore: AutomaticStateStore(state: fixture.authorizedState())
+                settingsProvider: scenario.provider, calendarStore: store, stateStore: stateStore
             ).run()
 
             try expect(
-                result.outcome == scenario.expectedOutcome,
-                "Automatic attempt should report \(scenario.name) safely")
+                result.outcome == scenario.expectedOutcome, "Automatic attempt should report \(scenario.name) safely")
+            try expect(
+                (await stateStore.currentState()).operationalStatus.latestOutcome == scenario.expectedOutcome,
+                "Automatic scheduling should persist the \(scenario.name) gate outcome")
             try expect(
                 await store.listCalendarsCallCount() == 0,
                 "The \(scenario.name) configuration gate should fail before Calendar inventory")
             try expect(
-                await store.mutationCount() == 0,
-                "The \(scenario.name) configuration gate must prevent mutation")
+                await store.mutationCount() == 0, "The \(scenario.name) configuration gate must prevent mutation")
         }
     }
 
@@ -330,15 +329,15 @@ enum CalendarAutomaticReconciliationTests {
         let provider = CountingAutomaticSettingsProvider(settings: fixture.settings)
         let stateStore = AutomaticStateStore(state: fixture.authorizedState())
         let store = RecoveringAutomaticCalendarStore(fixture: fixture)
-        let useCase = fixture.useCase(
-            settingsProvider: provider, calendarStore: store, stateStore: stateStore)
+        let useCase = fixture.useCase(settingsProvider: provider, calendarStore: store, stateStore: stateStore)
 
         let first = try await useCase.run()
         let retry = try await useCase.run(kind: .retry)
 
         try expect(first.outcome == .transientFailure, "The first inventory failure should schedule a fresh retry")
         try expect(retry.outcome == .applied, "The recovered retry should build and apply a fresh plan")
-        try expect(await provider.callCount() == 3, "The retry should reload configuration and recheck it before mutation")
+        try expect(
+            await provider.callCount() == 3, "The retry should reload configuration and recheck it before mutation")
         try expect(await store.listCalendarsCallCount() == 2, "The retry should reload Calendar inventory")
         try expect(
             await store.eventRequestCalendarIDs() == [fixture.hub.id, fixture.work.id],
@@ -423,9 +422,9 @@ private struct AutomaticReconciliationFixture {
             operationalStatus: .empty)
     }
 
-    func storeWithSourceEvent(
-        hubEvents: [CalendarEvent] = [], failOperationNumber: Int? = nil
-    ) -> AutomaticCalendarStore {
+    func storeWithSourceEvent(hubEvents: [CalendarEvent] = [], failOperationNumber: Int? = nil)
+        -> AutomaticCalendarStore
+    {
         AutomaticCalendarStore(
             calendars: [hub, work],
             eventsByCalendarID: [
@@ -450,8 +449,8 @@ private struct AutomaticReconciliationFixture {
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         return CalendarAutomaticReconciliationUseCase(
             settingsProvider: settingsProvider ?? AutomaticSettingsProvider(settings: settings),
-            authorizationStatus: authorization, calendarStore: calendarStore,
-            stateStore: stateStore, configurationChanges: configurationChanges, now: { now }, calendar: calendar)
+            authorizationStatus: authorization, calendarStore: calendarStore, stateStore: stateStore,
+            configurationChanges: configurationChanges, now: { now }, calendar: calendar)
     }
 }
 
@@ -547,9 +546,9 @@ private actor AutomaticStateStore: CalendarAutomationStateStore {
 
     func loadState() async -> CalendarAutomationPersistentState { state }
     func saveState(_ state: CalendarAutomationPersistentState) async throws { self.state = state }
-    func updateState(
-        _ transform: @Sendable (CalendarAutomationPersistentState) -> CalendarAutomationPersistentState
-    ) async throws -> CalendarAutomationPersistentState {
+    func updateState(_ transform: @Sendable (CalendarAutomationPersistentState) -> CalendarAutomationPersistentState)
+        async throws -> CalendarAutomationPersistentState
+    {
         state = transform(state)
         return state
     }
@@ -576,8 +575,7 @@ private actor RecoveringAutomaticCalendarStore: CalendarStorePort {
         return [
             CalendarEvent(
                 id: "source", calendar: calendar, title: "Example", start: fixture.now,
-                end: fixture.now.addingTimeInterval(100), isAllDay: false, availability: .busy,
-                status: .confirmed)
+                end: fixture.now.addingTimeInterval(100), isAllDay: false, availability: .busy, status: .confirmed)
         ]
     }
 
@@ -604,8 +602,7 @@ private actor BlockingAutomaticCalendarStore: CalendarStorePort {
         return [
             CalendarEvent(
                 id: "source", calendar: calendar, title: "Example", start: fixture.now,
-                end: fixture.now.addingTimeInterval(100), isAllDay: false, availability: .busy,
-                status: .confirmed)
+                end: fixture.now.addingTimeInterval(100), isAllDay: false, availability: .busy, status: .confirmed)
         ]
     }
 
