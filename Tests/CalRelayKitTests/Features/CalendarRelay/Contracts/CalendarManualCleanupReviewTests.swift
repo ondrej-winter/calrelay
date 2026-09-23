@@ -9,56 +9,108 @@ extension CalendarManualCleanupTests {
     }
 
     private static func testReviewPrivacyAndExecutionOrder() async throws {
-        let fixture = ManualCleanupFixture()
-        let allDay = CalendarEvent(
-            id: "all-day-id",
-            calendar: CalendarIdentity(
-                id: fixture.work.id, title: fixture.work.title, sourceTitle: fixture.work.sourceTitle),
-            title: "[OLD] All day example", start: fixture.calendar.startOfDay(for: fixture.now),
-            end: fixture.calendar.startOfDay(for: fixture.now).addingTimeInterval(86_400), isAllDay: true,
-            availability: .busy, status: .confirmed)
+        let now = Date(timeIntervalSince1970: 10_000)
+        let calendar: Calendar = {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+            return calendar
+        }()
+        let hub = RelayCalendar(
+            id: "CALENDAR_ID_SENTINEL_CLEANUP_HUB", title: "CALENDAR_TITLE_SENTINEL_CLEANUP_HUB",
+            sourceTitle: "SOURCE_SELECTOR_SENTINEL_CLEANUP_HUB", isWritable: true)
+        let work = RelayCalendar(
+            id: "CALENDAR_ID_SENTINEL_CLEANUP_WORK", title: "CALENDAR_TITLE_SENTINEL_CLEANUP_WORK",
+            sourceTitle: "SOURCE_SELECTOR_SENTINEL_CLEANUP_WORK", isWritable: true)
+        let legacyMarker = "[LEGACY_MARKER_SENTINEL_CLEANUP]"
+        let currentMarker = "[CURRENT_MARKER_SENTINEL_CLEANUP]"
+        let roleName = "Approved Cleanup Role"
+        let hubIdentity = CalendarIdentity(id: hub.id, title: hub.title, sourceTitle: hub.sourceTitle)
+        let workIdentity = CalendarIdentity(id: work.id, title: work.title, sourceTitle: work.sourceTitle)
+        let timedTitle = "EVENT_TITLE_SENTINEL_CLEANUP_TIMED"
+        let laterTitle = "EVENT_TITLE_SENTINEL_CLEANUP_LATER"
+        let allDayTitle = "EVENT_TITLE_SENTINEL_CLEANUP_ALL_DAY"
+        let allDayStart = calendar.startOfDay(for: now)
+        let eventsByCalendarID: [PhysicalCalendarReference: [CalendarEvent]] = [
+            hub.id: [
+                CalendarEvent(
+                    id: "EVENT_ID_SENTINEL_CLEANUP_LATER", calendar: hubIdentity,
+                    title: "\(legacyMarker) \(laterTitle)", start: now.addingTimeInterval(200),
+                    end: now.addingTimeInterval(300), isAllDay: false, availability: .busy, status: .confirmed),
+                CalendarEvent(
+                    id: "EVENT_ID_SENTINEL_CLEANUP_TIMED", calendar: hubIdentity,
+                    title: "\(legacyMarker) \(timedTitle)", start: now, end: now.addingTimeInterval(100),
+                    isAllDay: false, availability: .busy, status: .confirmed)
+            ],
+            work.id: [
+                CalendarEvent(
+                    id: "EVENT_ID_SENTINEL_CLEANUP_ALL_DAY", calendar: workIdentity,
+                    title: "\(legacyMarker) \(allDayTitle)", start: allDayStart,
+                    end: allDayStart.addingTimeInterval(86_400), isAllDay: true, availability: .busy,
+                    status: .confirmed)
+            ]
+        ]
+        let settings = CalendarRelaySettings(
+            hubCalendar: HubCalendarSettings(
+                calendar: CalendarSelector(sourceTitle: hub.sourceTitle, calendarTitle: hub.title)),
+            personalPrefix: "[PERSONAL_MARKER_SENTINEL_CLEANUP]", syncWindowDays: 1,
+            workCalendars: [
+                WorkCalendarSettings(
+                    name: roleName, prefix: currentMarker,
+                    calendar: CalendarSelector(sourceTitle: work.sourceTitle, calendarTitle: work.title))
+            ], legacyMarkers: [legacyMarker])
         let store = CommandHandlerCalendarStore(
-            calendars: [fixture.hub, fixture.work],
-            eventsByCalendarID: [
-                fixture.hub.id: [
-                    fixture.event(id: "later", title: "[OLD] Later", start: fixture.now.addingTimeInterval(200)),
-                    fixture.event()
-                ], fixture.work.id: [allDay]
-            ])
-        let settings = fixture.base.settingsWith(prefix: "[WORK]", name: "Work role", legacyMarkers: ["[OLD]"])
-        let useCase = fixture.useCase(provider: ManualApplySettingsProvider(settings: settings), store: store)
+            calendars: [hub, work], eventsByCalendarID: eventsByCalendarID)
+        let useCase = CalendarManualCleanupUseCase(
+            settingsProvider: ManualApplySettingsProvider(settings: settings),
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { now },
+            calendar: { calendar })
+
         let review = try await useCase.review()
+
         try expect(
-            review.rows.map(\.title) == ["Example", "Later", "All day example"],
+            review.rows.map(\.title) == [timedTitle, laterTitle, allDayTitle],
             "Review rows must be in hub-first execution order")
         try expect(
-            review.window == LegacyCleanupWindow.calculate(referenceDate: fixture.now, calendar: fixture.calendar),
+            review.window == LegacyCleanupWindow.calculate(referenceDate: now, calendar: calendar),
             "Review must disclose the complete captured cleanup range")
         let output = CalendarManualCleanupFormatter.formatReview(review)
-        try expect(
-            output.contains("Selected deletions: 3") && output.contains("Work role")
-                && output.contains("all-day dates; end exclusive"),
-            "Review includes count, configured roles and explicit all-day interval semantics")
-        for forbidden in [
-            "test-legacy", "all-day-id", "test-hub", "test-work", "Test Hub", "Test Work", "Test Source", "[OLD]",
-            "[WORK]"
-        ] { try expect(!output.contains(forbidden), "Review must omit IDs, calendar names, selectors and markers") }
+        for approved in [timedTitle, laterTitle, allDayTitle, roleName, "time range", "all-day dates; end exclusive"] {
+            try expect(output.contains(approved), "Cleanup review should include approved detail: \(approved)")
+        }
+        try expect(output.contains("Selected deletions: 3"), "Cleanup review should include the selected count")
+        let prohibited = [
+            "EVENT_ID_SENTINEL_CLEANUP_TIMED", "EVENT_ID_SENTINEL_CLEANUP_LATER",
+            "EVENT_ID_SENTINEL_CLEANUP_ALL_DAY", "CALENDAR_ID_SENTINEL_CLEANUP_HUB",
+            "CALENDAR_ID_SENTINEL_CLEANUP_WORK", hub.title, work.title, hub.sourceTitle, work.sourceTitle,
+            legacyMarker, currentMarker, "PERSONAL_MARKER_SENTINEL_CLEANUP"
+        ]
+        for forbidden in prohibited {
+            try expect(!output.contains(forbidden), "Cleanup review must omit prohibited detail: \(forbidden)")
+        }
+
         let success = CalendarManualCleanupFormatter.formatSuccess(confirmedDeletions: 3)
+        try expectCleanupCompletionPrivacy(
+            success, prohibited: prohibited + [timedTitle, laterTitle, allDayTitle, roleName])
+        try expect((await store.deletedEvents()).isEmpty, "Cleanup review must remain non-mutating")
+    }
+
+    private static func expectCleanupCompletionPrivacy(_ output: String, prohibited: [String]) throws {
         try expect(
-            success.contains("complete local range") && success.contains("point-in-time")
-                && success.contains("Remove legacyMarkers manually"),
+            output.contains("complete local range") && output.contains("point-in-time")
+                && output.contains("Remove legacyMarkers manually"),
             "Verified cleanup must state its bounded local point-in-time result without automatic YAML editing")
+        for forbidden in prohibited {
+            try expect(!output.contains(forbidden), "Cleanup completion must omit transient detail: \(forbidden)")
+        }
         for forbiddenClaim in [
             "all calendars", "entire history", "globally retired", "retired everywhere", "recurring series removed",
             "all recurring series retired", "removed calendars are covered", "covers removed calendars",
             "cannot be recreated", "will not be recreated"
         ] {
             try expect(
-                !success.localizedCaseInsensitiveContains(forbiddenClaim),
+                !output.localizedCaseInsensitiveContains(forbiddenClaim),
                 "Verified app cleanup must not claim global, historical, recurring-series, or future-retirement scope")
         }
-        try expect(
-            !success.contains("Example") && !success.contains("Work role"), "Completion retains no review details")
     }
 
     private static func testEmptyPlanStillVerifiesAndSemanticSettingsMatch() async throws {

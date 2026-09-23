@@ -16,7 +16,7 @@ enum CalendarListCommandHandlerTests {
 
         try expect(output.contains("Calendars (1)"), "Calendar list handler should format calendar count")
         try expect(output.contains("iCloud / Personal Work"), "Calendar list handler should format calendar selector")
-        try expect(output.contains("id: hub-1"), "CLI inventory should include EventKit calendar IDs")
+        try expect(output.contains("id: \(calendarIDSentinel)"), "CLI inventory should include EventKit calendar IDs")
         try expect(
             output.contains("does not verify configured readiness"), "Inventory should not make a readiness claim")
     }
@@ -55,12 +55,15 @@ enum CalendarListCommandHandlerTests {
 
         try expect(output.contains("iCloud / Personal Work"), "App inventory should include source and title")
         try expect(output.contains("writable"), "App inventory should include writability")
-        try expect(!output.contains("hub-1"), "App inventory must omit EventKit calendar IDs")
+        try expect(!output.contains(calendarIDSentinel), "App inventory must omit EventKit calendar IDs")
         try expect(output.contains("separate from configured readiness"), "App inventory should distinguish readiness")
     }
 
+    private static let calendarIDSentinel = "CALENDAR_ID_SENTINEL_INVENTORY"
+
     private static func hubCalendar() -> RelayCalendar {
-        RelayCalendar(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud", isWritable: true)
+        RelayCalendar(
+            id: calendarIDSentinel, title: "Personal Work", sourceTitle: "iCloud", isWritable: true)
     }
 
     private static func expect(_ condition: Bool, _ message: String) throws {

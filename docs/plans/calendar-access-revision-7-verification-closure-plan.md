@@ -2,7 +2,7 @@
 
 ## Plan record
 
-- **Status:** Ready for implementation.
+- **Status:** In progress; `CAV-01` through `CAV-03` are complete, and `CAV-04` is next.
 - **Prepared:** September 22, 2026.
 - **Canonical requirements:**
   `/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay/docs/specs/calendar-access-spec.md`,
@@ -59,7 +59,7 @@ Any production correction discovered by the planned tests must:
 | `ACCESS-03` — Ordinary configured-topology readiness | Implemented | **Directly tested.** Shared preflight covers authorization, missing, ambiguous, colliding, unreadable, and read-only roles; ordered reads, aggregation, no-prompt behavior, and no-mutation gates are covered across reusable, CLI, manual-app, and automatic paths. | None; retain the existing tests. |
 | `ACCESS-04` — Legacy-cleanup preflight | Implemented | **Directly tested.** Complete-range reads, all-role gating, no-prompt behavior, ordered verification, remaining-match failure, verification-read failure, no rollback, and exact recurring-occurrence resolution are covered. | None. |
 | `ACCESS-05` — Failure after mutation begins | Implemented | **Directly tested.** Ordered confirmation, stop-on-first-failure, partial counts, no rollback, empty ordinary success, and no ordinary verification reread are covered. | None. |
-| `ACCESS-06` — Privacy-safe diagnostics and cleanup review | Implemented | **Partially direct.** Partial failures, cleanup failures, app inventory, cleanup review, automatic state, notification output, and persistence have tests, but the identifier allowlist and denylist are distributed across suites and are not uniformly sentinel-backed. | Consolidate and strengthen assertions in `CAV-03`. |
+| `ACCESS-06` — Privacy-safe diagnostics and cleanup review | Implemented | **Directly tested.** Sentinel-backed tests cover approved CLI inventory and explanation disclosure plus readiness, failure, cleanup, app, automatic-notification, and serialized-state denylists. | None. |
 | `ACCESS-07` — EventKit boundary | Implemented | **Directly tested.** Opaque physical identities, ordered snapshots, reviewed-action identity, topology binding, and the deterministic exact-occurrence zero/one/many decision consumed by `EventKitCalendarStore` are covered. | None. |
 
 ## Acceptance-check traceability
@@ -74,16 +74,16 @@ Any production correction discovered by the planned tests must:
 | `ACCESS-AC-06` | **Directly tested** | `CalendarAccessPreflightTests` and the manual and automatic preflight suites | None. |
 | `ACCESS-AC-07` | **Directly tested** | `CalendarCleanupAccessTests`, `CalendarManualCleanupFailureTests`, and CLI cleanup tests | None. |
 | `ACCESS-AC-08` | **Directly tested** | `CalendarMutationExecutorTests`, manual apply and cleanup failure tests, and automatic reconciliation tests | None. |
-| `ACCESS-AC-09` | **Partially direct** | CLI inventory and explanation, cleanup review, failure, and app-inventory tests | Strengthen the explicit ID allowlist and the readiness, failure, cleanup, app, and persistence denylist with recognizable sentinels. |
+| `ACCESS-AC-09` | **Directly tested** | `CalendarAccessPrivacyTests`, `CalendarListCommandHandlerTests`, `ReconcileCommandHandlerTests`, `CalendarManualCleanupTests`, and `CalendarAutomationPersistenceTests` | None. |
 | `ACCESS-AC-10` | **Directly tested** | Fake-backed custom runner and framework-free domain and application APIs | None. All new tests must remain deterministic, fake-backed, offline, and independent of live EventKit access. |
-| `ACCESS-AC-11` | **Partially direct** | `CalendarAutomationPersistenceTests`, cleanup presentation tests, and attention-state tests | Expand the common prohibited-value corpus to include both event and calendar identifiers, then verify persisted and app-facing output against it. |
+| `ACCESS-AC-11` | **Directly tested** | Sentinel-backed cleanup presentation, real automatic-operation outcome and attention, and UserDefaults serialization tests | None. |
 | `ACCESS-AC-12` | **Directly tested** | `testResolvesOnlyTheExactPlannedOccurrence`, `testMissingExactOccurrenceThrowsEventNotFound`, and `testDuplicateExactCandidatesThrowEventAmbiguous` in `EventKitExactEventOccurrenceResolverTests` | None. |
 | `ACCESS-AC-13` | **Directly tested** | Ordinary, cleanup, cleanup-verification, and automatic ordered-read tests | None. |
 | `ACCESS-AC-14` | **Directly tested** | `CalendarReviewedActionTests`, configuration identity, standing authorization, and opaque-reference tests | None. |
 | `ACCESS-AC-15` | **Directly tested** | Mutation executor, CLI ordinary apply, cleanup verification, manual apply, and automatic reconciliation tests | None. |
 
-No acceptance check is entirely uncovered. The remaining gaps are bounded parts
-of `ACCESS-AC-01`, `ACCESS-AC-09`, and `ACCESS-AC-11`.
+No acceptance check is entirely uncovered. The only remaining gap is the bounded
+app permission-metadata portion of `ACCESS-AC-01` addressed by `CAV-04`.
 
 ## Execution summary
 
@@ -93,7 +93,7 @@ each changes
 `/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay/Tests/CalRelayKitTests/Main.swift`
 to avoid overlapping suite-registration edits.
 
-The next executable task is `CAV-03`. No task is blocked.
+The next executable task is `CAV-04`. No task is blocked.
 
 ## Detailed tasks
 
@@ -250,7 +250,7 @@ that controls deletion.
 Any production behavior correction beyond the resolver extraction requires a
 failing regression test first.
 
-### [ ] CAV-03 — Close the privacy allowlist and denylist matrix
+### [x] CAV-03 — Close the privacy allowlist and denylist matrix
 
 **Dependencies:** None.
 
@@ -314,18 +314,18 @@ names, event titles and details, marker values, and raw configuration.
 
 #### Acceptance and verification
 
-- [ ] **CAV-03-AC1:** Positive disclosure tests prove that identifiers are
+- [x] **CAV-03-AC1:** Positive disclosure tests prove that identifiers are
   available only in successful CLI inventory and explicitly requested,
   successful ordinary CLI explanation.
-- [ ] **CAV-03-AC2:** Readiness, failure, cleanup, app, automatic, and
+- [x] **CAV-03-AC2:** Readiness, failure, cleanup, app, automatic, and
   persistence surfaces reject both event-ID and calendar-ID sentinels.
-- [ ] **CAV-03-AC3:** Cleanup review retains its approved transient title,
+- [x] **CAV-03-AC3:** Cleanup review retains its approved transient title,
   role, and time information while rejecting every prohibited field.
-- [ ] **CAV-03-AC4:** Every negative assertion uses protected data actually
+- [x] **CAV-03-AC4:** Every negative assertion uses protected data actually
   present in the constructed input.
-- [ ] **CAV-03-AC5:** No production change is made unless a sentinel-backed
+- [x] **CAV-03-AC5:** No production change is made unless a sentinel-backed
   test fails against current output.
-- [ ] **CAV-03-V1:** The focused suites pass:
+- [x] **CAV-03-V1:** The focused suites pass:
 
   ```sh
   cd '/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay' && \
@@ -336,6 +336,30 @@ names, event titles and details, marker values, and raw configuration.
     CalendarManualCleanupTests \
     CalendarAutomationPersistenceTests
   ```
+
+- **Passing evidence:**
+  `CalendarAccessPrivacyTests.testReadinessAndAccessFailuresOmitProtectedIdentifiersAndEventDetails`,
+  `CalendarAccessPrivacyTests.testMutationFailureOmitsProtectedIdentifiersAndEventDetails`,
+  `CalendarAccessPrivacyTests.testCleanupErrorsRemainAggregateAndActionable`,
+  `CalendarListCommandHandlerTests.testCalendarListHandlerFormatsCalendarsFromInjectedStore`,
+  `CalendarListCommandHandlerTests.testAppInventoryFormattingOmitsEventKitCalendarIDs`,
+  `ReconcileCommandHandlerTests.testReconcileHandlerFormatsExplanationFromInjectedStoreAndConfig`,
+  `ReconcileCommandHandlerTests.testExplanationAccessFailureEmitsNoPartialOutputOrIdentifiers`,
+  `ReconcileCommandHandlerTests.testCleanupDryRunReportsCompleteRoleSummariesAndPrivateOrderedReview`,
+  `ReconcileCommandHandlerTests.testCleanupApplyFailureOnlyConfirmsCompletedActionsAndStaysPrivate`,
+  `CalendarManualCleanupTests.testReviewPrivacyAndExecutionOrder`,
+  `CalendarAutomationPersistenceTests.testRuntimeDescriptionsAndAttentionOutputRemainOpaque`,
+  and
+  `CalendarAutomationPersistenceTests.testAutomaticOperationPersistsAndNotifiesWithoutSensitiveInputs`.
+- **Verification result (September 22, 2026):** The focused command above
+  passed with `CalRelayKitTests passed`. `make format-check` exited successfully;
+  it reported non-fatal formatter warnings under the current configuration.
+  `make check` then passed
+  strict SwiftLint with 0 violations, `swift build`, the complete
+  `CalRelayKitTests` runner, and all four CLI help smoke checks. `git --no-pager
+  diff --check` also passed. No production source changed; the only implementation
+  adjustments during validation were test-fixture cleanup required by Swift 6
+  sendability and SwiftLint.
 
 ### [ ] CAV-04 — Automate app Calendar-usage metadata verification
 

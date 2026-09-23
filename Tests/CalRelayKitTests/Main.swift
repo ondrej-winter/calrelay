@@ -39,7 +39,9 @@ import Foundation
         if filters.isEmpty || filters.contains("OrdinaryReconciliationWindowTests") {
             try OrdinaryReconciliationWindowTests.runAll()
         }
-        if filters.isEmpty || filters.contains("CalendarAccessPrivacyTests") { try CalendarAccessPrivacyTests.runAll() }
+        if filters.isEmpty || filters.contains("CalendarAccessPrivacyTests") {
+            try await CalendarAccessPrivacyTests.runAll()
+        }
     }
 
     private static func runAccessSuites(filters: Set<String>) async throws {

@@ -226,15 +226,16 @@ enum ReconcileCommandHandlerTests {
     }
 
     private static func testReconcileHandlerFormatsExplanationFromInjectedStoreAndConfig() async throws {
-        let fixture = reconciliationFixture()
+        let fixture = explanationPrivacyFixture()
         let staleHubEvent = CalendarEvent(
-            id: "stale-hub",
+            id: "EVENT_ID_SENTINEL_EXPLANATION_STALE",
             calendar: CalendarIdentity(
                 id: fixture.hubCalendar.id, title: fixture.hubCalendar.title,
-                sourceTitle: fixture.hubCalendar.sourceTitle), title: "[ACME] Old Planning",
+                sourceTitle: fixture.hubCalendar.sourceTitle),
+            title: "[WORK_MARKER_SENTINEL_EXPLANATION] EVENT_TITLE_SENTINEL_EXPLANATION_STALE",
             start: fixture.workEvent.start, end: fixture.workEvent.end, isAllDay: false, availability: .busy,
             status: .confirmed)
-        let configURL = try writeTemporaryConfigFile()
+        let configURL = try writeTemporaryConfigFile(contents: explanationPrivacySettingsYAML())
         let store = CommandHandlerCalendarStore(
             calendars: [fixture.hubCalendar, fixture.workCalendar],
             eventsByCalendarID: [fixture.hubCalendar.id: [staleHubEvent], fixture.workCalendar.id: [fixture.workEvent]])
@@ -243,11 +244,21 @@ enum ReconcileCommandHandlerTests {
 
         let output = try await handler.run(config: configURL.path, apply: false, explain: true, cleanupLegacy: false)
 
-        try expect(output.contains("Google / ACME Work"), "Explanation output should include candidate calendar")
-        try expect(output.contains("Client Planning"), "Explanation output should include candidate event title")
-        try expect(output.contains("event-id=acme-source-1"), "Successful explanation may include the source event ID")
-        try expect(output.contains("calendar-id=acme-1"), "Successful explanation may include the source calendar ID")
-        try expect(output.contains("caused-by=acme-source-1"), "Create explanation should cite its causal event ID")
+        for approved in [
+            "EVENT_ID_SENTINEL_EXPLANATION_SOURCE", "EVENT_ID_SENTINEL_EXPLANATION_STALE",
+            "CALENDAR_ID_SENTINEL_EXPLANATION_HUB", "CALENDAR_ID_SENTINEL_EXPLANATION_WORK"
+        ] {
+            try expect(output.contains(approved), "Successful explanation should include approved identifier: \(approved)")
+        }
+        try expect(
+            output.contains("SOURCE_SELECTOR_SENTINEL_EXPLANATION_WORK / CALENDAR_TITLE_SENTINEL_EXPLANATION_WORK"),
+            "Explanation output should include the candidate calendar")
+        try expect(
+            output.contains("EVENT_TITLE_SENTINEL_EXPLANATION_SOURCE"),
+            "Explanation output should include the candidate event title")
+        try expect(
+            output.contains("caused-by=EVENT_ID_SENTINEL_EXPLANATION_SOURCE"),
+            "Create explanation should cite its causal event ID")
         try expect(output.contains("Effective window:"), "Explanation should include the effective window boundaries")
         try expect(output.contains("configuredForwardDays=1"), "Explanation should include the configured horizon")
         try expect(output.contains("routing=work-to-hub-source"), "Explanation should include routing treatment")
@@ -269,13 +280,21 @@ enum ReconcileCommandHandlerTests {
     }
 
     private static func testExplanationAccessFailureEmitsNoPartialOutputOrIdentifiers() async throws {
-        let fixture = reconciliationFixture()
-        let configURL = try writeTemporaryConfigFile()
-        let store = CommandHandlerCalendarStore(calendars: [fixture.hubCalendar, fixture.workCalendar])
+        let fixture = explanationPrivacyFixture()
+        let protectedHubEvent = CalendarEvent(
+            id: "EVENT_ID_SENTINEL_EXPLANATION_PARTIAL",
+            calendar: CalendarIdentity(
+                id: fixture.hubCalendar.id, title: fixture.hubCalendar.title,
+                sourceTitle: fixture.hubCalendar.sourceTitle),
+            title: "EVENT_TITLE_SENTINEL_EXPLANATION_PARTIAL", start: fixture.workEvent.start,
+            end: fixture.workEvent.end, isAllDay: false, availability: .busy, status: .confirmed)
+        let configURL = try writeTemporaryConfigFile(contents: explanationPrivacySettingsYAML())
+        let store = ExplanationPrivacyFailureStore(
+            calendars: [fixture.hubCalendar, fixture.workCalendar], hubEvent: protectedHubEvent,
+            failedCalendarID: fixture.workCalendar.id)
         let progressiveOutput = CommandOutputRecorder()
         let handler = ReconcileCommandHandler(
-            authorizationStatus: TestCalendarAuthorizationStatus(state: .denied), calendarStore: store,
-            now: { fixture.now })
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { fixture.now })
 
         do {
             _ = try await handler.run(
@@ -284,12 +303,20 @@ enum ReconcileCommandHandlerTests {
         } catch let error as ReconcileCalendarsError {
             try expect((await progressiveOutput.values()).isEmpty, "Failed explanation should emit no partial output")
             try expect(
-                error.description.contains("Enable full access for CalRelay in System Settings"),
-                "Explanation access failure should include recovery guidance")
-            for forbidden in ["hub-1", "acme-1", "acme-source-1", "Client Planning"] {
+                error.description.contains("SOURCE_SELECTOR_SENTINEL_EXPLANATION_WORK")
+                    && error.description.contains("CALENDAR_TITLE_SENTINEL_EXPLANATION_WORK"),
+                "Explanation access failure may identify the configured selector that could not be read")
+            for forbidden in [
+                "EVENT_ID_SENTINEL_EXPLANATION_PARTIAL", "EVENT_TITLE_SENTINEL_EXPLANATION_PARTIAL",
+                "CALENDAR_ID_SENTINEL_EXPLANATION_HUB", "CALENDAR_ID_SENTINEL_EXPLANATION_WORK",
+                "WORK_MARKER_SENTINEL_EXPLANATION", "PERSONAL_MARKER_SENTINEL_EXPLANATION"
+            ] {
                 try expect(!error.description.contains(forbidden), "Explanation failure should omit \(forbidden)")
             }
-            try expect(await store.listCalendarsCallCount() == 0, "Denied explanation should stop before store access")
+            try expect(
+                await store.eventRequestCalendarIDs() == [fixture.hubCalendar.id, fixture.workCalendar.id],
+                "Explanation failure fixture must load the protected hub event before the work read fails")
+            try expect(await store.mutationAttemptCount() == 0, "Failed explanation must remain non-mutating")
             return
         }
 
@@ -694,6 +721,40 @@ enum ReconcileCommandHandlerTests {
             now: now, hubCalendar: hubCalendar, workCalendar: workCalendar, workEvent: workEvent)
     }
 
+    private static func explanationPrivacyFixture() -> CommandHandlerFixture {
+        let now = Date(timeIntervalSince1970: 10_000)
+        let hubCalendar = RelayCalendar(
+            id: "CALENDAR_ID_SENTINEL_EXPLANATION_HUB", title: "CALENDAR_TITLE_SENTINEL_EXPLANATION_HUB",
+            sourceTitle: "SOURCE_SELECTOR_SENTINEL_EXPLANATION_HUB", isWritable: true)
+        let workCalendar = RelayCalendar(
+            id: "CALENDAR_ID_SENTINEL_EXPLANATION_WORK", title: "CALENDAR_TITLE_SENTINEL_EXPLANATION_WORK",
+            sourceTitle: "SOURCE_SELECTOR_SENTINEL_EXPLANATION_WORK", isWritable: true)
+        let workEvent = CalendarEvent(
+            id: "EVENT_ID_SENTINEL_EXPLANATION_SOURCE",
+            calendar: CalendarIdentity(
+                id: workCalendar.id, title: workCalendar.title, sourceTitle: workCalendar.sourceTitle),
+            title: "EVENT_TITLE_SENTINEL_EXPLANATION_SOURCE", start: Date(timeIntervalSince1970: 11_000),
+            end: Date(timeIntervalSince1970: 12_000), isAllDay: false, availability: .busy, status: .confirmed)
+        return CommandHandlerFixture(
+            now: now, hubCalendar: hubCalendar, workCalendar: workCalendar, workEvent: workEvent)
+    }
+
+    private static func explanationPrivacySettingsYAML() -> String {
+        """
+        hubCalendar:
+          sourceTitle: "SOURCE_SELECTOR_SENTINEL_EXPLANATION_HUB"
+          calendarTitle: "CALENDAR_TITLE_SENTINEL_EXPLANATION_HUB"
+        personalPrefix: "[PERSONAL_MARKER_SENTINEL_EXPLANATION]"
+        syncWindowDays: 1
+        workCalendars:
+          - name: "Approved explanation role"
+            prefix: "[WORK_MARKER_SENTINEL_EXPLANATION]"
+            calendar:
+              sourceTitle: "SOURCE_SELECTOR_SENTINEL_EXPLANATION_WORK"
+              calendarTitle: "CALENDAR_TITLE_SENTINEL_EXPLANATION_WORK"
+        """
+    }
+
     private static func expectTruthfulCleanupScope(_ output: String) throws {
         try expect(
             output.localizedCaseInsensitiveContains("local")
@@ -798,4 +859,33 @@ private struct CommandHandlerFixture {
     let hubCalendar: RelayCalendar
     let workCalendar: RelayCalendar
     let workEvent: CalendarEvent
+}
+
+private struct ExplanationPrivacyFailure: Error {}
+
+private actor ExplanationPrivacyFailureStore: CalendarStorePort {
+    private let calendars: [RelayCalendar]
+    private let hubEvent: CalendarEvent
+    private let failedCalendarID: PhysicalCalendarReference
+    private var eventRequests: [PhysicalCalendarReference] = []
+    private var mutationAttempts = 0
+
+    init(calendars: [RelayCalendar], hubEvent: CalendarEvent, failedCalendarID: PhysicalCalendarReference) {
+        self.calendars = calendars
+        self.hubEvent = hubEvent
+        self.failedCalendarID = failedCalendarID
+    }
+
+    func listCalendars() async throws -> [RelayCalendar] { calendars }
+
+    func events(in calendar: CalendarIdentity, from start: Date, to end: Date) async throws -> [CalendarEvent] {
+        eventRequests.append(calendar.id)
+        if calendar.id == failedCalendarID { throw ExplanationPrivacyFailure() }
+        return calendar.id == hubEvent.calendar.id ? [hubEvent] : []
+    }
+
+    func createEvent(_ event: CalendarEventProjection) async throws { mutationAttempts += 1 }
+    func deleteEvent(_ event: CalendarEventIdentity) async throws { mutationAttempts += 1 }
+    func eventRequestCalendarIDs() -> [PhysicalCalendarReference] { eventRequests }
+    func mutationAttemptCount() -> Int { mutationAttempts }
 }
