@@ -2,7 +2,7 @@
 
 ## Plan record
 
-- **Status:** In progress; `CAV-01` through `CAV-03` are complete, and `CAV-04` is next.
+- **Status:** In progress; `CAV-01` through `CAV-04` are complete, and `CAV-05` is next.
 - **Prepared:** September 22, 2026.
 - **Canonical requirements:**
   `/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay/docs/specs/calendar-access-spec.md`,
@@ -54,7 +54,7 @@ Any production correction discovered by the planned tests must:
 
 | Outcome | Implementation state | Automated-verification state | Remaining closure |
 | --- | --- | --- | --- |
-| `ACCESS-01` — Permission ownership and authorization states | Implemented | **Partially direct.** `CalendarAuthorizationTests` proves setup requests only for `.notDetermined`, and `CalendarNoPromptContractTests` plus `CalendarAutomaticReconciliationTests` prove inventory, config check, ordinary CLI and app operations, cleanup, standing authorization, automatic ordinary runs, retries, and revocation never request. | Add app permission-metadata checks in `CAV-04`. |
+| `ACCESS-01` — Permission ownership and authorization states | Implemented | **Directly tested.** `CalendarAuthorizationTests` proves setup requests only for `.notDetermined`; `CalendarNoPromptContractTests` plus `CalendarAutomaticReconciliationTests` prove inventory, config check, ordinary CLI and app operations, cleanup, standing authorization, automatic ordinary runs, retries, and revocation never request; and `CalendarAppBundleMetadataTests` plus the guarded app build prove the production permission metadata remains present while the fake UI-test host remains permission-free. | None. |
 | `ACCESS-02` — Calendar discovery | Implemented | **Directly tested.** Configuration-independent inventory, empty success, CLI IDs and writability, app ID omission, and separation from configured readiness are covered. | None; retain the existing tests. |
 | `ACCESS-03` — Ordinary configured-topology readiness | Implemented | **Directly tested.** Shared preflight covers authorization, missing, ambiguous, colliding, unreadable, and read-only roles; ordered reads, aggregation, no-prompt behavior, and no-mutation gates are covered across reusable, CLI, manual-app, and automatic paths. | None; retain the existing tests. |
 | `ACCESS-04` — Legacy-cleanup preflight | Implemented | **Directly tested.** Complete-range reads, all-role gating, no-prompt behavior, ordered verification, remaining-match failure, verification-read failure, no rollback, and exact recurring-occurrence resolution are covered. | None. |
@@ -66,7 +66,7 @@ Any production correction discovered by the planned tests must:
 
 | Acceptance check | Verification state | Existing automated evidence | Concrete remaining gap |
 | --- | --- | --- | --- |
-| `ACCESS-AC-01` | **Partially direct** | `CalendarAuthorizationTests`, `CalendarNoPromptContractTests`, and `CalendarAutomaticReconciliationTests` | App permission metadata is not automatically checked. |
+| `ACCESS-AC-01` | **Directly tested** | `CalendarAuthorizationTests`, `CalendarNoPromptContractTests`, `CalendarAutomaticReconciliationTests`, `CalendarAppBundleMetadataTests`, and the guarded app build | None. |
 | `ACCESS-AC-02` | **Directly tested** | `CalendarAuthorizationTests`, `CalendarListCommandHandlerTests`, and `CalRelayContractTests` | None. |
 | `ACCESS-AC-03` | **Directly tested** | `CalendarAccessPreflightTests`, `ConfigCheckCommandHandlerTests`, `ReconcileCommandHandlerTests`, `CalendarManualDryRunTests`, `CalendarManualApplyTests`, and `CalendarAutomaticReconciliationTests` | None. |
 | `ACCESS-AC-04` | **Directly tested** | `ConfigCheckCommandHandlerTests` | None. |
@@ -82,8 +82,8 @@ Any production correction discovered by the planned tests must:
 | `ACCESS-AC-14` | **Directly tested** | `CalendarReviewedActionTests`, configuration identity, standing authorization, and opaque-reference tests | None. |
 | `ACCESS-AC-15` | **Directly tested** | Mutation executor, CLI ordinary apply, cleanup verification, manual apply, and automatic reconciliation tests | None. |
 
-No acceptance check is entirely uncovered. The only remaining gap is the bounded
-app permission-metadata portion of `ACCESS-AC-01` addressed by `CAV-04`.
+Every acceptance check now has direct automated evidence. `CAV-05` remains as the
+integration checkpoint for final traceability and complete-gate confirmation.
 
 ## Execution summary
 
@@ -93,7 +93,7 @@ each changes
 `/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay/Tests/CalRelayKitTests/Main.swift`
 to avoid overlapping suite-registration edits.
 
-The next executable task is `CAV-04`. No task is blocked.
+The next executable task is `CAV-05`. No task is blocked.
 
 ## Detailed tasks
 
@@ -361,7 +361,7 @@ names, event titles and details, marker values, and raw configuration.
   adjustments during validation were test-fixture cleanup required by Swift 6
   sendability and SwiftLint.
 
-### [ ] CAV-04 — Automate app Calendar-usage metadata verification
+### [x] CAV-04 — Automate app Calendar-usage metadata verification
 
 **Dependencies:** None.
 
@@ -375,7 +375,7 @@ automated evidence that they remain present in the source and the built app.
 - Retain unless a test exposes invalid content:
   `/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay/Resources/CalRelayApp/Info.plist`.
 - Update
-  `/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay/Scripts/build-calrelay-app.sh`.
+  `/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay/scripts/build-calrelay-app.sh`.
 - Add
   `/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay/Tests/CalRelayKitTests/Features/CalendarRelay/Contracts/CalendarAppBundleMetadataTests.swift`.
 - Update
@@ -406,15 +406,15 @@ as `plutil` or `/usr/libexec/PlistBuddy`; do not add a package dependency.
 
 #### Acceptance and verification
 
-- [ ] **CAV-04-AC1:** The deterministic suite fails if either source metadata
+- [x] **CAV-04-AC1:** The deterministic suite fails if either source metadata
   key is missing or empty.
-- [ ] **CAV-04-AC2:** `make app` fails if either key is missing or empty in the
+- [x] **CAV-04-AC2:** `make app` fails if either key is missing or empty in the
   copied bundle.
-- [ ] **CAV-04-AC3:** A successful app build contains both nonempty values in
+- [x] **CAV-04-AC3:** A successful app build contains both nonempty values in
   its final signed bundle.
-- [ ] **CAV-04-AC4:** The fake UI-test host remains independent of Calendar
+- [x] **CAV-04-AC4:** The fake UI-test host remains independent of Calendar
   permission metadata.
-- [ ] **CAV-04-V1:** The focused suite and app build pass:
+- [x] **CAV-04-V1:** The focused suite and app build pass:
 
   ```sh
   cd '/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay' && \
@@ -424,6 +424,26 @@ as `plutil` or `/usr/libexec/PlistBuddy`; do not add a package dependency.
 
 The build script, rather than a handoff-only diagnostic command, must enforce
 the metadata failure.
+
+- **Passing evidence:**
+  `CalendarAppBundleMetadataTests.testProductionSourceInfoPlistContainsNonemptyCalendarUsageDescriptions`,
+  `CalendarAppBundleMetadataTests.testUITestHostSourceInfoPlistOmitsCalendarUsageDescriptions`,
+  `CalendarAppBundleMetadataTests.testAppBuildRejectsMissingCalendarUsageDescriptions`,
+  and
+  `CalendarAppBundleMetadataTests.testAppBuildRejectsEmptyCalendarUsageDescriptions`.
+  The build-script fixture exercises both required keys in both missing and
+  whitespace-only forms.
+- **Verification result (September 23, 2026):** The focused suite passed with
+  `CalRelayKitTests passed`. `make app` built and strictly verified the signed
+  bundle, and `plutil` extracted nonempty values for both Calendar usage-description
+  keys from the final `.build/CalRelay.app/Contents/Info.plist`. `make
+  format-check` exited successfully with the repository’s existing non-fatal
+  formatter warnings. `make check` passed strict SwiftLint with 0 violations,
+  `swift build`, the complete `CalRelayKitTests` runner, and all four CLI help
+  smoke checks. `zsh -n scripts/build-calrelay-app.sh` and `git --no-pager diff
+  --check` also passed. The source production property list required no change,
+  and the fake UI-test-host property list remains free of Calendar permission
+  metadata.
 
 ### [ ] CAV-05 — Integrate traceability and run the complete automated gate
 

@@ -45,6 +45,9 @@ import Foundation
     }
 
     private static func runAccessSuites(filters: Set<String>) async throws {
+        if filters.isEmpty || filters.contains("CalendarAppBundleMetadataTests") {
+            try CalendarAppBundleMetadataTests.runAll()
+        }
         if filters.isEmpty || filters.contains("CalendarListCommandHandlerTests") {
             try await CalendarListCommandHandlerTests.runAll()
         }

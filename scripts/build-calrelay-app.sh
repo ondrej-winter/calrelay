@@ -25,6 +25,16 @@ mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}"
 
 cp "${BUILD_DIR}/${EXECUTABLE_NAME}" "${MACOS_DIR}/${EXECUTABLE_NAME}"
 cp "${ROOT_DIR}/Resources/CalRelayApp/Info.plist" "${CONTENTS_DIR}/Info.plist"
+
+INFO_PLIST="${CONTENTS_DIR}/Info.plist"
+/usr/bin/plutil -lint "${INFO_PLIST}" >/dev/null
+for key in NSCalendarsFullAccessUsageDescription NSCalendarsUsageDescription; do
+    if ! value=$(/usr/bin/plutil -extract "${key}" raw -expect string "${INFO_PLIST}" 2>/dev/null) || [[ -z "${value//[[:space:]]/}" ]]; then
+        echo "error: ${key} must be a nonempty string in ${INFO_PLIST}." >&2
+        exit 1
+    fi
+done
+
 chmod 755 "${MACOS_DIR}/${EXECUTABLE_NAME}"
 
 /usr/bin/xattr -cr "${APP_BUNDLE}"
