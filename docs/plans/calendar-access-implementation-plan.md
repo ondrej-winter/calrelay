@@ -2,7 +2,8 @@
 
 ## Plan record
 
-- **Status:** Ready.
+- **Status:** Complete; `CALACC-01` through `CALACC-07` have current passing
+  evidence. Optional live EventKit validation was not performed.
 - **Prepared:** September 24, 2026.
 - **Canonical requirements:**
   [`../specs/calendar-access-spec.md`](../specs/calendar-access-spec.md),
@@ -87,13 +88,52 @@ production change and a verified-compliant handoff, not a speculative rewrite.
 | `ACCESS-07`, `ACCESS-AC-10`, boundary portions of `ACCESS-AC-12` through `ACCESS-AC-14` | `CALACC-05`, `CALACC-06` |
 | Complete contract and live macOS boundary | `CALACC-07` |
 
+### Current acceptance baseline — September 24, 2026
+
+Current HEAD has direct deterministic evidence for every required outcome and
+acceptance check. No automated-evidence gap was identified. The suite names below
+are exact filters registered in `Tests/CalRelayKitTests/Main.swift`; the focused
+union passed after routing correction `94352fd`.
+
+| Outcome | Current automated evidence | Gap |
+| --- | --- | --- |
+| `ACCESS-01` | `CalendarAuthorizationTests`, `CalendarNoPromptContractTests`, `CalendarAutomaticReconciliationTests`, `CalendarAppBundleMetadataTests` | None. |
+| `ACCESS-02` | `CalendarAuthorizationTests`, `CalendarListCommandHandlerTests` | None. |
+| `ACCESS-03` | `CalendarAccessPreflightTests`, `ConfigCheckCommandHandlerTests`, `ReconcileCommandHandlerTests`, `CalendarControlPanelStatusTests`, `CalendarManualDryRunTests`, `CalendarManualApplyTests`, `CalendarStandingAuthorizationTests`, `CalendarAutomaticReconciliationTests` | None. |
+| `ACCESS-04` | `CalendarCleanupAccessTests`, `CalendarManualCleanupTests`, `ReconcileCommandHandlerTests` | None. |
+| `ACCESS-05` | `CalendarMutationExecutorTests`, `CalendarManualApplyTests`, `CalendarManualCleanupTests`, `CalendarAutomaticReconciliationTests` | None. |
+| `ACCESS-06` | `CalendarAccessPrivacyTests`, `CalendarListCommandHandlerTests`, `ReconcileCommandHandlerTests`, `CalendarManualCleanupTests`, `CalendarAutomationPersistenceTests` | None. |
+| `ACCESS-07` | `CalendarAuthorizationTests`, `CalendarAccessPreflightTests`, `CalendarMutationExecutorTests`, `EventKitExactEventOccurrenceResolverTests`, `CalendarReviewedActionTests`, `CalendarStandingAuthorizationTests`, `CalendarAutomationPersistenceTests` | None. |
+
+| Acceptance check | Current automated evidence | Gap |
+| --- | --- | --- |
+| `ACCESS-AC-01` | `CalendarAuthorizationTests`, `CalendarNoPromptContractTests`, `CalendarAutomaticReconciliationTests`, `CalendarAppBundleMetadataTests` | None. |
+| `ACCESS-AC-02` | `CalendarAuthorizationTests`, `CalendarListCommandHandlerTests` | None. |
+| `ACCESS-AC-03` | `CalendarAccessPreflightTests`, `ConfigCheckCommandHandlerTests`, `ReconcileCommandHandlerTests`, `CalendarControlPanelStatusTests`, `CalendarManualDryRunTests`, `CalendarManualApplyTests`, `CalendarStandingAuthorizationTests`, `CalendarAutomaticReconciliationTests` | None. |
+| `ACCESS-AC-04` | `ConfigCheckCommandHandlerTests` | None. |
+| `ACCESS-AC-05` | `CalendarCleanupAccessTests`, `CalendarManualCleanupTests`, `ReconcileCommandHandlerTests` | None. |
+| `ACCESS-AC-06` | `CalendarAccessPreflightTests`, `CalendarAutomaticReconciliationTests`, `CalendarManualApplyTests`, `CalendarManualCleanupTests` | None. |
+| `ACCESS-AC-07` | `CalendarCleanupAccessTests`, `CalendarManualCleanupTests` | None. |
+| `ACCESS-AC-08` | `CalendarMutationExecutorTests`, `CalendarManualApplyTests`, `CalendarManualCleanupTests`, `CalendarAutomaticReconciliationTests` | None. |
+| `ACCESS-AC-09` | `CalendarAccessPrivacyTests`, `CalendarListCommandHandlerTests`, `ReconcileCommandHandlerTests`, `CalendarManualCleanupTests`, `CalendarAutomationPersistenceTests` | None. |
+| `ACCESS-AC-10` | `CalendarAccessPreflightTests`, `CalendarMutationExecutorTests`, and the fake-backed custom runner | None. |
+| `ACCESS-AC-11` | `CalendarManualCleanupTests`, `CalendarAutomationPersistenceTests` | None. |
+| `ACCESS-AC-12` | `EventKitExactEventOccurrenceResolverTests` | None. |
+| `ACCESS-AC-13` | `CalendarAccessPreflightTests`, `CalendarCleanupAccessTests`, `CalendarAutomaticReconciliationTests` | None. |
+| `ACCESS-AC-14` | `CalendarReviewedActionTests`, `CalendarStandingAuthorizationTests`, `CalendarAutomationPersistenceTests`, `CalendarAuthorizationTests` | None. |
+| `ACCESS-AC-15` | `CalendarMutationExecutorTests`, `ReconcileCommandHandlerTests`, `CalendarManualApplyTests`, `CalendarAutomaticReconciliationTests`, `CalendarCleanupAccessTests` | None. |
+
+Boundary inspection also found the EventKit import only in the outbound EventKit
+adapter and full-access requester injection only into `CalendarAccessSetupUseCase`
+at production app composition or deterministic test boundaries. No production
+correction is justified by the current baseline.
+
 ## Execution summary
 
-Execute `CALACC-01` first. `CALACC-02`, `CALACC-03`, and `CALACC-04` may be
-investigated independently after the baseline, but implement discovered fixes
-sequentially because their tests and application surfaces overlap. Complete
-`CALACC-05` and `CALACC-06` after those behavioral gates, then finish with
-`CALACC-07`.
+`CALACC-01` through `CALACC-07` are complete. Every focused gate started green,
+the complete repository gate passed, and no acceptance failure justified a
+production or test correction. The implementation result is a verified-compliant
+current HEAD plus this completion record.
 
 ## CALACC-01 — Establish the current acceptance baseline
 
@@ -121,14 +161,36 @@ work.
   behavior.
 - Do not modify production code without a failing acceptance-level test.
 
-- [ ] **CALACC-01-AC1:** Every `ACCESS-01` through `ACCESS-07` outcome and
+- [x] **CALACC-01-AC1:** Every `ACCESS-01` through `ACCESS-07` outcome and
   `ACCESS-AC-01` through `ACCESS-AC-15` check has current automated evidence or
   an explicitly identified gap.
-- [ ] **CALACC-01-AC2:** No task recreates completed work solely because it
+- [x] **CALACC-01-AC2:** No task recreates completed work solely because it
   appeared in a historical implementation plan.
-- [ ] **CALACC-01-AC3:** Unrelated workspace changes remain untouched.
-- [ ] **CALACC-01-V1:** The focused suite union runs using exact suite names
+- [x] **CALACC-01-AC3:** Unrelated workspace changes remain untouched.
+- [x] **CALACC-01-V1:** The focused suite union runs using exact suite names
   registered in `Tests/CalRelayKitTests/Main.swift`.
+
+**Passing evidence (September 24, 2026):** The following exact registered suite
+union completed with `CalRelayKitTests passed`:
+
+```sh
+swift run CalRelayKitTests \
+  CalendarAuthorizationTests CalendarNoPromptContractTests \
+  CalendarListCommandHandlerTests CalendarAppBundleMetadataTests \
+  CalendarAccessPreflightTests ConfigCheckCommandHandlerTests \
+  ReconcileCommandHandlerTests CalendarControlPanelStatusTests \
+  CalendarManualDryRunTests CalendarManualApplyTests \
+  CalendarStandingAuthorizationTests CalendarAutomaticReconciliationTests \
+  CalendarCleanupAccessTests CalendarManualCleanupTests \
+  CalendarMutationExecutorTests EventKitExactEventOccurrenceResolverTests \
+  CalendarReviewedActionTests CalendarAutomationPersistenceTests \
+  CalendarAccessPrivacyTests
+```
+
+SwiftPM emitted non-fatal linker warnings for absent Command Line Tools search
+paths. There were no calendar-access failures, unrelated failures, or missing
+assertions requiring production or test changes. The workspace was clean before
+this documentation checkpoint.
 
 ## CALACC-02 — Verify permission ownership and inventory
 
@@ -163,15 +225,42 @@ work.
 - Verify production app metadata contains both required nonempty Calendar usage
   descriptions.
 
-- [ ] **CALACC-02-AC1:** Only the explicit app setup/recovery path can request
+- [x] **CALACC-02-AC1:** Only the explicit app setup/recovery path can request
   full Calendar access.
-- [ ] **CALACC-02-AC2:** Every non-setup operation remains non-prompting for every
+- [x] **CALACC-02-AC2:** Every non-setup operation remains non-prompting for every
   authorization state.
-- [ ] **CALACC-02-AC3:** CLI and app inventories satisfy their distinct
+- [x] **CALACC-02-AC3:** CLI and app inventories satisfy their distinct
   disclosure contracts, including empty-inventory success.
-- [ ] **CALACC-02-V1:** `CalendarAuthorizationTests`,
+- [x] **CALACC-02-V1:** `CalendarAuthorizationTests`,
   `CalendarNoPromptContractTests`, `CalendarListCommandHandlerTests`, and
   `CalendarAppBundleMetadataTests` pass.
+
+**Passing evidence (September 24, 2026):** The exact four-suite CALACC-02 gate
+completed with `CalRelayKitTests passed`:
+
+```sh
+swift run CalRelayKitTests \
+  CalendarAuthorizationTests CalendarNoPromptContractTests \
+  CalendarListCommandHandlerTests CalendarAppBundleMetadataTests
+```
+
+The focused tests confirm that setup requests only from `.notDetermined`, every
+settled state remains non-prompting, inventory requires pre-existing full access,
+and an empty inventory succeeds. The no-prompt contract covers inventory, config
+check, CLI and manual ordinary operations, cleanup, and standing authorization
+across every authorization state; the completed CALACC-01 baseline also covers
+automatic and retry attempts. CLI formatting includes source, title, EventKit ID,
+and writability without a readiness claim, while app formatting omits EventKit
+IDs and distinguishes inventory from configuration validity and configured
+readiness.
+
+Source and composition inspection found the request capability injected only
+into `CalendarAccessSetupUseCase` by production app composition or deterministic
+test composition. CLI inventory composition has no configuration dependency. The
+app setup presentation retains distinct recovery guidance for restricted,
+denied/revoked, write-only, full-access, and unknown states, and both production
+Calendar usage-description keys remain nonempty and enforced by the app-bundle
+build script. No production or test correction was justified.
 
 ## CALACC-03 — Verify shared ordinary topology preflight
 
@@ -210,19 +299,46 @@ work.
   authorization topology binding, and ordinary local-confirmation semantics.
 - Keep one shared preflight rather than introducing wrapper-specific variants.
 
-- [ ] **CALACC-03-AC1:** Every ordinary surface rejects the same complete set of
+- [x] **CALACC-03-AC1:** Every ordinary surface rejects the same complete set of
   topology failures before mutation or success.
-- [ ] **CALACC-03-AC2:** Resolvable roles are read hub-first and then in work
+- [x] **CALACC-03-AC2:** Resolvable roles are read hub-first and then in work
   declaration order, including when other failures are aggregated.
-- [ ] **CALACC-03-AC3:** Migration-pending config check performs preflight but
+- [x] **CALACC-03-AC3:** Migration-pending config check performs preflight but
   never reports readiness.
-- [ ] **CALACC-03-AC4:** A ready empty ordinary plan succeeds without mutation or
+- [x] **CALACC-03-AC4:** A ready empty ordinary plan succeeds without mutation or
   a post-mutation verification read.
-- [ ] **CALACC-03-V1:** `CalendarAccessPreflightTests`,
+- [x] **CALACC-03-V1:** `CalendarAccessPreflightTests`,
   `ConfigCheckCommandHandlerTests`, `ReconcileCommandHandlerTests`,
   `CalendarControlPanelStatusTests`, `CalendarManualDryRunTests`,
   `CalendarManualApplyTests`, `CalendarStandingAuthorizationTests`, and
   `CalendarAutomaticReconciliationTests` pass.
+
+**Passing evidence (September 24, 2026):** The exact eight-suite CALACC-03 gate
+completed with `CalRelayKitTests passed`:
+
+```sh
+swift run CalRelayKitTests CalendarAccessPreflightTests ConfigCheckCommandHandlerTests ReconcileCommandHandlerTests CalendarControlPanelStatusTests CalendarManualDryRunTests CalendarManualApplyTests CalendarStandingAuthorizationTests CalendarAutomaticReconciliationTests
+```
+
+The focused tests confirm exact source/title resolution, physical-calendar
+collision detection, writability checks, aggregate read failures, and sequential
+hub-first then declaration-ordered work-calendar reads without capability-probe
+mutation. Configuration loading and structural validation precede Calendar
+access. Migration-pending config check still reads the complete resolvable
+topology and reports failure without a readiness claim, while ordinary
+reconciliation modes fail migration pending before Calendar access as required by
+their owning contracts.
+
+Source inspection confirms config check and control-panel status invoke
+`CalendarAccessPreflightUseCase` directly, while CLI dry-run/apply/explanation,
+manual app dry-run/apply, standing authorization, and automatic reconciliation
+share it through `ReconcileCalendarsUseCase`. Existing regression coverage proves
+that physical topology and reconciliation-policy changes invalidate standing
+authorization, every automatic preflight failure prevents all mutation, and ready
+empty CLI, manual, and automatic plans succeed without mutation or an ordinary
+post-mutation verification read. The post-closure routing correction therefore
+preserves the calendar-access contract. The gate started green, exposed no
+missing acceptance assertion, and justified no production or test correction.
 
 ## CALACC-04 — Verify cleanup preflight and verification
 
@@ -255,15 +371,42 @@ portions of `ACCESS-AC-13` and `ACCESS-AC-15`.
 - Preserve cleanup's stronger verification semantics; do not add them to
   ordinary apply.
 
-- [ ] **CALACC-04-AC1:** Cleanup never deletes a readable subset when any
+- [x] **CALACC-04-AC1:** Cleanup never deletes a readable subset when any
   configured role fails preflight.
-- [ ] **CALACC-04-AC2:** Cleanup preflight and verification use the complete
+- [x] **CALACC-04-AC2:** Cleanup preflight and verification use the complete
   cleanup range and required read order.
-- [ ] **CALACC-04-AC3:** Verification failure leaves confirmed deletions applied
+- [x] **CALACC-04-AC3:** Verification failure leaves confirmed deletions applied
   and reports unsuccessful completion.
-- [ ] **CALACC-04-V1:** `CalendarCleanupAccessTests`,
+- [x] **CALACC-04-V1:** `CalendarCleanupAccessTests`,
   `CalendarManualCleanupTests`, `CalendarManualCleanupReviewTests`, and cleanup
   coverage in `ReconcileCommandHandlerTests` pass.
+
+**Passing evidence (September 24, 2026):** The exact registered-suite gate
+completed with `CalRelayKitTests passed`:
+
+```sh
+swift run CalRelayKitTests CalendarCleanupAccessTests CalendarManualCleanupTests ReconcileCommandHandlerTests
+```
+
+`CalendarManualCleanupReviewTests` is extension coverage executed by the
+registered `CalendarManualCleanupTests` suite rather than a standalone runner
+filter. The focused tests confirm that missing legacy markers fail before
+Calendar access; CLI and app cleanup both delegate to `CalendarCleanupUseCase`;
+and every cleanup snapshot uses the captured complete local-date range for the
+hub followed by work calendars in declaration order. The shared access preflight
+preserves exact selector, distinct physical-calendar, read, and writability
+gates, so an aggregate preflight failure prevents all deletion rather than
+cleaning a readable subset.
+
+Apply coverage proves that every ordered deletion is attempted and confirmed
+before verification starts. Verification then rereads the complete topology over
+the same range, succeeds only when no exact legacy-marker match remains, and
+continues collecting safely determinable read failures. A verification read
+failure or remaining match reports unsuccessful completion while confirmed
+deletions remain applied without rollback. Ordinary apply retains its separate
+local-confirmation semantics and does not receive a verification reread. The gate
+started green, exposed no missing acceptance assertion, and justified no
+production or test correction.
 
 ## CALACC-05 — Verify mutation, occurrence, and action identity
 
@@ -297,18 +440,49 @@ preflight behavior.
   on zero or multiple matches without substitution or inferred success.
 - Keep EventKit types and raw identifier mechanics inside the outbound adapter.
 
-- [ ] **CALACC-05-AC1:** Partial mutation results contain no event details or
+- [x] **CALACC-05-AC1:** Partial mutation results contain no event details or
   provider identifiers.
-- [ ] **CALACC-05-AC2:** Ordinary success requires confirmation of every ordered
+- [x] **CALACC-05-AC2:** Ordinary success requires confirmation of every ordered
   action and performs no verification read.
-- [ ] **CALACC-05-AC3:** Exact recurring-occurrence resolution has deterministic
+- [x] **CALACC-05-AC3:** Exact recurring-occurrence resolution has deterministic
   zero, one, and multiple-match coverage.
-- [ ] **CALACC-05-AC4:** Physical-calendar, exact-occurrence, or action-order
+- [x] **CALACC-05-AC4:** Physical-calendar, exact-occurrence, or action-order
   changes invalidate reviewed or standing authorization as required.
-- [ ] **CALACC-05-V1:** `CalendarMutationExecutorTests`,
+- [x] **CALACC-05-V1:** `CalendarMutationExecutorTests`,
   `EventKitExactEventOccurrenceResolverTests`, `CalendarReviewedActionTests`,
   `CalendarManualApplyTests`, `CalendarStandingAuthorizationTests`, and
   `CalendarAutomationPersistenceTests` pass.
+
+**Passing evidence (September 24, 2026):** The exact six-suite CALACC-05 gate
+completed with `CalRelayKitTests passed`:
+
+```sh
+swift run CalRelayKitTests CalendarMutationExecutorTests EventKitExactEventOccurrenceResolverTests CalendarReviewedActionTests CalendarManualApplyTests CalendarStandingAuthorizationTests CalendarAutomationPersistenceTests
+```
+
+The focused mutation coverage confirms supplied plan order, confirmation only
+after each successful action, immediate stop at the first failure, privacy-safe
+per-role counts plus the failed role and category, and no compensating rollback.
+Manual ordinary apply requires every planned action to be confirmed, consumes a
+failed or completed one-use review, and performs no post-mutation verification
+read; a ready empty plan remains a successful no-mutation result.
+
+Exact-action coverage binds delete review to the physical calendar, event
+reference, and recurring occurrence, binds create review to the physical
+destination and projected fields, and compares the ordered identity sequence so
+reordered actions cannot reuse a review. Fresh-snapshot tests require new review
+for physical-calendar, event-reference, occurrence, or executable-field changes,
+while standing authorization remains bound to mutation-relevant configuration,
+declaration-ordered physical topology, and reconciliation policy through an
+opaque persisted identity.
+
+The EventKit boundary resolves recurring deletion candidates only when event
+reference, physical calendar, and occurrence date identify exactly one match;
+zero matches fail as not found and multiple matches fail as ambiguous. The
+adapter then removes only that resolved occurrence with EventKit
+`span: .thisEvent`. EventKit types and raw identifier conversion remain confined
+to the outbound adapter. The gate started green, exposed no missing acceptance
+assertion, and justified no production or test correction.
 
 ## CALACC-06 — Verify disclosure and architecture boundaries
 
@@ -342,16 +516,45 @@ and `ACCESS-AC-11`.
   only.
 - Add no logging of EventKit objects or calendar content.
 
-- [ ] **CALACC-06-AC1:** Protected-value sentinels are absent from restricted
+- [x] **CALACC-06-AC1:** Protected-value sentinels are absent from restricted
   outputs and persisted state.
-- [ ] **CALACC-06-AC2:** Inventory and ordinary explanation retain only their
+- [x] **CALACC-06-AC2:** Inventory and ordinary explanation retain only their
   approved disclosure exceptions.
-- [ ] **CALACC-06-AC3:** Domain and application interfaces contain no EventKit
+- [x] **CALACC-06-AC3:** Domain and application interfaces contain no EventKit
   types.
-- [ ] **CALACC-06-V1:** `CalendarAccessPrivacyTests`,
+- [x] **CALACC-06-V1:** `CalendarAccessPrivacyTests`,
   `CalendarListCommandHandlerTests`, `ReconcileCommandHandlerTests`,
   `CalendarAutomationPersistenceTests`, and `CalendarAppBundleMetadataTests`
   pass.
+
+**Passing evidence (September 24, 2026):** The exact five-suite CALACC-06 gate
+completed with `CalRelayKitTests passed`:
+
+```sh
+swift run CalRelayKitTests CalendarAccessPrivacyTests CalendarListCommandHandlerTests ReconcileCommandHandlerTests CalendarAutomationPersistenceTests CalendarAppBundleMetadataTests
+```
+
+The adjacent `CalendarManualCleanupTests` suite also passed, confirming that app
+cleanup review exposes only the transient marker-stripped title, configured role,
+and time range while completion and failure presentation return to aggregate
+privacy-safe output.
+
+Sentinel coverage confirms that restricted failures, readiness output, partial
+mutation diagnostics, ordinary success output, cleanup completion, automation
+attention, and persisted operational state omit event details, raw configuration,
+markers, selectors, calendar names, and provider identifiers. Successful CLI
+inventory retains calendar IDs and explicitly requested ordinary explanation
+retains calendar and event IDs as the two approved disclosure exceptions; app
+inventory omits calendar IDs.
+
+Source inspection found no EventKit, SwiftUI, AppKit, ArgumentParser, or Yams
+imports in domain or application code and no EventKit type names in those layers.
+The full-access request port is injected only into `CalendarAccessSetupUseCase`
+from app composition; all other operations receive status-only authorization.
+EventKit imports and raw identifier conversion remain in the outbound adapter,
+and production sources contain no logging API usage that could disclose Calendar
+objects or content. The gate exposed no missing acceptance assertion and
+justified no production or test correction.
 
 ## CALACC-07 — Final integration and handoff
 
@@ -403,17 +606,45 @@ composition, or the UI-test harness changes.
 - Record manual observations separately and never represent them as deterministic
   automated passes.
 
-- [ ] **CALACC-07-AC1:** All fifteen acceptance checks have current passing
+- [x] **CALACC-07-AC1:** All fifteen acceptance checks have current passing
   evidence.
-- [ ] **CALACC-07-AC2:** No unrelated behavior, dependencies, or accepted
+- [x] **CALACC-07-AC2:** No unrelated behavior, dependencies, or accepted
   contracts changed.
-- [ ] **CALACC-07-AC3:** Manual EventKit checks use only dedicated harmless
+- [x] **CALACC-07-AC3:** Manual EventKit checks use only dedicated harmless
   calendars and disclose no personal calendar data.
-- [ ] **CALACC-07-V1:** `make format-check` and `make check` pass.
-- [ ] **CALACC-07-V2:** Conditional app and UI checks pass or are recorded as not
+- [x] **CALACC-07-V1:** `make format-check` and `make check` pass.
+- [x] **CALACC-07-V2:** Conditional app and UI checks pass or are recorded as not
   applicable with their scope reason.
-- [ ] **CALACC-07-V3:** The final diff is whitespace-clean and preserves
+- [x] **CALACC-07-V3:** The final diff is whitespace-clean and preserves
   unrelated workspace changes.
+
+**Passing evidence (September 24, 2026):** Final automated validation completed
+successfully:
+
+```sh
+make format-check
+make check
+git --no-pager diff HEAD --check
+```
+
+`make format-check` returned success. It reported pre-existing formatting
+warnings in unchanged Swift files and made no changes. `make check` completed
+with exit status zero: SwiftLint found zero violations in 373 files, the SwiftPM
+build succeeded, `CalRelayKitTests` passed, and the root, calendar inventory,
+configuration check, and reconciliation help smoke checks succeeded. The build
+emitted non-failing Command Line Tools linker search-path warnings.
+
+The combined diff is whitespace-clean and changes only
+`docs/plans/calendar-access-implementation-plan.md`; no product behavior,
+dependency, accepted specification, app source, app resource, bundle tooling,
+accessibility contract, fake UI composition, or UI-test harness changed.
+Therefore `make app` and `make ui-test` were not applicable. Existing staged plan
+work remains staged, and the later completion updates remain unstaged.
+
+No live EventKit validation was performed, so no real calendar was accessed or
+mutated and no personal calendar data was disclosed. Any future manual validation
+remains subject to the dedicated-harmless-calendar and separate-evidence rules
+above; it must not be represented as part of this automated pass.
 
 ## Risks and mitigations
 
@@ -436,6 +667,7 @@ composition, or the UI-test harness changes.
 
 ## Next executable work
 
-Start with `CALACC-01`: recheck the workspace, execute the current access-focused
-suite union, and produce the current acceptance traceability before changing any
-production source.
+No automated calendar-access implementation work remains. Optional live EventKit
+validation may be performed separately with dedicated harmless calendars and the
+stable production app bundle identity; record those observations separately and
+do not revise the deterministic pass into a claim about live provider behavior.
