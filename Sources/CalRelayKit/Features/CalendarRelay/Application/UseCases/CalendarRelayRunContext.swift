@@ -3,8 +3,7 @@ import Foundation
 struct ReconciliationRunContext {
     let hubCalendar: ResolvedCalendar
     let workCalendars: [WorkCalendarResolution]
-    let managedPrefixes: Set<String>
-    let personalPrefix: String
+    let currentWorkPrefixes: Set<String>
     let window: CalendarAccessWindow
     let syncWindowDays: Int
     let hubEvents: [CalendarEvent]

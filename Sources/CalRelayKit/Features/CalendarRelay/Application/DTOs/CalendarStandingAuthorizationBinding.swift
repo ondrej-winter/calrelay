@@ -2,11 +2,13 @@ import CryptoKit
 import Foundation
 
 public struct CalendarReconciliationPolicyVersion: Equatable, Sendable {
-    /// Version 1 covers exact-target, delete-first ordinary actions ordered by hub then
-    /// declaration-ordered work roles within each phase. Review and increment this value
-    /// whenever identical validated settings and snapshots can change executable actions,
-    /// targets, or order; presentation-only changes do not require an increment.
-    public static let current = CalendarReconciliationPolicyVersion(rawValue: "ordinary-reconciliation-policy-v1")
+    /// Version 2 restricts ordinary hub deletion ownership to current work markers, preserving
+    /// personal-prefix and other non-local valid marked hub events as authoritative sources. It
+    /// retains exact-target, delete-first actions ordered by hub then declaration-ordered work
+    /// roles within each phase. Review and increment this value whenever identical validated
+    /// settings and snapshots can change executable actions, targets, or order; presentation-only
+    /// changes do not require an increment.
+    public static let current = CalendarReconciliationPolicyVersion(rawValue: "ordinary-reconciliation-policy-v2")
 
     public let rawValue: String
 

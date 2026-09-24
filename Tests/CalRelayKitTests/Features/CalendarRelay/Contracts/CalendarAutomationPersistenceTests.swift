@@ -28,15 +28,15 @@ enum CalendarAutomationPersistenceTests {
             resolvedCalendars: [
                 calendars[0], PhysicalCalendarReference(providerIdentifier: "replacement-work"), calendars[2]
             ], policyVersion: .current)
-        let changedPolicy = CalendarStandingAuthorizationBinding.derive(
+        let legacyPolicy = CalendarStandingAuthorizationBinding.derive(
             settings: settings, resolvedCalendars: calendars,
-            policyVersion: CalendarReconciliationPolicyVersion(rawValue: "ordinary-policy-next"))
+            policyVersion: CalendarReconciliationPolicyVersion(rawValue: "ordinary-reconciliation-policy-v1"))
 
         try expect(binding == renamed, "Diagnostic work-calendar names must not change authorization identity")
         try expect(binding == reorderedLegacyMarkers, "Legacy-marker set order must not change authorization identity")
         try expect(binding != reorderedWork, "Work-calendar declaration order must change authorization identity")
         try expect(binding != changedTopology, "Physical calendar continuity must change authorization identity")
-        try expect(binding != changedPolicy, "Reconciliation policy changes must change authorization identity")
+        try expect(binding != legacyPolicy, "A legacy reconciliation policy must not retain authorization identity")
         try expect(
             binding.description == "<opaque-standing-authorization-binding>",
             "Opaque authorization identity must not expose its digest or inputs")

@@ -9,7 +9,7 @@ enum CalendarAutomaticReconciliationTests {
         try await testConfigurationAndMigrationFailuresStopBeforeCalendarAccess()
         try await testMissingStandingAuthorizationPerformsNoMutation()
         try await testReadyEmptyPlanUpdatesSuccessWithoutMutation()
-        try await testBindingMismatchRevokesAuthorizationWithoutMutation()
+        try await testLegacyPolicyAuthorizationIsRevokedWithoutMutation()
         try await testPreMutationConfigurationTransitionsFailClosed()
         try await testObservedAtoBtoATransitionBeforeMutationRevokesAuthorization()
         try await testAuthorizationRevocationBeforeMutationPreservesMatchingGrant()
@@ -205,23 +205,26 @@ enum CalendarAutomaticReconciliationTests {
         }
     }
 
-    private static func testBindingMismatchRevokesAuthorizationWithoutMutation() async throws {
+    private static func testLegacyPolicyAuthorizationIsRevokedWithoutMutation() async throws {
         let fixture = AutomaticReconciliationFixture()
-        let mismatched = CalendarStandingAuthorizationBinding.derive(
+        let legacyPolicyBinding = CalendarStandingAuthorizationBinding.derive(
             settings: fixture.settings, resolvedCalendars: [fixture.hub.id, fixture.work.id],
-            policyVersion: CalendarReconciliationPolicyVersion(rawValue: "different-policy"))
+            policyVersion: CalendarReconciliationPolicyVersion(rawValue: "ordinary-reconciliation-policy-v1"))
         let stateStore = AutomaticStateStore(
             state: CalendarAutomationPersistentState(
-                schedulingPreference: .enabled, standingAuthorization: mismatched, operationalStatus: .empty))
+                schedulingPreference: .enabled, standingAuthorization: legacyPolicyBinding,
+                operationalStatus: .empty))
         let store = fixture.storeWithSourceEvent()
 
         let result = try await fixture.useCase(calendarStore: store, stateStore: stateStore).run()
 
-        try expect(result.outcome == .standingAuthorizationRequired, "A binding mismatch should suspend automation")
-        try expect(await store.mutationCount() == 0, "A binding mismatch must prevent mutation")
+        try expect(
+            result.outcome == .standingAuthorizationRequired,
+            "A legacy-policy standing authorization should suspend automation")
+        try expect(await store.mutationCount() == 0, "A legacy-policy authorization must prevent mutation")
         try expect(
             (await stateStore.currentState()).standingAuthorization == nil,
-            "A mismatched binding should be removed rather than silently reactivated")
+            "A legacy-policy authorization should be removed rather than silently reactivated")
     }
 
     private static func testPreMutationConfigurationTransitionsFailClosed() async throws {

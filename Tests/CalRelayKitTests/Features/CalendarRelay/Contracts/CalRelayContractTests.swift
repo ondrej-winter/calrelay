@@ -1087,7 +1087,7 @@ enum CalRelayContractTests {
     private static func testStaleLocalHubProjectionDoesNotRouteForExtraCycle() async throws {
         let fixtures = applicationFixtures()
         let staleHubProjection = calendarEvent(
-            id: "stale-personal-hub-1", calendar: fixtures.hubReference, title: "[ME] Dentist",
+            id: "stale-work-hub-1", calendar: fixtures.hubReference, title: "[ACME] Removed Source",
             start: Date(timeIntervalSince1970: 13_000), end: Date(timeIntervalSince1970: 14_000))
         let store = FakeCalendarStore(
             calendars: [fixtures.hubCalendar, fixtures.workCalendar],
@@ -1497,6 +1497,10 @@ enum CalRelayContractTests {
         let personalHubSource = calendarEvent(
             id: "hub-personal", calendar: base.hubReference, title: "Dentist",
             start: Date(timeIntervalSince1970: 17_000), end: Date(timeIntervalSince1970: 18_000))
+        let personalMarkedHubSource = calendarEvent(
+            id: "hub-personal-marked", calendar: base.hubReference, title: "[ME] Dentist",
+            start: Date(timeIntervalSince1970: 18_000), end: Date(timeIntervalSince1970: 19_000), availability: .free,
+            currentUserParticipantStatus: .declined)
         let remoteHubSource = calendarEvent(
             id: "hub-remote", calendar: base.hubReference, title: "[REMOTE] Partner Planning",
             start: Date(timeIntervalSince1970: 19_000), end: Date(timeIntervalSince1970: 20_000), availability: .free)
@@ -1514,13 +1518,14 @@ enum CalRelayContractTests {
             eventsByCalendarID: [
                 base.hubCalendar.id: [
                     retainedHubProjection, cancelledHubProjection, duplicateOne, duplicateTwo, personalHubSource,
-                    remoteHubSource, cancelledRemoteHubSource, invalidHubSource
+                    personalMarkedHubSource, remoteHubSource, cancelledRemoteHubSource, invalidHubSource
                 ], base.workCalendar.id: [base.workEvent, reviewSource, staleWorkProjection]
             ])
         return ExplanationClassificationFixture(
             base: base, reviewSource: reviewSource, retainedHubProjection: retainedHubProjection,
             cancelledHubProjection: cancelledHubProjection, duplicateOne: duplicateOne, duplicateTwo: duplicateTwo,
-            personalHubSource: personalHubSource, remoteHubSource: remoteHubSource,
+            personalHubSource: personalHubSource, personalMarkedHubSource: personalMarkedHubSource,
+            remoteHubSource: remoteHubSource,
             cancelledRemoteHubSource: cancelledRemoteHubSource, invalidHubSource: invalidHubSource,
             staleWorkProjection: staleWorkProjection, store: store)
     }
@@ -1552,6 +1557,11 @@ enum CalRelayContractTests {
             fixture.personalHubSource, in: explanation,
             expected: CandidateClassificationExpectation(
                 eligibility: .noCurrentUserAttendeeIncluded(.busy), routing: .hubPersonalSource,
+                expectation: .noMatchingExpectation, disposition: .preservedUnmanagedOrNonLocal))
+        try expectCandidate(
+            fixture.personalMarkedHubSource, in: explanation,
+            expected: CandidateClassificationExpectation(
+                eligibility: .markedHubEligibilityBypass, routing: .nonLocalValidMarkerHubSource,
                 expectation: .noMatchingExpectation, disposition: .preservedUnmanagedOrNonLocal))
         try expectCandidate(
             fixture.remoteHubSource, in: explanation,
@@ -1671,6 +1681,7 @@ private struct ExplanationClassificationFixture {
     let duplicateOne: CalendarEvent
     let duplicateTwo: CalendarEvent
     let personalHubSource: CalendarEvent
+    let personalMarkedHubSource: CalendarEvent
     let remoteHubSource: CalendarEvent
     let cancelledRemoteHubSource: CalendarEvent
     let invalidHubSource: CalendarEvent

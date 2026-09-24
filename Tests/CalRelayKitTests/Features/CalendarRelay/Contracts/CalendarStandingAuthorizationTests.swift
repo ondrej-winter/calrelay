@@ -137,13 +137,20 @@ enum CalendarStandingAuthorizationTests {
             try await useCase.validateCurrentAuthorization() == .invalidated,
             "Changed physical calendar identity should invalidate authorization")
 
-        try await grant(useCase)
-        let changedPolicyUseCase = fixture.useCase(
-            provider: provider, calendarStore: store, stateStore: stateStore,
-            policyVersion: CalendarReconciliationPolicyVersion(rawValue: "ordinary-policy-next"))
+        let legacyPolicyBinding = CalendarStandingAuthorizationBinding.derive(
+            settings: originalSettings,
+            resolvedCalendars: [
+                PhysicalCalendarReference(providerIdentifier: "replacement-hub"),
+                PhysicalCalendarReference(providerIdentifier: "replacement-work")
+            ],
+            policyVersion: CalendarReconciliationPolicyVersion(rawValue: "ordinary-reconciliation-policy-v1"))
+        await stateStore.replace(
+            CalendarAutomationPersistentState(
+                schedulingPreference: .enabled, standingAuthorization: legacyPolicyBinding,
+                operationalStatus: .empty))
         try expect(
-            try await changedPolicyUseCase.validateCurrentAuthorization() == .invalidated,
-            "A reconciliation-policy version change should invalidate authorization")
+            try await useCase.validateCurrentAuthorization() == .invalidated,
+            "A standing authorization granted under reconciliation policy v1 should be invalidated")
     }
 
     private static func testRenewalInvalidatesObservedMismatchAndPreservesPause() async throws {

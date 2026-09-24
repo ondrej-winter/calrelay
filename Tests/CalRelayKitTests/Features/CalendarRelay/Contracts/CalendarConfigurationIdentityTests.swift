@@ -155,7 +155,7 @@ enum CalendarConfigurationIdentityTests {
         let original = binding(settings: originalSettings)
 
         try expect(
-            CalendarReconciliationPolicyVersion.current.rawValue == "ordinary-reconciliation-policy-v1",
+            CalendarReconciliationPolicyVersion.current.rawValue == "ordinary-reconciliation-policy-v2",
             "Review this policy checkpoint whenever ordinary executable actions, exact targets, or order change")
         try expect(
             binding(settings: presentationOnlySettings) == original,
@@ -163,7 +163,7 @@ enum CalendarConfigurationIdentityTests {
         try expect(
             binding(
                 settings: originalSettings,
-                policyVersion: CalendarReconciliationPolicyVersion(rawValue: "ordinary-reconciliation-policy-v2"))
+                policyVersion: CalendarReconciliationPolicyVersion(rawValue: "ordinary-reconciliation-policy-v1"))
                 != original, "A product-controlled reconciliation-policy version change must derive a different binding"
         )
     }

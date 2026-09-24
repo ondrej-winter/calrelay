@@ -90,7 +90,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
 
     private func compute(settings: CalendarRelaySettings, now: Date) async throws -> OrdinaryReconciliationComputation {
         let context = try await loadRunContext(settings: settings, now: now)
-        let titlePolicy = ManagedEventTitlePolicy(managedPrefixes: context.managedPrefixes)
+        let titlePolicy = ManagedEventTitlePolicy(currentWorkPrefixes: context.currentWorkPrefixes)
         let workTargets = context.workCalendars.map { workCalendar in
             WorkCalendarProjectionTarget(settings: workCalendar.settings, calendar: workCalendar.calendar.reference)
         }
@@ -107,7 +107,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
         }
         let expectedHubEvents = hubExpectations.map(\.projection)
         let hubPlan = ReconciliationPlanner.plan(
-            expected: expectedHubEvents, existing: context.hubEvents, managedPrefixes: context.managedPrefixes)
+            expected: expectedHubEvents, existing: context.hubEvents, managedPrefixes: context.currentWorkPrefixes)
         let reconciledExistingHubEvents = context.hubEvents.filter { !hubPlan.deletes.contains($0) }
 
         let existingHubExpectations = reconciledExistingHubEvents.flatMap { event in
@@ -167,11 +167,11 @@ public struct ReconcileCalendarsUseCase: Sendable {
                 settings: workCalendar, calendar: ResolvedCalendar(reference: calendarSnapshot.calendar),
                 events: calendarSnapshot.events)
         }
-        let managedPrefixes = Set(settings.workCalendars.map(\.prefix) + [settings.personalPrefix])
+        let currentWorkPrefixes = Set(settings.workCalendars.map(\.prefix))
 
         return ReconciliationRunContext(
-            hubCalendar: hubCalendar, workCalendars: workCalendars, managedPrefixes: managedPrefixes,
-            personalPrefix: settings.personalPrefix, window: snapshot.window, syncWindowDays: settings.syncWindowDays,
+            hubCalendar: hubCalendar, workCalendars: workCalendars, currentWorkPrefixes: currentWorkPrefixes,
+            window: snapshot.window, syncWindowDays: settings.syncWindowDays,
             hubEvents: hubSnapshot.events)
     }
 
@@ -301,7 +301,6 @@ public struct ReconcileCalendarsUseCase: Sendable {
             return EventInclusionPolicy.includes(event) ? .hubPersonalSource : .invalidOrUnmarkedHubSource
         }
         if event.status == .cancelled { return .cancelledMarkedHubPreservation }
-        if marker == context.personalPrefix { return .exactLocalMarkerHubSource(role: .hub) }
         if let index = context.workCalendars.firstIndex(where: { $0.settings.prefix == marker }) {
             let workCalendar = context.workCalendars[index]
             return .exactLocalMarkerHubSource(role: .work(name: workCalendar.settings.name, declarationIndex: index))
@@ -332,10 +331,10 @@ public struct ReconcileCalendarsUseCase: Sendable {
             }
         }
 
-        let titlePolicy = ManagedEventTitlePolicy(managedPrefixes: computation.context.managedPrefixes)
+        let titlePolicy = ManagedEventTitlePolicy(currentWorkPrefixes: computation.context.currentWorkPrefixes)
         let isManaged =
             event.calendar == computation.context.hubCalendar.reference
-            ? titlePolicy.isManagedProjection(event) : titlePolicy.isRelayedWorkBlocker(event)
+            ? titlePolicy.isLocallyManagedHubProjection(event) : titlePolicy.isRelayedWorkBlocker(event)
         if isManaged, candidateExpectation(for: event, computation: computation) == .matchesExpectedProjection {
             return .retained
         }

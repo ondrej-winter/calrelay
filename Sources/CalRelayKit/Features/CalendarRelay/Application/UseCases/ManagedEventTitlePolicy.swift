@@ -1,9 +1,9 @@
 struct ManagedEventTitlePolicy: Sendable {
-    let managedPrefixes: Set<String>
+    let currentWorkPrefixes: Set<String>
 
-    func isManagedProjection(_ event: CalendarEvent) -> Bool {
+    func isLocallyManagedHubProjection(_ event: CalendarEvent) -> Bool {
         guard let marker = MarkedEventTitle.marker(in: event.title) else { return false }
-        return managedPrefixes.contains(marker)
+        return currentWorkPrefixes.contains(marker)
     }
 
     func hasValidMarker(_ event: CalendarEvent) -> Bool { MarkedEventTitle.marker(in: event.title) != nil }

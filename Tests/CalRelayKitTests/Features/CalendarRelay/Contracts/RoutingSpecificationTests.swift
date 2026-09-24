@@ -5,6 +5,7 @@ enum RoutingSpecificationTests {
     static func runAll() async throws {
         try testRelayDirectionUsesExactMarkersAndMarkedHubAuthority()
         try await testStaleLocalHubProjectionIsExcludedFromLogicalHub()
+        try await testPersonalMarkedHubEventRemainsAuthoritative()
         try await testTwoMachinesConvergeThroughSharedHubWithoutRemoteMarkerRegistry()
         try await testExternalMarkedHubEventRemainsAuthoritativeAndWorkDeletionStaysLocal()
         try await testIndependentWindowsLimitCrossMachineCoverageToTheirOverlap()
@@ -88,6 +89,42 @@ enum RoutingSpecificationTests {
                 projection.destinationCalendar == identity(topology.workB)
                     && projection.title == staleHubProjection.title
             }, "A stale locally owned hub projection should not route for an extra cycle")
+    }
+
+    private static func testPersonalMarkedHubEventRemainsAuthoritative() async throws {
+        let topology = routingTopology()
+        let interval = routingInterval()
+        let personalMarkedHubEvent = event(
+            id: "personal-marked-hub", calendar: identity(topology.hub), title: "[PERSONAL] Dentist",
+            start: interval.start, end: interval.end, availability: .free,
+            currentUserParticipantStatus: .declined)
+        let state = RoutingSharedCalendarState(events: [personalMarkedHubEvent])
+        let store = RoutingMachineCalendarStore(
+            visibleCalendars: [topology.hub, topology.workA, topology.workB], state: state)
+        let settings = settings(
+            hub: topology.hub, personalMarker: "[PERSONAL]", syncWindowDays: 10,
+            workCalendars: [(topology.workA, "[A]"), (topology.workB, "[B]")])
+        let useCase = reconciliation(store: store, calendar: utcCalendar())
+
+        let plan = try await useCase.apply(settings: settings, now: referenceDate())
+
+        try expect(
+            !plan.deletes.contains(personalMarkedHubEvent),
+            "A hub event carrying the configured personal marker should remain authoritative")
+        try expect(
+            Set(plan.creates.map(\.destinationCalendar.id)) == Set([topology.workA.id, topology.workB.id]),
+            "The personal marker should not exclude any configured work calendar as an origin")
+        try expect(
+            plan.creates.allSatisfy { $0.title == personalMarkedHubEvent.title },
+            "A personal-marked authoritative hub event should route unchanged despite response or availability")
+        try expect(
+            await state.events(in: topology.hub.id) == [personalMarkedHubEvent],
+            "Applying the plan should preserve the authoritative personal-marked hub event")
+
+        let settled = try await useCase.dryRun(settings: settings, now: referenceDate())
+        try expect(
+            settled.creates.isEmpty && settled.deletes.isEmpty,
+            "A personal-marked authoritative hub event should converge after routing")
     }
 
     private static func testTwoMachinesConvergeThroughSharedHubWithoutRemoteMarkerRegistry() async throws {
