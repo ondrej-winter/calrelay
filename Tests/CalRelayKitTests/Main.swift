@@ -1,8 +1,27 @@
 import Foundation
 
 @main struct CalRelayKitTestRunner {
+    private static let registeredFilters: Set<String> = [
+        "CalendarAccessPreflightTests", "CalendarAccessPrivacyTests", "CalendarAppBundleMetadataTests",
+        "CalendarAuthorizationTests", "CalendarAutomaticReconciliationTests", "CalendarAutomationCoordinationTests",
+        "CalendarAutomationPersistenceTests", "CalendarCleanupAccessTests", "CalendarConfigurationIdentityTests",
+        "CalendarConfigurationObservationTests", "CalendarConfigurationSchemaTests", "CalendarControlPanelStatusTests",
+        "CalendarListCommandHandlerTests", "CalendarLoginLaunchPolicyTests", "CalendarManualApplyFreshSnapshotTests",
+        "CalendarManualApplySafetyTests", "CalendarManualApplyTests", "CalendarManualCleanupFailureTests",
+        "CalendarManualCleanupReviewTests", "CalendarManualCleanupSnapshotTests", "CalendarManualCleanupTests",
+        "CalendarManualDryRunTests", "CalendarMutationExecutorTests", "CalendarNoPromptContractTests",
+        "CalendarReviewedActionTests", "CalendarStandingAuthorizationTests", "CalRelayCLISmokeTests",
+        "CalRelayContractTests", "ConfigCheckCommandHandlerTests", "EventKitExactEventOccurrenceResolverTests",
+        "FileCalendarRelaySettingsProviderTests", "OrdinaryReconciliationWindowTests", "ReconcileCommandHandlerTests",
+        "RoutingSpecificationTests", "ConfigurationFileSelectionTests"
+    ]
+
     static func main() async throws {
         let filters = Set(CommandLine.arguments.dropFirst())
+        let unknownFilters = filters.subtracting(registeredFilters)
+        guard unknownFilters.isEmpty else {
+            throw TestFailure("Unknown test suite filter(s): \(unknownFilters.sorted().joined(separator: ", "))")
+        }
         try await runConfigurationSuites(filters: filters)
         if filters.isEmpty || filters.contains("CalendarReviewedActionTests") {
             try CalendarReviewedActionTests.runAll()
@@ -14,9 +33,26 @@ import Foundation
         try await runAutomationSuites(filters: filters)
         if filters.isEmpty || filters.contains("CalendarManualCleanupTests") {
             try await CalendarManualCleanupTests.runAll()
+        } else {
+            if filters.contains("CalendarManualCleanupSnapshotTests") {
+                try await CalendarManualCleanupTests.runSnapshotTests()
+            }
+            if filters.contains("CalendarManualCleanupFailureTests") {
+                try await CalendarManualCleanupTests.runFailureTests()
+            }
+            if filters.contains("CalendarManualCleanupReviewTests") {
+                try await CalendarManualCleanupTests.runReviewTests()
+            }
         }
         if filters.isEmpty || filters.contains("CalendarManualApplyTests") {
             try await CalendarManualApplyTests.runAll()
+        } else {
+            if filters.contains("CalendarManualApplySafetyTests") {
+                try await CalendarManualApplyTests.runSafetyTests()
+            }
+            if filters.contains("CalendarManualApplyFreshSnapshotTests") {
+                try await CalendarManualApplyTests.runFreshSnapshotTests()
+            }
         }
         try await runCommandSuites(filters: filters)
         try await runContractSuites(filters: filters)
