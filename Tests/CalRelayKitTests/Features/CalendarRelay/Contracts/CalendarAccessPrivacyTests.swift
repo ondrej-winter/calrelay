@@ -8,6 +8,7 @@ enum CalendarAccessPrivacyTests {
         try testCleanupErrorsRemainAggregateAndActionable()
     }
 
+    // ACCESS-AC-09: readiness and access failures omit protected runtime details.
     private static func testReadinessAndAccessFailuresOmitProtectedIdentifiersAndEventDetails() async throws {
         let fixture = PrivacyAccessFixture()
 
@@ -43,6 +44,7 @@ enum CalendarAccessPrivacyTests {
         }
     }
 
+    // ACCESS-AC-09: partial mutation diagnostics remain aggregate and privacy-safe.
     private static func testMutationFailureOmitsProtectedIdentifiersAndEventDetails() async throws {
         let fixture = PrivacyAccessFixture()
         let event = CalendarEvent(
@@ -75,6 +77,7 @@ enum CalendarAccessPrivacyTests {
         throw TestFailure("Expected a mutation failure")
     }
 
+    // ACCESS-AC-09: cleanup errors disclose only aggregate actionable information.
     private static func testCleanupErrorsRemainAggregateAndActionable() throws {
         let partial = CalendarMutationPartialResult(
             confirmedCounts: [CalendarRoleMutationCounts(role: .hub, confirmedDeletes: 1, confirmedCreates: 0)],

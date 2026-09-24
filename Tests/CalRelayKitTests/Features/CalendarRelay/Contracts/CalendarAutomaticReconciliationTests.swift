@@ -78,6 +78,7 @@ enum CalendarAutomaticReconciliationTests {
             "Empty success should update last-success freshness")
     }
 
+    // ACCESS-AC-01: automatic and retry attempts inspect authorization without requesting.
     private static func testAutomaticAndRetryAttemptsNeverRequestCalendarAccess() async throws {
         let fixture = AutomaticReconciliationFixture()
 
@@ -305,6 +306,7 @@ enum CalendarAutomaticReconciliationTests {
             "Temporary unavailable access should preserve a still-matching standing grant")
     }
 
+    // ACCESS-AC-01: authorization revocation remains non-prompting on the next attempt.
     private static func testAuthorizationRevocationBetweenAttemptsDoesNotRequestAgain() async throws {
         let fixture = AutomaticReconciliationFixture()
         let authorization = RequestCapableAutomaticAuthorization(state: .fullAccess)

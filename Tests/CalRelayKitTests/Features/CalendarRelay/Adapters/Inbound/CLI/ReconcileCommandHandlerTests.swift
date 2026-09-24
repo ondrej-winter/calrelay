@@ -225,6 +225,7 @@ enum ReconcileCommandHandlerTests {
         throw TestFailure("Expected ordinary apply mutation failure")
     }
 
+    // ACCESS-AC-09: explicitly requested successful CLI explanation may disclose approved identifiers.
     private static func testReconcileHandlerFormatsExplanationFromInjectedStoreAndConfig() async throws {
         let fixture = explanationPrivacyFixture()
         let staleHubEvent = CalendarEvent(
@@ -279,6 +280,7 @@ enum ReconcileCommandHandlerTests {
         try expect((await store.deletedEvents()).isEmpty, "Explanation should not delete events")
     }
 
+    // ACCESS-AC-09: failed explanation emits neither partial output nor protected identifiers.
     private static func testExplanationAccessFailureEmitsNoPartialOutputOrIdentifiers() async throws {
         let fixture = explanationPrivacyFixture()
         let protectedHubEvent = CalendarEvent(
@@ -480,6 +482,7 @@ enum ReconcileCommandHandlerTests {
         }
     }
 
+    // ACCESS-AC-09: cleanup review discloses only its approved transient fields.
     private static func testCleanupDryRunReportsCompleteRoleSummariesAndPrivateOrderedReview() async throws {
         let now = Date(timeIntervalSince1970: 10_000)
         let hubCalendar = RelayCalendar(
@@ -610,6 +613,7 @@ enum ReconcileCommandHandlerTests {
         try expect((await store.createdEvents()).isEmpty, "Cleanup apply should never create ordinary projections")
     }
 
+    // ACCESS-AC-09: cleanup partial-failure output remains aggregate and privacy-safe.
     private static func testCleanupApplyFailureOnlyConfirmsCompletedActionsAndStaysPrivate() async throws {
         let fixture = reconciliationFixture()
         let hub = CalendarIdentity(

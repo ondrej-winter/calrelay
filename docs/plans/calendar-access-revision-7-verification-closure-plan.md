@@ -2,7 +2,7 @@
 
 ## Plan record
 
-- **Status:** In progress; `CAV-01` through `CAV-04` are complete, and `CAV-05` is next.
+- **Status:** Complete; `CAV-01` through `CAV-05` are complete.
 - **Prepared:** September 22, 2026.
 - **Canonical requirements:**
   `/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay/docs/specs/calendar-access-spec.md`,
@@ -14,9 +14,9 @@
   coordination, persistence, reconciliation, cleanup, or app-lifecycle work;
   manual EventKit or real-calendar acceptance; and changes to the accepted
   specification without a newly discovered contract conflict.
-- **Readiness:** No unresolved product decision or implementation blocker is
-  known. Current evidence indicates verification gaps rather than a known
-  production behavior defect.
+- **Readiness:** Verification closure is complete. No unresolved product
+  decision, implementation blocker, or known calendar-access behavior defect
+  remains in this plan.
 
 The canonical specification defines seven required outcomes, `ACCESS-01`
 through `ACCESS-07`, and fifteen acceptance checks, `ACCESS-AC-01` through
@@ -54,46 +54,40 @@ Any production correction discovered by the planned tests must:
 
 | Outcome | Implementation state | Automated-verification state | Remaining closure |
 | --- | --- | --- | --- |
-| `ACCESS-01` — Permission ownership and authorization states | Implemented | **Directly tested.** `CalendarAuthorizationTests` proves setup requests only for `.notDetermined`; `CalendarNoPromptContractTests` plus `CalendarAutomaticReconciliationTests` prove inventory, config check, ordinary CLI and app operations, cleanup, standing authorization, automatic ordinary runs, retries, and revocation never request; and `CalendarAppBundleMetadataTests` plus the guarded app build prove the production permission metadata remains present while the fake UI-test host remains permission-free. | None. |
-| `ACCESS-02` — Calendar discovery | Implemented | **Directly tested.** Configuration-independent inventory, empty success, CLI IDs and writability, app ID omission, and separation from configured readiness are covered. | None; retain the existing tests. |
-| `ACCESS-03` — Ordinary configured-topology readiness | Implemented | **Directly tested.** Shared preflight covers authorization, missing, ambiguous, colliding, unreadable, and read-only roles; ordered reads, aggregation, no-prompt behavior, and no-mutation gates are covered across reusable, CLI, manual-app, and automatic paths. | None; retain the existing tests. |
-| `ACCESS-04` — Legacy-cleanup preflight | Implemented | **Directly tested.** Complete-range reads, all-role gating, no-prompt behavior, ordered verification, remaining-match failure, verification-read failure, no rollback, and exact recurring-occurrence resolution are covered. | None. |
-| `ACCESS-05` — Failure after mutation begins | Implemented | **Directly tested.** Ordered confirmation, stop-on-first-failure, partial counts, no rollback, empty ordinary success, and no ordinary verification reread are covered. | None. |
-| `ACCESS-06` — Privacy-safe diagnostics and cleanup review | Implemented | **Directly tested.** Sentinel-backed tests cover approved CLI inventory and explanation disclosure plus readiness, failure, cleanup, app, automatic-notification, and serialized-state denylists. | None. |
-| `ACCESS-07` — EventKit boundary | Implemented | **Directly tested.** Opaque physical identities, ordered snapshots, reviewed-action identity, topology binding, and the deterministic exact-occurrence zero/one/many decision consumed by `EventKitCalendarStore` are covered. | None. |
+| `ACCESS-01` — Permission ownership and authorization states | Implemented | **Directly tested.** The exact `ACCESS-AC-01` evidence below covers setup-only requests, every non-setup operation, automatic retry and revocation, and packaged permission metadata. | None. |
+| `ACCESS-02` — Calendar discovery | Implemented | **Directly tested.** `CalendarAuthorizationTests.testInventoryReturnsEmptySuccessfulInventory`, `CalendarListCommandHandlerTests.testCalendarListHandlerFormatsCalendarsFromInjectedStore`, `CalendarListCommandHandlerTests.testCalendarListHandlerTreatsEmptyInventoryAsSuccessWithoutReadinessClaim`, `CalendarListCommandHandlerTests.testCalendarListHandlerReportsReadOnlyCalendars`, and `CalendarListCommandHandlerTests.testAppInventoryFormattingOmitsEventKitCalendarIDs`. | None. |
+| `ACCESS-03` — Ordinary configured-topology readiness | Implemented | **Directly tested.** `CalendarAccessPreflightTests.testPreflightAggregatesTopologyFailuresAndReadsResolvableRolesInOrder`, `CalendarAccessPreflightTests.testReadyPreflightReturnsCompleteOrderedSnapshotWithoutMutation`, `ConfigCheckCommandHandlerTests.testConfigCheckReportsReadyTopologyWithoutMutation`, `ReconcileCommandHandlerTests.testOrdinaryModesUseOrdinaryAccessWindow`, `CalendarManualDryRunTests.testDryRunLoadsFreshSettingsAndReturnsAggregateCountsWithoutMutation`, `CalendarManualApplyTests.testReviewRequiresOneUseConfirmationAndFreshPreflight`, and `CalendarAutomaticReconciliationTests.testAutomaticPreflightFailuresPreventAllMutations`. | None. |
+| `ACCESS-04` — Legacy-cleanup preflight | Implemented | **Directly tested.** `CalendarCleanupAccessTests.testCleanupDryRunSelectsOnlyExactLegacyMarkersInTopologyOrder`, `CalendarCleanupAccessTests.testCleanupApplyVerifiesCompleteRangeAfterDeletes`, `CalendarCleanupAccessTests.testCleanupApplyFailsWhenVerificationFindsRemainingMatchWithoutRollback`, `CalendarCleanupAccessTests.testCleanupApplyFailsWhenVerificationReadFailsWithoutRollback`, `CalendarManualCleanupTests.testReviewApplyAndOneUseConfirmation`, and `EventKitExactEventOccurrenceResolverTests.testResolvesOnlyTheExactPlannedOccurrence`, `EventKitExactEventOccurrenceResolverTests.testMissingExactOccurrenceThrowsEventNotFound`, and `EventKitExactEventOccurrenceResolverTests.testDuplicateExactCandidatesThrowEventAmbiguous`. | None. |
+| `ACCESS-05` — Failure after mutation begins | Implemented | **Directly tested.** `CalendarMutationExecutorTests.testExecutorConfirmsOrderedActionsAfterSuccess`, `CalendarMutationExecutorTests.testExecutorStopsAtFirstFailureAndReportsPrivacySafeCounts`, `CalendarMutationExecutorTests.testExecutorTreatsEmptyPlanAsSuccess`, `ReconcileCommandHandlerTests.testApplyFailureOnlyConfirmsCompletedActions`, `CalendarManualApplyTests.testPartialFailureConsumesConfirmationAndOmitsDetails`, and `CalendarAutomaticReconciliationTests.testPartialMutationPersistsOnlyAggregateConfirmedCounts`. | None. |
+| `ACCESS-06` — Privacy-safe diagnostics and cleanup review | Implemented | **Directly tested.** The exact sentinel-backed tests listed for `ACCESS-AC-09` and `ACCESS-AC-11` below cover approved CLI disclosure and readiness, failure, cleanup, app, automatic-notification, and serialized-state denylists. | None. |
+| `ACCESS-07` — EventKit boundary | Implemented | **Directly tested.** `CalendarAuthorizationTests.testOpaqueProviderReferencesPreserveIdentityWithoutStringExposure`, `CalendarAccessPreflightTests.testReadyPreflightReturnsCompleteOrderedSnapshotWithoutMutation`, `CalendarReviewedActionTests.runAll`, `CalendarConfigurationIdentityTests.testResolvedTopologyOrderAndContinuityDeriveDifferentBindings`, and `EventKitExactEventOccurrenceResolverTests.testResolvesOnlyTheExactPlannedOccurrence`, `EventKitExactEventOccurrenceResolverTests.testMissingExactOccurrenceThrowsEventNotFound`, and `EventKitExactEventOccurrenceResolverTests.testDuplicateExactCandidatesThrowEventAmbiguous` cover opaque physical identity, ordered snapshots, reviewed-action identity, topology binding, and exact recurring-occurrence resolution. | None. |
 
 ## Acceptance-check traceability
 
-| Acceptance check | Verification state | Existing automated evidence | Concrete remaining gap |
+| Acceptance check | Verification state | Exact automated evidence | Remaining gap |
 | --- | --- | --- | --- |
-| `ACCESS-AC-01` | **Directly tested** | `CalendarAuthorizationTests`, `CalendarNoPromptContractTests`, `CalendarAutomaticReconciliationTests`, `CalendarAppBundleMetadataTests`, and the guarded app build | None. |
-| `ACCESS-AC-02` | **Directly tested** | `CalendarAuthorizationTests`, `CalendarListCommandHandlerTests`, and `CalRelayContractTests` | None. |
-| `ACCESS-AC-03` | **Directly tested** | `CalendarAccessPreflightTests`, `ConfigCheckCommandHandlerTests`, `ReconcileCommandHandlerTests`, `CalendarManualDryRunTests`, `CalendarManualApplyTests`, and `CalendarAutomaticReconciliationTests` | None. |
-| `ACCESS-AC-04` | **Directly tested** | `ConfigCheckCommandHandlerTests` | None. |
-| `ACCESS-AC-05` | **Directly tested** | `CalendarCleanupAccessTests`, `CalendarManualCleanupTests`, and `ReconcileCommandHandlerTests` | None. |
-| `ACCESS-AC-06` | **Directly tested** | `CalendarAccessPreflightTests` and the manual and automatic preflight suites | None. |
-| `ACCESS-AC-07` | **Directly tested** | `CalendarCleanupAccessTests`, `CalendarManualCleanupFailureTests`, and CLI cleanup tests | None. |
-| `ACCESS-AC-08` | **Directly tested** | `CalendarMutationExecutorTests`, manual apply and cleanup failure tests, and automatic reconciliation tests | None. |
-| `ACCESS-AC-09` | **Directly tested** | `CalendarAccessPrivacyTests`, `CalendarListCommandHandlerTests`, `ReconcileCommandHandlerTests`, `CalendarManualCleanupTests`, and `CalendarAutomationPersistenceTests` | None. |
-| `ACCESS-AC-10` | **Directly tested** | Fake-backed custom runner and framework-free domain and application APIs | None. All new tests must remain deterministic, fake-backed, offline, and independent of live EventKit access. |
-| `ACCESS-AC-11` | **Directly tested** | Sentinel-backed cleanup presentation, real automatic-operation outcome and attention, and UserDefaults serialization tests | None. |
-| `ACCESS-AC-12` | **Directly tested** | `testResolvesOnlyTheExactPlannedOccurrence`, `testMissingExactOccurrenceThrowsEventNotFound`, and `testDuplicateExactCandidatesThrowEventAmbiguous` in `EventKitExactEventOccurrenceResolverTests` | None. |
-| `ACCESS-AC-13` | **Directly tested** | Ordinary, cleanup, cleanup-verification, and automatic ordered-read tests | None. |
-| `ACCESS-AC-14` | **Directly tested** | `CalendarReviewedActionTests`, configuration identity, standing authorization, and opaque-reference tests | None. |
-| `ACCESS-AC-15` | **Directly tested** | Mutation executor, CLI ordinary apply, cleanup verification, manual apply, and automatic reconciliation tests | None. |
+| `ACCESS-AC-01` | **Directly tested** | `CalendarAuthorizationTests.testSetupRequestsOnlyWhenAuthorizationIsNotDetermined`; `CalendarAuthorizationTests.testSetupDoesNotRequestForSettledAuthorizationStates`; `CalendarNoPromptContractTests.testInventoryAndConfigCheckNeverRequestCalendarAccess`; `CalendarNoPromptContractTests.testCLIOrdinaryOperationsNeverRequestCalendarAccess`; `CalendarNoPromptContractTests.testManualAppOrdinaryOperationsNeverRequestCalendarAccess`; `CalendarNoPromptContractTests.testCleanupOperationsNeverRequestCalendarAccess`; `CalendarNoPromptContractTests.testStandingAuthorizationNeverRequestsCalendarAccess`; `CalendarAutomaticReconciliationTests.testAutomaticAndRetryAttemptsNeverRequestCalendarAccess`; `CalendarAutomaticReconciliationTests.testAuthorizationRevocationBetweenAttemptsDoesNotRequestAgain`; `CalendarAppBundleMetadataTests.testProductionSourceInfoPlistContainsNonemptyCalendarUsageDescriptions`; `CalendarAppBundleMetadataTests.testUITestHostSourceInfoPlistOmitsCalendarUsageDescriptions`; `CalendarAppBundleMetadataTests.testAppBuildRejectsMissingCalendarUsageDescriptions`; and `CalendarAppBundleMetadataTests.testAppBuildRejectsEmptyCalendarUsageDescriptions`. | None. |
+| `ACCESS-AC-02` | **Directly tested** | `CalendarAuthorizationTests.testInventoryReturnsEmptySuccessfulInventory`; `CalendarListCommandHandlerTests.testCalendarListHandlerFormatsCalendarsFromInjectedStore`; `CalendarListCommandHandlerTests.testCalendarListHandlerTreatsEmptyInventoryAsSuccessWithoutReadinessClaim`; and `CalendarListCommandHandlerTests.testCalendarListHandlerReportsReadOnlyCalendars`. | None. |
+| `ACCESS-AC-03` | **Directly tested** | `CalendarAccessPreflightTests.testPreflightAggregatesTopologyFailuresAndReadsResolvableRolesInOrder`; `CalendarAccessPreflightTests.testReadyPreflightReturnsCompleteOrderedSnapshotWithoutMutation`; `ConfigCheckCommandHandlerTests.testConfigCheckReportsReadyTopologyWithoutMutation`; `ReconcileCommandHandlerTests.testOrdinaryModesUseOrdinaryAccessWindow`; `CalendarManualDryRunTests.testDryRunLoadsFreshSettingsAndReturnsAggregateCountsWithoutMutation`; `CalendarManualApplyTests.testReviewRequiresOneUseConfirmationAndFreshPreflight`; and `CalendarAutomaticReconciliationTests.testAutomaticPreflightFailuresPreventAllMutations`. | None. |
+| `ACCESS-AC-04` | **Directly tested** | `ConfigCheckCommandHandlerTests.testMigrationPendingConfigCheckStillRunsPreflightAndFails` and `ConfigCheckCommandHandlerTests.testMigrationPendingConfigCheckAggregatesPreflightFailuresWithoutReadinessClaim`. | None. |
+| `ACCESS-AC-05` | **Directly tested** | `CalendarCleanupAccessTests.testCleanupDryRunSelectsOnlyExactLegacyMarkersInTopologyOrder`; `CalendarCleanupAccessTests.testCleanupApplyVerifiesCompleteRangeAfterDeletes`; `CalendarManualCleanupTests.testReviewApplyAndOneUseConfirmation`; `ReconcileCommandHandlerTests.testCleanupModesUseCleanupAccessWindow`; and `ReconcileCommandHandlerTests.testCleanupApplyEmitsFreshReviewAndProgressiveConfirmation`. | None. |
+| `ACCESS-AC-06` | **Directly tested** | `CalendarAccessPreflightTests.testPreflightAggregatesTopologyFailuresAndReadsResolvableRolesInOrder`; `CalendarAutomaticReconciliationTests.testAutomaticPreflightFailuresPreventAllMutations`; `CalendarManualApplyTests.testConfigurationChangesBeforeFirstMutationAbort`; and `CalendarManualCleanupTests.testConfigurationRaceVetoesAllDeletion`. | None. |
+| `ACCESS-AC-07` | **Directly tested** | `CalendarCleanupAccessTests.testCleanupApplyVerifiesCompleteRangeAfterDeletes`; `CalendarCleanupAccessTests.testCleanupApplyFailsWhenVerificationFindsRemainingMatchWithoutRollback`; `CalendarCleanupAccessTests.testCleanupApplyFailsWhenVerificationReadFailsWithoutRollback`; and `CalendarManualCleanupTests.testReviewApplyAndOneUseConfirmation`. | None. |
+| `ACCESS-AC-08` | **Directly tested** | `CalendarMutationExecutorTests.testExecutorStopsAtFirstFailureAndReportsPrivacySafeCounts`; `CalendarManualApplyTests.testPartialFailureConsumesConfirmationAndOmitsDetails`; `CalendarManualCleanupTests.testFailuresPreserveConfirmedCounts`; and `CalendarAutomaticReconciliationTests.testPartialMutationPersistsOnlyAggregateConfirmedCounts`. | None. |
+| `ACCESS-AC-09` | **Directly tested** | `CalendarAccessPrivacyTests.testReadinessAndAccessFailuresOmitProtectedIdentifiersAndEventDetails`; `CalendarAccessPrivacyTests.testMutationFailureOmitsProtectedIdentifiersAndEventDetails`; `CalendarAccessPrivacyTests.testCleanupErrorsRemainAggregateAndActionable`; `CalendarListCommandHandlerTests.testCalendarListHandlerFormatsCalendarsFromInjectedStore`; `CalendarListCommandHandlerTests.testAppInventoryFormattingOmitsEventKitCalendarIDs`; `ReconcileCommandHandlerTests.testReconcileHandlerFormatsExplanationFromInjectedStoreAndConfig`; `ReconcileCommandHandlerTests.testExplanationAccessFailureEmitsNoPartialOutputOrIdentifiers`; `ReconcileCommandHandlerTests.testCleanupDryRunReportsCompleteRoleSummariesAndPrivateOrderedReview`; `ReconcileCommandHandlerTests.testCleanupApplyFailureOnlyConfirmsCompletedActionsAndStaysPrivate`; `CalendarManualCleanupTests.testReviewPrivacyAndExecutionOrder`; `CalendarAutomationPersistenceTests.testRuntimeDescriptionsAndAttentionOutputRemainOpaque`; and `CalendarAutomationPersistenceTests.testAutomaticOperationPersistsAndNotifiesWithoutSensitiveInputs`. | None. |
+| `ACCESS-AC-10` | **Directly tested** | `CalendarAccessPreflightTests.testReadyPreflightReturnsCompleteOrderedSnapshotWithoutMutation` and `CalendarMutationExecutorTests.testExecutorConfirmsOrderedActionsAfterSuccess` execute through fake ports without live EventKit access; the complete custom `CalRelayKitTests` runner and `make check` compile and execute the framework-free domain and application boundaries. | None. |
+| `ACCESS-AC-11` | **Directly tested** | `CalendarManualCleanupTests.testReviewPrivacyAndExecutionOrder`; `CalendarAutomationPersistenceTests.testRuntimeDescriptionsAndAttentionOutputRemainOpaque`; and `CalendarAutomationPersistenceTests.testAutomaticOperationPersistsAndNotifiesWithoutSensitiveInputs`. | None. |
+| `ACCESS-AC-12` | **Directly tested** | `EventKitExactEventOccurrenceResolverTests.testResolvesOnlyTheExactPlannedOccurrence`; `EventKitExactEventOccurrenceResolverTests.testMissingExactOccurrenceThrowsEventNotFound`; and `EventKitExactEventOccurrenceResolverTests.testDuplicateExactCandidatesThrowEventAmbiguous`. | None. |
+| `ACCESS-AC-13` | **Directly tested** | `CalendarAccessPreflightTests.testReadyPreflightReturnsCompleteOrderedSnapshotWithoutMutation`; `CalendarCleanupAccessTests.testCleanupDryRunSelectsOnlyExactLegacyMarkersInTopologyOrder`; `CalendarCleanupAccessTests.testCleanupApplyVerifiesCompleteRangeAfterDeletes`; and `CalendarAutomaticReconciliationTests.testFreshAuthorizedAttemptAppliesAndPersistsAggregateSuccess`. | None. |
+| `ACCESS-AC-14` | **Directly tested** | `CalendarReviewedActionTests.runAll`; `CalendarConfigurationIdentityTests.testResolvedTopologyOrderAndContinuityDeriveDifferentBindings`; `CalendarAutomationPersistenceTests.testBindingIsSemanticVersionedAndOpaque`; and `CalendarAuthorizationTests.testOpaqueProviderReferencesPreserveIdentityWithoutStringExposure`. | None. |
+| `ACCESS-AC-15` | **Directly tested** | `CalendarMutationExecutorTests.testExecutorConfirmsOrderedActionsAfterSuccess`; `CalendarMutationExecutorTests.testExecutorTreatsEmptyPlanAsSuccess`; `ReconcileCommandHandlerTests.testEmptyApplyReportsSuccessfulNoChange`; `CalendarManualApplyTests.testReviewRequiresOneUseConfirmationAndFreshPreflight`; `CalendarAutomaticReconciliationTests.testReadyEmptyPlanUpdatesSuccessWithoutMutation`; and `CalendarCleanupAccessTests.testCleanupApplyVerifiesCompleteRangeAfterDeletes`. | None. |
 
-Every acceptance check now has direct automated evidence. `CAV-05` remains as the
-integration checkpoint for final traceability and complete-gate confirmation.
+Every required outcome and acceptance check has exact automated evidence. `CAV-05`
+is the final integration checkpoint.
 
 ## Execution summary
 
-Execute `CAV-01` through `CAV-04` before the integration checkpoint `CAV-05`.
-The first four tasks are logically independent, but apply them sequentially if
-each changes
-`/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay/Tests/CalRelayKitTests/Main.swift`
-to avoid overlapping suite-registration edits.
-
-The next executable task is `CAV-05`. No task is blocked.
+`CAV-01` through `CAV-05` are complete. No task is blocked.
 
 ## Detailed tasks
 
@@ -445,7 +439,7 @@ the metadata failure.
   and the fake UI-test-host property list remains free of Calendar permission
   metadata.
 
-### [ ] CAV-05 — Integrate traceability and run the complete automated gate
+### [x] CAV-05 — Integrate traceability and run the complete automated gate
 
 **Dependencies:** `CAV-01`, `CAV-02`, `CAV-03`, `CAV-04`.
 
@@ -483,18 +477,18 @@ not require UI automation unless its scope expands into the listed app surfaces.
 
 #### Acceptance and verification
 
-- [ ] **CAV-05-AC1:** Every new suite provides `runAll()` and is registered in
+- [x] **CAV-05-AC1:** Every new suite provides `runAll()` and is registered in
   the custom runner at
   `/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay/Tests/CalRelayKitTests/Main.swift`.
-- [ ] **CAV-05-AC2:** The final traceability maps every `ACCESS-01` through
+- [x] **CAV-05-AC2:** The final traceability maps every `ACCESS-01` through
   `ACCESS-07` outcome and every `ACCESS-AC-01` through `ACCESS-AC-15` check to
   passing automated evidence.
-- [ ] **CAV-05-AC3:** No manual or live EventKit observation is represented as
+- [x] **CAV-05-AC3:** No manual or live EventKit observation is represented as
   an automated pass.
-- [ ] **CAV-05-AC4:** No completed scheduling, persistence, coordination,
+- [x] **CAV-05-AC4:** No completed scheduling, persistence, coordination,
   reconciliation, or cleanup work is reimplemented.
-- [ ] **CAV-05-V1:** Every focused task suite passes.
-- [ ] **CAV-05-V2:** The repository formatting and quality gates pass:
+- [x] **CAV-05-V1:** Every focused task suite passes.
+- [x] **CAV-05-V2:** The repository formatting and quality gates pass:
 
   ```sh
   cd '/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay' && \
@@ -502,25 +496,48 @@ not require UI automation unless its scope expands into the listed app surfaces.
   make check
   ```
 
-- [ ] **CAV-05-V3:** The app build and bundle validation pass:
+- [x] **CAV-05-V3:** The app build and bundle validation pass:
 
   ```sh
   cd '/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay' && \
   make app
   ```
 
-- [ ] **CAV-05-V4:** The final diff contains no whitespace errors:
+- [x] **CAV-05-V4:** The final diff contains no whitespace errors:
 
   ```sh
   cd '/Users/owinter/Documents/Projects/ondrej-winter.nosync/calrelay' && \
   git --no-pager diff HEAD --check
   ```
 
-- [ ] **CAV-05-V5:** Each conditional check is either run and passes or is
+- [x] **CAV-05-V5:** Each conditional check is either run and passes or is
   reported as not applicable with its scope reason.
+
+- **Passing evidence:** The CAV-01 through CAV-04 focused suites all passed in one
+  custom-runner invocation: `CalendarAuthorizationTests`,
+  `CalendarNoPromptContractTests`, `CalendarAutomaticReconciliationTests`,
+  `EventKitExactEventOccurrenceResolverTests`, `CalendarAccessPrivacyTests`,
+  `CalendarListCommandHandlerTests`, `ReconcileCommandHandlerTests`,
+  `CalendarManualCleanupTests`, `CalendarAutomationPersistenceTests`, and
+  `CalendarAppBundleMetadataTests`. The newly added suites each expose `runAll()`
+  and are registered in `Tests/CalRelayKitTests/Main.swift`.
+- **Verification result (September 23, 2026):** The focused union passed with
+  `CalRelayKitTests passed`. `make format-check` exited successfully with the
+  repository’s existing non-fatal formatter warnings. `make check` passed strict
+  SwiftLint with 0 violations, `swift build`, the complete custom test runner,
+  and all four CLI help smoke checks. `make app` built and strictly verified the
+  signed bundle; `plutil` extracted both required Calendar usage-description
+  strings from the final bundle, and `codesign --verify --deep --strict` passed.
+  `git --no-pager diff HEAD --check` passed after the final documentation update.
+  The CLI-entry/composition smoke check was not applicable because no source
+  under `Sources/CalRelayCLI` changed. UI automation was not applicable because
+  no app UI, accessibility, fake UI composition, UI-test-host, or UI-test source
+  changed. No manual or live EventKit observation is recorded as automated
+  evidence, no accepted specification changed, and no completed product behavior
+  was reimplemented.
 
 ## Handoff
 
-Begin with `CAV-01`. Keep all tests deterministic, isolated, fake-backed, and
-offline. Do not request live Calendar permission, open real calendars, or mutate
-EventKit data as part of this plan's automated verification.
+Verification closure is complete. Keep all tests deterministic, isolated,
+fake-backed, and offline. Do not request live Calendar permission, open real
+calendars, or mutate EventKit data as part of ordinary automated verification.

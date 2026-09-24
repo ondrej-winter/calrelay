@@ -8,6 +8,7 @@ enum CalendarListCommandHandlerTests {
         try testAppInventoryFormattingOmitsEventKitCalendarIDs()
     }
 
+    // ACCESS-AC-09: successful CLI inventory may disclose approved calendar identifiers.
     private static func testCalendarListHandlerFormatsCalendarsFromInjectedStore() async throws {
         let store = CommandHandlerCalendarStore(calendars: [hubCalendar()])
         let authorization = CalendarListAuthorizationStatus(state: .fullAccess)
@@ -50,6 +51,7 @@ enum CalendarListCommandHandlerTests {
         try expect(output.contains("read-only"), "Inventory should report read-only status")
     }
 
+    // ACCESS-AC-09: app inventory omits EventKit calendar identifiers.
     private static func testAppInventoryFormattingOmitsEventKitCalendarIDs() throws {
         let output = CalendarListFormatter.formatForApp([hubCalendar()])
 

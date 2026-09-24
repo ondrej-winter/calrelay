@@ -8,6 +8,7 @@ extension CalendarManualCleanupTests {
         try await testConcurrentConfirmationAndReviewAreRejected()
     }
 
+    // ACCESS-AC-09, ACCESS-AC-11: app cleanup review uses its narrow transient disclosure allowlist.
     private static func testReviewPrivacyAndExecutionOrder() async throws {
         let now = Date(timeIntervalSince1970: 10_000)
         let calendar: Calendar = {

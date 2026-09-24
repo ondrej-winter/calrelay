@@ -45,6 +45,7 @@ enum CalendarAutomationPersistenceTests {
             "Opaque authorization debug output must not expose its digest or inputs")
     }
 
+    // ACCESS-AC-09, ACCESS-AC-11: runtime identity and app attention output remain opaque.
     private static func testRuntimeDescriptionsAndAttentionOutputRemainOpaque() throws {
         let settings = sensitiveSettings()
         let calendars = physicalCalendars()
@@ -73,6 +74,7 @@ enum CalendarAutomationPersistenceTests {
         }
     }
 
+    // ACCESS-AC-09, ACCESS-AC-11: persisted app status and notifications retain only allowlisted data.
     private static func testAutomaticOperationPersistsAndNotifiesWithoutSensitiveInputs() async throws {
         let fixture = try AutomationPrivacyOperationFixture()
         let defaultsFixture = defaultsFixture()
