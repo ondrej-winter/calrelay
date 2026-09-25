@@ -12,6 +12,7 @@ enum CalendarCleanupAccessTests {
         try await testAuthorizationGateCanVetoFreshPlan()
         try await testCleanupRangeUsesPositiveOverlapAndRetainsCompleteIntervals()
         try await testCleanupDryRunSelectsOnlyExactLegacyMarkersInTopologyOrder()
+        try testCleanupPlannerUsesCompleteWithinCalendarOrder()
         try await testCleanupApplyVerifiesCompleteRangeAfterDeletes()
         try await testCleanupApplyFailsWhenVerificationFindsRemainingMatchWithoutRollback()
         try await testCleanupApplyFailsWhenVerificationReadFailsWithoutRollback()
@@ -204,6 +205,41 @@ enum CalendarCleanupAccessTests {
         try expect(await store.mutationCount() == 0, "Cleanup dry-run must not mutate")
     }
 
+    private static func testCleanupPlannerUsesCompleteWithinCalendarOrder() throws {
+        let calendar = RelayCalendar(id: "hub", title: "Hub", sourceTitle: "iCloud", isWritable: true)
+        let earlyStart = event(id: "early-start", calendar: calendar, title: "[OLD] Later title", start: 1_000, end: 9_000)
+        let earlyEnd = event(id: "early-end", calendar: calendar, title: "[OLD] Later title", start: 2_000, end: 3_000)
+        let uppercase = event(id: "uppercase", calendar: calendar, title: "[OLD] Alpha", start: 2_000, end: 4_000)
+        let lowercase = event(id: "lowercase", calendar: calendar, title: "[OLD] alpha", start: 2_000, end: 4_000)
+        let accented = event(id: "accented", calendar: calendar, title: "[OLD] Álpha", start: 2_000, end: 4_000)
+        let earlierOccurrence = event(
+            id: "series", calendar: calendar, title: "[OLD] Ωmega", start: 2_000, end: 4_000,
+            occurrenceDate: Date(timeIntervalSince1970: 10_000))
+        let laterOccurrence = event(
+            id: "series", calendar: calendar, title: "[OLD] Ωmega", start: 2_000, end: 4_000,
+            occurrenceDate: Date(timeIntervalSince1970: 20_000))
+        let allDay = event(
+            id: "all-day", calendar: calendar, title: "[OLD] Aardvark", start: 2_000, end: 4_000,
+            isAllDay: true)
+        let snapshot = CalendarAccessPreflightSnapshot(
+            window: CalendarAccessWindow(start: Date(timeIntervalSince1970: 0), end: Date(timeIntervalSince1970: 30_000)),
+            calendars: [
+                PreflightCalendarSnapshot(
+                    role: .hub,
+                    selector: CalendarSelector(sourceTitle: calendar.sourceTitle, calendarTitle: calendar.title),
+                    calendar: CalendarIdentity(id: calendar.id, title: calendar.title, sourceTitle: calendar.sourceTitle),
+                    events: [allDay, laterOccurrence, lowercase, earlyEnd, accented, earlyStart, earlierOccurrence, uppercase])
+            ])
+
+        let plan = CalendarCleanupPlanner.plan(snapshot: snapshot, legacyMarkers: ["[OLD]"])
+
+        try expect(
+            plan.deletions.map(\.event) == [
+                earlyStart, earlyEnd, uppercase, lowercase, accented, earlierOccurrence, laterOccurrence, allDay
+            ],
+            "Cleanup must order by start, end, timed before all-day, Unicode scalars, then exact occurrence identity")
+    }
+
     private static func testCleanupApplyVerifiesCompleteRangeAfterDeletes() async throws {
         let calendars = readyCalendars()
         let store = CleanupCalendarStore(
@@ -341,14 +377,15 @@ enum CalendarCleanupAccessTests {
     }
 
     private static func event(
-        id: String, calendar: RelayCalendar, title: String, start: TimeInterval, end: TimeInterval? = nil
+        id: String, calendar: RelayCalendar, title: String, start: TimeInterval, end: TimeInterval? = nil,
+        isAllDay: Bool = false, occurrenceDate: Date? = nil
     ) -> CalendarEvent {
         CalendarEvent(
             id: id,
             calendar: CalendarIdentity(id: calendar.id, title: calendar.title, sourceTitle: calendar.sourceTitle),
             title: title, start: Date(timeIntervalSince1970: start),
-            end: Date(timeIntervalSince1970: end ?? start + 1_000), isAllDay: false, availability: .busy,
-            status: .confirmed)
+            end: Date(timeIntervalSince1970: end ?? start + 1_000), isAllDay: isAllDay, availability: .busy,
+            status: .confirmed, occurrenceDate: occurrenceDate)
     }
 
     private static func settingsYAML(syncWindowDays: Int? = nil, legacyMarkers: [String]? = nil) -> String {

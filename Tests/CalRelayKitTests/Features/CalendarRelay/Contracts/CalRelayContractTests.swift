@@ -92,6 +92,7 @@ enum CalRelayContractTests {
         try await Self.testExplanationUsesSharedOrderedActionsAndCreateCausality()
         try Self.testFormatsEmptyReconciliationPlan()
         try Self.testFormatsPlannedCreatesAndDeletes()
+        try Self.testOrdinaryResultDerivesCompatibilityPlanFromAuthoritativeActions()
         try Self.testFormatsOrdinaryActionsInSuppliedExecutionOrder()
         try Self.testReconciliationPlanOutputAvoidsDebugDumps()
         try Self.testFormatsCalendarList()
@@ -1148,6 +1149,23 @@ enum CalRelayContractTests {
             "Output should include delete time range")
     }
 
+    private static func testOrdinaryResultDerivesCompatibilityPlanFromAuthoritativeActions() throws {
+        let hub = CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud")
+        let work = CalendarIdentity(id: "work-1", title: "ACME Work", sourceTitle: "Google")
+        let delete = calendarEvent(id: "delete-1", calendar: work, title: "[OLD] Stale")
+        let create = calendarEventProjection(destinationCalendar: hub, title: "[ACME] Current")
+        let actions: [CalendarMutationAction] = [
+            .delete(role: .work(name: "ACME", declarationIndex: 0), event: delete),
+            .create(role: .hub, event: create),
+        ]
+
+        let result = OrdinaryReconciliationResult(actions: actions)
+
+        try expect(result.actions == actions, "Ordinary actions should remain the authoritative ordered plan")
+        try expect(result.plan.deletes == [delete], "Delete summaries should be derived from authoritative actions")
+        try expect(result.plan.creates == [create], "Create summaries should be derived from authoritative actions")
+    }
+
     private static func testFormatsOrdinaryActionsInSuppliedExecutionOrder() throws {
         let hub = CalendarIdentity(id: "hub-1", title: "Personal Work", sourceTitle: "iCloud")
         let work = CalendarIdentity(id: "work-1", title: "ACME Work", sourceTitle: "Google")
@@ -1164,8 +1182,7 @@ enum CalRelayContractTests {
             .delete(role: .work(name: "ACME", declarationIndex: 0), event: delete), .create(role: .hub, event: create),
             .delete(role: .work(name: "ACME", declarationIndex: 0), event: laterDelete)
         ]
-        let result = OrdinaryReconciliationResult(
-            plan: ReconciliationPlan(creates: [create], deletes: [delete, laterDelete]), actions: actions)
+        let result = OrdinaryReconciliationResult(actions: actions)
 
         let output = ReconciliationPlanFormatter.format(result)
 

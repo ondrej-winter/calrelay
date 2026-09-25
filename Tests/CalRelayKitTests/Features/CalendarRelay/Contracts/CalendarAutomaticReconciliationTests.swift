@@ -19,6 +19,7 @@ enum CalendarAutomaticReconciliationTests {
         try await testDisabledSchedulingFailsClosedEvenWithStandingAuthorization()
         try await testTransientReadFailureSchedulesBoundedFreshRetry()
         try await testRetryReloadsFreshConfigurationSnapshotAndPlan()
+        try await testCoalescedFollowUpLoadsAndExecutesFreshPlan()
         try await testLargeValidPlanAppliesWithoutHeuristicLimit()
         try await testConcurrentRevocationDuringMutationCannotBeResurrected()
     }
@@ -449,6 +450,40 @@ enum CalendarAutomaticReconciliationTests {
         try expect(await store.mutationCount() == 1, "The retry should apply only its fresh plan")
     }
 
+    private static func testCoalescedFollowUpLoadsAndExecutesFreshPlan() async throws {
+        let fixture = AutomaticReconciliationFixture()
+        let provider = CountingAutomaticSettingsProvider(settings: fixture.settings)
+        let stateStore = AutomaticStateStore(state: fixture.authorizedState())
+        let store = CoalescedAutomaticCalendarStore(fixture: fixture)
+        let useCase = fixture.useCase(settingsProvider: provider, calendarStore: store, stateStore: stateStore)
+        var coordinator = CalendarAppOperationCoordinator()
+
+        try expect(
+            coordinator.request(.automaticReconciliation) == .start,
+            "The first automatic attempt should become active")
+        try expect(
+            coordinator.request(.automaticReconciliation) == .coalesced,
+            "A trigger behind active automatic work should coalesce")
+
+        let first = try await useCase.run()
+        try expect(first.outcome == .partialMutation, "The first attempt should stop after its failed create")
+        try expect(
+            coordinator.finish() == .automaticReconciliation,
+            "Completing the first attempt should start one coalesced follow-up")
+
+        let followUp = try await useCase.run()
+        try expect(followUp.outcome == .applied, "The coalesced follow-up should apply its fresh plan")
+        try expect(coordinator.finish() == nil, "Only one coalesced follow-up should run")
+        try expect(await provider.callCount() == 4, "Each attempt should load and recheck settings independently")
+        try expect(await store.listCalendarsCallCount() == 2, "Each attempt should load fresh calendar inventory")
+        try expect(
+            await store.eventRequestCalendarIDs() == [fixture.hub.id, fixture.work.id, fixture.hub.id, fixture.work.id],
+            "Each attempt should read a new hub-first snapshot")
+        try expect(
+            await store.createAttemptTitles() == ["[WORK] First", "[WORK] Second"],
+            "The follow-up must execute the new snapshot plan instead of resuming the earlier failed create")
+    }
+
     private static func testLargeValidPlanAppliesWithoutHeuristicLimit() async throws {
         let fixture = AutomaticReconciliationFixture()
         let eventCount = 128
@@ -813,3 +848,48 @@ private actor AutomaticCalendarStore: CalendarStorePort {
 }
 
 private struct AutomaticStoreFailure: Error {}
+
+private actor CoalescedAutomaticCalendarStore: CalendarStorePort {
+    private let fixture: AutomaticReconciliationFixture
+    private var listCalls = 0
+    private var eventRequests: [PhysicalCalendarReference] = []
+    private var mutationAttempts = 0
+    private var attemptedCreateTitles: [String] = []
+
+    init(fixture: AutomaticReconciliationFixture) { self.fixture = fixture }
+
+    func listCalendars() async throws -> [RelayCalendar] {
+        listCalls += 1
+        return [fixture.hub, fixture.work]
+    }
+
+    func events(in calendar: CalendarIdentity, from start: Date, to end: Date) async throws -> [CalendarEvent] {
+        eventRequests.append(calendar.id)
+        if calendar.id == fixture.hub.id, listCalls == 1 {
+            return [
+                CalendarEvent(
+                    id: "stale", calendar: calendar, title: "[WORK] Stale", start: fixture.now,
+                    end: fixture.now.addingTimeInterval(100), isAllDay: false, availability: .busy, status: .confirmed)
+            ]
+        }
+        guard calendar.id == fixture.work.id else { return [] }
+        let title = listCalls == 1 ? "First" : "Second"
+        return [
+            CalendarEvent(
+                id: "source-\(listCalls)", calendar: calendar, title: title, start: fixture.now,
+                end: fixture.now.addingTimeInterval(100), isAllDay: false, availability: .busy, status: .confirmed)
+        ]
+    }
+
+    func createEvent(_ event: CalendarEventProjection) async throws {
+        mutationAttempts += 1
+        attemptedCreateTitles.append(event.title)
+        if mutationAttempts == 2 { throw AutomaticStoreFailure() }
+    }
+
+    func deleteEvent(_ event: CalendarEventIdentity) async throws { mutationAttempts += 1 }
+
+    func listCalendarsCallCount() -> Int { listCalls }
+    func eventRequestCalendarIDs() -> [PhysicalCalendarReference] { eventRequests }
+    func createAttemptTitles() -> [String] { attemptedCreateTitles }
+}

@@ -32,11 +32,6 @@ public struct CalendarEventReference: Equatable, Hashable, Comparable, Sendable,
     var eventKitIdentifier: String { providerIdentifier }
     var diagnosticIdentifier: String { providerIdentifier }
 
-    func totalOrderKey(occurrenceDate: Date?) -> String {
-        let occurrence = occurrenceDate?.timeIntervalSinceReferenceDate.description ?? ""
-        return "\(providerIdentifier)|\(occurrence)"
-    }
-
     public static func < (lhs: Self, rhs: Self) -> Bool { lhs.providerIdentifier < rhs.providerIdentifier }
 
     public var description: String { "<opaque-calendar-event-reference>" }

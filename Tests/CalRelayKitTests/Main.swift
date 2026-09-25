@@ -14,7 +14,7 @@ import Foundation
         "CalRelayContractTests", "ConfigCheckCommandHandlerTests", "EventKitExactEventOccurrenceResolverTests",
         "FileCalendarRelaySettingsProviderTests", "OrdinaryReconciliationCalendarCaptureTests",
         "OrdinaryReconciliationWindowTests", "ReconcileCommandHandlerTests",
-        "RoutingSpecificationTests", "ConfigurationFileSelectionTests"
+        "ReconciliationConvergenceTests", "ReconciliationSpecificationTests", "RoutingSpecificationTests", "ConfigurationFileSelectionTests"
     ]
 
     static func main() async throws {
@@ -144,6 +144,12 @@ import Foundation
     private static func runContractSuites(filters: Set<String>) async throws {
         if filters.isEmpty || filters.contains("OrdinaryReconciliationCalendarCaptureTests") {
             try await OrdinaryReconciliationCalendarCaptureTests.runAll()
+        }
+        if filters.isEmpty || filters.contains("ReconciliationConvergenceTests") {
+            try await ReconciliationConvergenceTests.runAll()
+        }
+        if filters.isEmpty || filters.contains("ReconciliationSpecificationTests") {
+            try await ReconciliationSpecificationTests.runAll()
         }
         if filters.isEmpty || filters.contains("RoutingSpecificationTests") {
             try await RoutingSpecificationTests.runAll()

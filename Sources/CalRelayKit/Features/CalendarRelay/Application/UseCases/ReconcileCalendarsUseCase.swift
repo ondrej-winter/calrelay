@@ -140,7 +140,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
         let reconciliationPlan = ReconciliationPlan(
             creates: hubPlan.creates + workPlan.creates, deletes: hubPlan.deletes + workPlan.deletes)
         let result = OrdinaryReconciliationResult(
-            plan: reconciliationPlan, actions: ordinaryActions(for: reconciliationPlan, context: context))
+            actions: ordinaryActions(for: reconciliationPlan, context: context))
 
         return OrdinaryReconciliationComputation(
             context: context, result: result, expectations: hubExpectations + workExpectations)
@@ -376,14 +376,14 @@ private struct ActionSortKey: Comparable {
     let end: Date
     let isAllDay: Bool
     let title: String
-    let tieBreaker: String
+    let tieBreaker: ActionOccurrenceIdentity?
 
     init(event: CalendarEvent) {
         start = event.start
         end = event.end
         isAllDay = event.isAllDay
         title = event.title
-        tieBreaker = event.id.totalOrderKey(occurrenceDate: event.occurrenceDate)
+        tieBreaker = ActionOccurrenceIdentity(eventID: event.id, occurrenceDate: event.occurrenceDate)
     }
 
     init(projection: CalendarEventProjection) {
@@ -391,7 +391,7 @@ private struct ActionSortKey: Comparable {
         end = projection.end
         isAllDay = projection.isAllDay
         title = projection.title
-        tieBreaker = ""
+        tieBreaker = nil
     }
 
     static func < (lhs: ActionSortKey, rhs: ActionSortKey) -> Bool {
@@ -403,6 +403,26 @@ private struct ActionSortKey: Comparable {
                 left.value < right.value
             }
         }
-        return lhs.tieBreaker < rhs.tieBreaker
+        switch (lhs.tieBreaker, rhs.tieBreaker) {
+        case (.none, .none): return false
+        case (.none, .some): return true
+        case (.some, .none): return false
+        case (.some(let left), .some(let right)): return left < right
+        }
+    }
+}
+
+private struct ActionOccurrenceIdentity: Comparable {
+    let eventID: CalendarEventReference
+    let occurrenceDate: Date?
+
+    static func < (lhs: ActionOccurrenceIdentity, rhs: ActionOccurrenceIdentity) -> Bool {
+        if lhs.eventID != rhs.eventID { return lhs.eventID < rhs.eventID }
+        switch (lhs.occurrenceDate, rhs.occurrenceDate) {
+        case (.none, .none): return false
+        case (.none, .some): return true
+        case (.some, .none): return false
+        case (.some(let left), .some(let right)): return left < right
+        }
     }
 }
