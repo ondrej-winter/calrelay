@@ -11,8 +11,9 @@ This directory contains the accepted, capability-owned product and behavior cont
 - [`configuration-spec.md`](configuration-spec.md): strict YAML settings, markers, selectors, path discovery, validation, and migration cleanup coverage.
 - [`cli-spec.md`](cli-spec.md): `calrelay` discovery, config check, ordinary dry-run/apply/explanation, legacy cleanup, and CLI-facing diagnostics.
 - [`macos-app-spec.md`](macos-app-spec.md): the control panel, manual sync and cleanup, standing authorization, launch-at-login, scheduling, freshness, recovery state, user notifications, and closed-app boundary.
+- [`distribution-spec.md`](distribution-spec.md): stable releases, Homebrew formula and cask installation, signing and notarization, upgrades, uninstallation, and release recovery.
 
-Together, these documents define the current EventKit MVP.
+Together, these documents define the current EventKit product and its distribution contract.
 
 ## Historical specification migrations
 

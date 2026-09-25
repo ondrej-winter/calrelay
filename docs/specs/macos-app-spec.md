@@ -3,8 +3,8 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 6 — accepted on September 16, 2026 after the reconciliation stress-test interview; ordered exact-plan comparison, policy/topology-bound standing authorization, and local ordinary success were defined.
-- **Acceptance basis:** The product interviews approved on September 16, 2026 prioritize reliably accurate relayed availability with minimal ongoing user effort for a developer who is comfortable editing YAML; when partial failure cannot avoid both harms, stale over-blocking is removed before replacement blockers are created.
+- **Revision:** 7 — accepted on September 25, 2026 with the Homebrew distribution contract; the production app identity was made an explicit upgrade-compatibility requirement.
+- **Acceptance basis:** The product interviews approved on September 16, 2026 prioritize reliably accurate relayed availability with minimal ongoing user effort for a developer who is comfortable editing YAML; when partial failure cannot avoid both harms, stale over-blocking is removed before replacement blockers are created. The project owner approved the production distribution identity boundary on September 25, 2026.
 - **Canonical artifact:** `docs/specs/macos-app-spec.md`.
 - **Scope:** The Dock-visible control panel, manual ordinary reconciliation, explicit legacy cleanup, scheduled reconciliation while the normal app is running, launch-at-login, operational status, user notifications, and lifecycle boundaries.
 
@@ -86,9 +86,11 @@
 - Scheduled reconciliation runs only while the normal Dock-visible app process is running. The accepted lifecycle decision is recorded in [`../adr/0001-launch-normal-app-at-login-for-scheduled-sync.md`](../adr/0001-launch-normal-app-at-login-for-scheduled-sync.md).
 - Launch-at-login for the normal app is part of this milestone. A login-item registration failure is actionable and prevents the app from presenting automation as fully healthy.
 - Sync while the normal app process is closed remains out of scope. Do not add a helper app, LaunchAgent, background-only mode, or equivalent closed-app execution without a later explicit product decision and an ADR covering lifecycle, permissions, signing, packaging, rollback, and user trust.
+- Production distribution retains the bundle identifier `dev.owinter.CalRelay` and one stable Developer Team signing identity so compatible upgrades do not intentionally create a new Calendar-permission, persistence, or launch-at-login identity. Distribution artifact requirements are owned by [`distribution-spec.md`](distribution-spec.md).
 
 ## Compatibility and breaking changes
 
+- Revision 7 makes the production bundle identifier and Developer Team signing identity explicit upgrade-compatibility boundaries; changing either requires a documented distribution migration.
 - Revision 6 binds standing authorization to configuration identity, reconciliation-policy version, and opaque resolved-topology identity. The delete-first reconciliation policy invalidates authorization granted under the previous create-first policy, and unproven physical calendar identity churn requires renewed review.
 - Revision 6 makes ordinary and cleanup confirmation compare ordered executable actions while retaining aggregate-only ordinary review and execution-ordered per-event cleanup review. Rationale-only changes do not invalidate confirmation.
 - Revision 6 counts a ready empty ordinary plan as success, defines mutating ordinary success by confirmed ordered actions without post-apply verification, and keeps manual partial-failure recovery separately confirmed from automatic retry authorization.
@@ -134,6 +136,7 @@
 - **APP-AC-13:** A ready empty ordinary plan updates freshness and last-success state; a mutating ordinary run succeeds after every ordered action is confirmed without a post-apply verification read.
 - **APP-AC-14:** A partial manual ordinary failure requires a new fresh manual review and confirmation for manual recovery, while independently authorized scheduling may repair it only through a later normal fresh automatic run.
 - **APP-AC-15:** Upgrade and topology tests invalidate standing authorization after a reconciliation-policy version change, work-calendar declaration-order change, physical calendar identity change, or unproven EventKit calendar continuity, without persisting raw configuration or calendar IDs.
+- **APP-AC-16:** A compatible production upgrade retains bundle identifier `dev.owinter.CalRelay` and the established Developer Team signing identity; a change to either is handled as a documented distribution migration rather than an ordinary upgrade.
 
 ## Verification approach
 
