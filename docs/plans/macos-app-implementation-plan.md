@@ -2,8 +2,8 @@
 
 ## Plan record
 
-- **Status:** In progress. `APP-P01` and `APP-P02` are complete; later slices
-  remain pending.
+- **Status:** In progress. `APP-P01` through `APP-P04` are complete; later
+  slices remain pending.
 - **Prepared:** September 25, 2026.
 - **Canonical requirements:**
   [`../specs/macos-app-spec.md`](../specs/macos-app-spec.md), revision 6,
@@ -24,12 +24,13 @@
   deterministic coverage already exist. Work therefore starts with current-HEAD
   verification and permits production changes only when a failing acceptance
   test demonstrates a concrete defect or uncovered behavior.
-- **Verification status:** `APP-P01` and `APP-P02` passed on September 25, 2026.
-  The complete deterministic gate, production app-bundle build, control-panel
-  and permission-focused suite, and supplemental app-inventory formatter suite
-  passed. No production correction was justified. Later app-specific,
-  isolated-UI, and live macOS evidence remains assigned to `APP-P03` through
-  `APP-P08` and `APP-LIVE-01` through `APP-LIVE-10`.
+- **Verification status:** `APP-P01` through `APP-P04` passed on September 25,
+  2026. The complete deterministic gate, production app-bundle build,
+  control-panel and permission-focused suites, manual ordinary and cleanup
+  suites, standing-authorization binding and persistence suites, and supplemental
+  app-inventory formatter suite passed. No production correction was justified.
+  Later app-specific, isolated-UI, and live macOS evidence remains assigned to
+  `APP-P05` through `APP-P08` and `APP-LIVE-01` through `APP-LIVE-10`.
 
 ## Outcome
 
@@ -298,22 +299,35 @@ recovery portion of `APP-AC-14`.
 - Prove that cleanup never edits YAML, enables ordinary scheduling, or persists
   event-level review data.
 
-- [ ] **APP-P03-AC1:** Ordinary confirmation is bound to the fresh ordered
+- [x] **APP-P03-AC1:** Ordinary confirmation is bound to the fresh ordered
   executable plan, not only aggregate counts.
-- [ ] **APP-P03-AC2:** Rationale-only changes do not invalidate an otherwise
+- [x] **APP-P03-AC2:** Rationale-only changes do not invalidate an otherwise
   identical executable plan.
-- [ ] **APP-P03-AC3:** Partial manual failure cannot resume under consumed
+- [x] **APP-P03-AC3:** Partial manual failure cannot resume under consumed
   confirmation.
-- [ ] **APP-P03-AC4:** Ready empty ordinary plans count as successful without a
+- [x] **APP-P03-AC4:** Ready empty ordinary plans count as successful without a
   verification read.
-- [ ] **APP-P03-AC5:** Cleanup remains separate, migration-only, privacy-safe,
+- [x] **APP-P03-AC5:** Cleanup remains separate, migration-only, privacy-safe,
   exact-plan-reviewed, and verification-backed.
-- [ ] **APP-P03-V1:**
+- [x] **APP-P03-V1:**
   `swift run CalRelayKitTests CalendarManualDryRunTests CalendarManualApplyTests CalendarReviewedActionTests`
   passes.
-- [ ] **APP-P03-V2:**
+- [x] **APP-P03-V2:**
   `swift run CalRelayKitTests CalendarManualCleanupTests CalendarCleanupAccessTests CalendarAccessPrivacyTests`
   passes.
+
+**Passing evidence (September 25, 2026):** Both exact required commands
+completed with `CalRelayKitTests passed`. The focused manual suites prove fresh
+configuration and snapshot loading, ordered executable-action comparison across
+physical calendars and exact occurrences, same-count and reordered-plan
+invalidation, rationale-only tolerance, consumed confirmation after partial
+failure, ready empty-plan success without a verification read, migration gating,
+and aggregate-only ordinary review. The cleanup suites prove complete
+declaration-ordered preflight, transient execution-ordered review detail, exact
+one-use confirmation, complete post-apply no-match verification, privacy-safe
+failure presentation, no calendar creation, and no YAML or scheduling mutation.
+The relevant review DTOs are transient and have no persistence conformance. No
+acceptance failure justified a production or test change.
 
 **Expected result:** Manual workflows receive exact stale-review, partial-failure,
 empty-plan, cleanup, and privacy evidence without changing their product scope.
@@ -357,18 +371,31 @@ such a production change. Do not weaken comparison to preserve old tests.
 - Prove that standing authorization cannot authorize manual apply or cleanup.
 - Prove that persisted identity is opaque and reveals none of its inputs.
 
-- [ ] **APP-P04-AC1:** Scheduling cannot become enabled before confirmed fresh
+- [x] **APP-P04-AC1:** Scheduling cannot become enabled before confirmed fresh
   standing authorization.
-- [ ] **APP-P04-AC2:** Every required configuration, policy, topology, and
+- [x] **APP-P04-AC2:** Every required configuration, policy, topology, and
   continuity change invalidates authorization.
-- [ ] **APP-P04-AC3:** Pause/resume preserves only a still-matching binding.
-- [ ] **APP-P04-AC4:** Authorization identity remains opaque in persistence,
+- [x] **APP-P04-AC3:** Pause/resume preserves only a still-matching binding.
+- [x] **APP-P04-AC4:** Authorization identity remains opaque in persistence,
   diagnostics, descriptions, and UI.
-- [ ] **APP-P04-AC5:** Authorization setup and validation never request Calendar
+- [x] **APP-P04-AC5:** Authorization setup and validation never request Calendar
   permission or mutate calendars.
-- [ ] **APP-P04-V1:**
+- [x] **APP-P04-V1:**
   `swift run CalRelayKitTests CalendarStandingAuthorizationTests CalendarConfigurationIdentityTests CalendarAutomationPersistenceTests CalendarNoPromptContractTests`
   passes.
+
+**Passing evidence (September 25, 2026):** The exact required focused suite
+completed with `CalRelayKitTests passed`. It proves that review is a fresh
+non-mutating ordinary dry run and explicit confirmation is required before first
+enablement; semantic configuration, declaration order, reconciliation-policy
+version, physical topology, and continuity changes invalidate authorization;
+representation-only YAML and diagnostic role-name changes remain equivalent; an
+observed selected-file change immediately revokes authorization, including the
+`A → B → A` case; pause preserves only a still-matching binding; and unavailable
+access suspends validation without prompting or silently granting authority.
+Persistence and runtime-description checks prove that the binding remains opaque
+and fail closed for corrupt or unsupported data. No acceptance failure justified
+a production or test change.
 
 **Expected result:** Current authorization receives complete binding and upgrade
 evidence, or a minimal tested correction closes the demonstrated gap.
@@ -661,8 +688,8 @@ automated passes.
 
 ## Handoff
 
-- **Readiness:** In progress; `APP-P01` and `APP-P02` are complete.
-- **Next executable task:** `APP-P03`.
+- **Readiness:** In progress; `APP-P01` through `APP-P04` are complete.
+- **Next executable task:** `APP-P05`.
 - **Unresolved product decisions:** None.
 - **Blocked work:** None.
 - **Expected implementation posture:** Verification-first; production changes
