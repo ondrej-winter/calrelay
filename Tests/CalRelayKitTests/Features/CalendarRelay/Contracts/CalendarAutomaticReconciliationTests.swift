@@ -4,6 +4,7 @@ import Foundation
 enum CalendarAutomaticReconciliationTests {
     static func runAll() async throws {
         try await testFreshAuthorizedAttemptAppliesAndPersistsAggregateSuccess()
+        try await testRetainedUseCaseReadsFreshCalendarForEachAttempt()
         try await testAutomaticAndRetryAttemptsNeverRequestCalendarAccess()
         try await testAutomaticPreflightFailuresPreventAllMutations()
         try await testConfigurationAndMigrationFailuresStopBeforeCalendarAccess()
@@ -45,6 +46,33 @@ enum CalendarAutomaticReconciliationTests {
         try expect(persisted.operationalStatus.latestOutcome == .applied, "Applied outcome should persist")
         try expect(
             persisted.operationalStatus.freshness.lastSuccessAt == fixture.now, "Success should update freshness")
+    }
+
+    private static func testRetainedUseCaseReadsFreshCalendarForEachAttempt() async throws {
+        let fixture = AutomaticReconciliationFixture()
+        let store = fixture.storeWithSourceEvent()
+        let firstCalendar = testCalendar(secondsFromGMT: 0)
+        let secondCalendar = testCalendar(secondsFromGMT: -10 * 60 * 60)
+        let calendarProvider = TestCalendarProvider(firstCalendar)
+        let useCase = CalendarAutomaticReconciliationUseCase(
+            settingsProvider: AutomaticSettingsProvider(settings: fixture.settings),
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store,
+            stateStore: AutomaticStateStore(state: fixture.authorizedState()),
+            configurationChanges: CalendarConfigurationChangeTracker(), now: { fixture.now },
+            calendarProvider: { calendarProvider.value() })
+
+        _ = try await useCase.run()
+        calendarProvider.replace(secondCalendar)
+        _ = try await useCase.run()
+
+        let firstWindow = OrdinaryReconciliationWindow.calculate(
+            referenceDate: fixture.now, calendar: firstCalendar, syncWindowDays: fixture.settings.syncWindowDays)
+        let secondWindow = OrdinaryReconciliationWindow.calculate(
+            referenceDate: fixture.now, calendar: secondCalendar, syncWindowDays: fixture.settings.syncWindowDays)
+        try expect(calendarProvider.readCount() == 2, "Each automatic attempt should sample a fresh calendar once")
+        try expect(
+            await store.eventRequestWindows() == [firstWindow, firstWindow, secondWindow, secondWindow],
+            "A retained automatic use case should use the fresh calendar for each attempt")
     }
 
     private static func testMissingStandingAuthorizationPerformsNoMutation() async throws {
@@ -732,6 +760,7 @@ private actor AutomaticCalendarStore: CalendarStorePort {
     private let readFailureCalendarIDs: Set<PhysicalCalendarReference>
     private var listCalls = 0
     private var eventRequests: [PhysicalCalendarReference] = []
+    private var eventWindows: [CalendarAccessWindow] = []
     private var operations = 0
     private var creates = 0
     private var deletes = 0
@@ -756,6 +785,7 @@ private actor AutomaticCalendarStore: CalendarStorePort {
 
     func events(in calendar: CalendarIdentity, from start: Date, to end: Date) async throws -> [CalendarEvent] {
         eventRequests.append(calendar.id)
+        eventWindows.append(CalendarAccessWindow(start: start, end: end))
         if readFailureCalendarIDs.contains(calendar.id) { throw AutomaticStoreFailure() }
         return eventsByCalendarID[calendar.id, default: []]
     }
@@ -772,6 +802,7 @@ private actor AutomaticCalendarStore: CalendarStorePort {
 
     func listCalendarsCallCount() -> Int { listCalls }
     func eventRequestCalendarIDs() -> [PhysicalCalendarReference] { eventRequests }
+    func eventRequestWindows() -> [CalendarAccessWindow] { eventWindows }
     func mutationCount() -> Int { creates + deletes }
     func operationAttemptCount() -> Int { operations }
 

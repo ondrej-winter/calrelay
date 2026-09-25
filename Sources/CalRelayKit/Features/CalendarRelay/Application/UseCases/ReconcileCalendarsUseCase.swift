@@ -18,15 +18,24 @@ public enum ReconcileCalendarsError: Error, Equatable, CustomStringConvertible, 
 public struct ReconcileCalendarsUseCase: Sendable {
     private let authorizationStatus: any CalendarAuthorizationStatusPort
     private let calendarStore: any CalendarStorePort
-    private let calendar: Calendar
+    private let calendarProvider: @Sendable () -> Calendar
 
     public init(
         authorizationStatus: any CalendarAuthorizationStatusPort, calendarStore: any CalendarStorePort,
-        calendar: Calendar = .current
+        calendarProvider: @escaping @Sendable () -> Calendar = { .current }
     ) {
         self.authorizationStatus = authorizationStatus
         self.calendarStore = calendarStore
-        self.calendar = calendar
+        self.calendarProvider = calendarProvider
+    }
+
+    public init(
+        authorizationStatus: any CalendarAuthorizationStatusPort, calendarStore: any CalendarStorePort,
+        calendar: Calendar
+    ) {
+        self.init(
+            authorizationStatus: authorizationStatus, calendarStore: calendarStore,
+            calendarProvider: { calendar })
     }
 
     public func dryRun(settings: CalendarRelaySettings, now: Date) async throws -> ReconciliationPlan {
@@ -140,6 +149,7 @@ public struct ReconcileCalendarsUseCase: Sendable {
     private func loadRunContext(settings: CalendarRelaySettings, now: Date) async throws -> ReconciliationRunContext {
         try Task.checkCancellation()
         try validate(settings)
+        let calendar = calendarProvider()
 
         let window = OrdinaryReconciliationWindow.calculate(
             referenceDate: now, calendar: calendar, syncWindowDays: settings.syncWindowDays)

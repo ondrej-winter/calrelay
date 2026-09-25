@@ -17,7 +17,24 @@ public actor CalendarStandingAuthorizationUseCase {
         calendarStore: any CalendarStorePort, stateStore: any CalendarAutomationStateStore,
         configurationChanges: CalendarConfigurationChangeTracker = CalendarConfigurationChangeTracker(),
         policyVersion: CalendarReconciliationPolicyVersion = .current, now: @escaping @Sendable () -> Date = Date.init,
-        calendar: Calendar = .current
+        calendarProvider: @escaping @Sendable () -> Calendar = { .current }
+    ) {
+        self.settingsProvider = settingsProvider
+        reconciliation = ReconcileCalendarsUseCase(
+            authorizationStatus: authorizationStatus, calendarStore: calendarStore,
+            calendarProvider: calendarProvider)
+        self.stateStore = stateStore
+        self.configurationChanges = configurationChanges
+        self.policyVersion = policyVersion
+        self.now = now
+    }
+
+    public init(
+        settingsProvider: any CalendarRelaySettingsProvider, authorizationStatus: any CalendarAuthorizationStatusPort,
+        calendarStore: any CalendarStorePort, stateStore: any CalendarAutomationStateStore,
+        configurationChanges: CalendarConfigurationChangeTracker = CalendarConfigurationChangeTracker(),
+        policyVersion: CalendarReconciliationPolicyVersion = .current, now: @escaping @Sendable () -> Date = Date.init,
+        calendar: Calendar
     ) {
         self.settingsProvider = settingsProvider
         reconciliation = ReconcileCalendarsUseCase(

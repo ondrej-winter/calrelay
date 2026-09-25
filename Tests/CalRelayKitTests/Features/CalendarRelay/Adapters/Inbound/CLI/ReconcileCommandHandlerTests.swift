@@ -15,6 +15,7 @@ enum ReconcileCommandHandlerTests {
         try await testStructurallyInvalidConfigurationFailsBeforeCalendarAccess()
         try await testCleanupRequiresLegacyMarkersBeforeCalendarAccess()
         try await testOrdinaryModesUseOrdinaryAccessWindow()
+        try await testRetainedHandlerReadsFreshCalendarForEachInvocation()
         try await testCleanupModesUseCleanupAccessWindow()
         try await testOrdinaryMigrationPendingFailsBeforeCalendarAccess()
         try await testCleanupDryRunReportsCompleteRoleSummariesAndPrivateOrderedReview()
@@ -417,6 +418,31 @@ enum ReconcileCommandHandlerTests {
         try expect(
             await explainStore.eventRequestWindows() == [expected, expected],
             "Ordinary explanation should use the ordinary access window")
+    }
+
+    private static func testRetainedHandlerReadsFreshCalendarForEachInvocation() async throws {
+        let fixture = reconciliationFixture()
+        let configURL = try writeTemporaryConfigFile()
+        let store = CommandHandlerCalendarStore(calendars: [fixture.hubCalendar, fixture.workCalendar])
+        let firstCalendar = testCalendar(secondsFromGMT: 0)
+        let secondCalendar = testCalendar(secondsFromGMT: -10 * 60 * 60)
+        let calendarProvider = TestCalendarProvider(firstCalendar)
+        let handler = ReconcileCommandHandler(
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { fixture.now },
+            calendarProvider: { calendarProvider.value() })
+
+        _ = try await handler.run(config: configURL.path, apply: false, explain: false, cleanupLegacy: false)
+        calendarProvider.replace(secondCalendar)
+        _ = try await handler.run(config: configURL.path, apply: false, explain: false, cleanupLegacy: false)
+
+        let firstWindow = OrdinaryReconciliationWindow.calculate(
+            referenceDate: fixture.now, calendar: firstCalendar, syncWindowDays: 1)
+        let secondWindow = OrdinaryReconciliationWindow.calculate(
+            referenceDate: fixture.now, calendar: secondCalendar, syncWindowDays: 1)
+        try expect(calendarProvider.readCount() == 2, "Each CLI invocation should sample a fresh calendar once")
+        try expect(
+            await store.eventRequestWindows() == [firstWindow, firstWindow, secondWindow, secondWindow],
+            "A retained CLI handler should use the fresh calendar throughout each invocation")
     }
 
     private static func testCleanupModesUseCleanupAccessWindow() async throws {

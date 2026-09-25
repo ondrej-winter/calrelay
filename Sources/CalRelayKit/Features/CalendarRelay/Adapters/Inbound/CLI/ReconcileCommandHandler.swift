@@ -15,16 +15,26 @@ public struct ReconcileCommandHandler: Sendable {
     private let authorizationStatus: any CalendarAuthorizationStatusPort
     private let calendarStore: any CalendarStorePort
     private let now: @Sendable () -> Date
-    private let calendar: Calendar
+    private let calendarProvider: @Sendable () -> Calendar
 
     public init(
         authorizationStatus: any CalendarAuthorizationStatusPort, calendarStore: any CalendarStorePort,
-        now: @escaping @Sendable () -> Date = Date.init, calendar: Calendar = .current
+        now: @escaping @Sendable () -> Date = Date.init,
+        calendarProvider: @escaping @Sendable () -> Calendar = { .current }
     ) {
         self.authorizationStatus = authorizationStatus
         self.calendarStore = calendarStore
         self.now = now
-        self.calendar = calendar
+        self.calendarProvider = calendarProvider
+    }
+
+    public init(
+        authorizationStatus: any CalendarAuthorizationStatusPort, calendarStore: any CalendarStorePort,
+        now: @escaping @Sendable () -> Date = Date.init, calendar: Calendar
+    ) {
+        self.init(
+            authorizationStatus: authorizationStatus, calendarStore: calendarStore, now: now,
+            calendarProvider: { calendar })
     }
 
     public func run(
@@ -35,6 +45,7 @@ public struct ReconcileCommandHandler: Sendable {
         let yaml = try String(contentsOfFile: selectedFile.path, encoding: .utf8)
         let settings = try YAMLCalendarRelaySettingsLoader.load(yaml)
         let currentDate = now()
+        let calendar = calendarProvider()
 
         if cleanupLegacy {
             let cleanupWindow = LegacyCleanupWindow.calculate(referenceDate: currentDate, calendar: calendar)

@@ -4,6 +4,7 @@ import Foundation
 enum CalendarStandingAuthorizationTests {
     static func runAll() async throws {
         try await testGrantRequiresFreshSuccessfulReviewAndExplicitConfirmation()
+        try await testRetainedUseCaseReadsFreshCalendarForEachReview()
         try await testChangedBindingRequiresFreshReviewBeforeGrant()
         try await testRenewalInvalidatesObservedMismatchAndPreservesPause()
         try await testConfigurationTopologyAndPolicyChangesInvalidateWithoutReactivation()
@@ -88,6 +89,33 @@ enum CalendarStandingAuthorizationTests {
         try expect(await store.listCalendarsCallCount() == 2, "Confirmation should repeat the complete dry run")
         try expect(await provider.callCount() == 2, "Review and confirmation should each load current settings")
         try expect(await store.mutationCount() == 0, "Granting standing authorization must not apply the reviewed plan")
+    }
+
+    private static func testRetainedUseCaseReadsFreshCalendarForEachReview() async throws {
+        let fixture = StandingAuthorizationFixture()
+        let settings = fixture.settings()
+        let store = fixture.store()
+        let firstCalendar = testCalendar(secondsFromGMT: 0)
+        let secondCalendar = testCalendar(secondsFromGMT: -10 * 60 * 60)
+        let calendarProvider = TestCalendarProvider(firstCalendar)
+        let useCase = CalendarStandingAuthorizationUseCase(
+            settingsProvider: StandingSettingsProvider(settings: settings),
+            authorizationStatus: StandingAuthorizationStatus(state: .fullAccess), calendarStore: store,
+            stateStore: StandingStateStore(), now: { fixture.now },
+            calendarProvider: { calendarProvider.value() })
+
+        _ = try await useCase.review()
+        calendarProvider.replace(secondCalendar)
+        _ = try await useCase.review()
+
+        let firstWindow = OrdinaryReconciliationWindow.calculate(
+            referenceDate: fixture.now, calendar: firstCalendar, syncWindowDays: settings.syncWindowDays)
+        let secondWindow = OrdinaryReconciliationWindow.calculate(
+            referenceDate: fixture.now, calendar: secondCalendar, syncWindowDays: settings.syncWindowDays)
+        try expect(calendarProvider.readCount() == 2, "Each standing-authorization review should sample once")
+        try expect(
+            await store.eventRequestWindows() == [firstWindow, firstWindow, secondWindow, secondWindow],
+            "A retained standing-authorization use case should use the fresh calendar for each review")
     }
 
     private static func testChangedBindingRequiresFreshReviewBeforeGrant() async throws {
@@ -354,6 +382,7 @@ private actor StandingCalendarStore: CalendarStorePort {
     private var calendars: [RelayCalendar]
     private let eventsByCalendarID: [PhysicalCalendarReference: [CalendarEvent]]
     private var listCalls = 0
+    private var eventWindows: [CalendarAccessWindow] = []
     private var creates = 0
     private var deletes = 0
 
@@ -368,12 +397,14 @@ private actor StandingCalendarStore: CalendarStorePort {
     }
 
     func events(in calendar: CalendarIdentity, from start: Date, to end: Date) async throws -> [CalendarEvent] {
-        eventsByCalendarID[calendar.id, default: []]
+        eventWindows.append(CalendarAccessWindow(start: start, end: end))
+        return eventsByCalendarID[calendar.id, default: []]
     }
 
     func createEvent(_ event: CalendarEventProjection) async throws { creates += 1 }
     func deleteEvent(_ event: CalendarEventIdentity) async throws { deletes += 1 }
     func replaceCalendars(_ calendars: [RelayCalendar]) { self.calendars = calendars }
     func listCalendarsCallCount() -> Int { listCalls }
+    func eventRequestWindows() -> [CalendarAccessWindow] { eventWindows }
     func mutationCount() -> Int { creates + deletes }
 }

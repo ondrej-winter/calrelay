@@ -12,7 +12,20 @@ public actor CalendarManualApplyUseCase {
     public init(
         settingsProvider: any CalendarRelaySettingsProvider, authorizationStatus: any CalendarAuthorizationStatusPort,
         calendarStore: any CalendarStorePort, now: @escaping @Sendable () -> Date = Date.init,
-        calendar: Calendar = .current
+        calendarProvider: @escaping @Sendable () -> Calendar = { .current }
+    ) {
+        self.settingsProvider = settingsProvider
+        reconciliation = ReconcileCalendarsUseCase(
+            authorizationStatus: authorizationStatus, calendarStore: calendarStore,
+            calendarProvider: calendarProvider)
+        executor = CalendarMutationExecutor(calendarStore: calendarStore)
+        self.now = now
+    }
+
+    public init(
+        settingsProvider: any CalendarRelaySettingsProvider, authorizationStatus: any CalendarAuthorizationStatusPort,
+        calendarStore: any CalendarStorePort, now: @escaping @Sendable () -> Date = Date.init,
+        calendar: Calendar
     ) {
         self.settingsProvider = settingsProvider
         reconciliation = ReconcileCalendarsUseCase(

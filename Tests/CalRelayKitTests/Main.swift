@@ -12,7 +12,8 @@ import Foundation
         "CalendarManualDryRunTests", "CalendarMutationExecutorTests", "CalendarNoPromptContractTests",
         "CalendarReviewedActionTests", "CalendarStandingAuthorizationTests", "CalRelayCLISmokeTests",
         "CalRelayContractTests", "ConfigCheckCommandHandlerTests", "EventKitExactEventOccurrenceResolverTests",
-        "FileCalendarRelaySettingsProviderTests", "OrdinaryReconciliationWindowTests", "ReconcileCommandHandlerTests",
+        "FileCalendarRelaySettingsProviderTests", "OrdinaryReconciliationCalendarCaptureTests",
+        "OrdinaryReconciliationWindowTests", "ReconcileCommandHandlerTests",
         "RoutingSpecificationTests", "ConfigurationFileSelectionTests"
     ]
 
@@ -141,6 +142,9 @@ import Foundation
     }
 
     private static func runContractSuites(filters: Set<String>) async throws {
+        if filters.isEmpty || filters.contains("OrdinaryReconciliationCalendarCaptureTests") {
+            try await OrdinaryReconciliationCalendarCaptureTests.runAll()
+        }
         if filters.isEmpty || filters.contains("RoutingSpecificationTests") {
             try await RoutingSpecificationTests.runAll()
         }

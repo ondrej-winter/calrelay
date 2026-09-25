@@ -8,12 +8,23 @@ public struct CalendarManualDryRunUseCase: Sendable {
     public init(
         settingsProvider: any CalendarRelaySettingsProvider, authorizationStatus: any CalendarAuthorizationStatusPort,
         calendarStore: any CalendarStorePort, now: @escaping @Sendable () -> Date = Date.init,
-        calendar: Calendar = .current
+        calendarProvider: @escaping @Sendable () -> Calendar = { .current }
     ) {
         self.settingsProvider = settingsProvider
         reconciliation = ReconcileCalendarsUseCase(
-            authorizationStatus: authorizationStatus, calendarStore: calendarStore, calendar: calendar)
+            authorizationStatus: authorizationStatus, calendarStore: calendarStore,
+            calendarProvider: calendarProvider)
         self.now = now
+    }
+
+    public init(
+        settingsProvider: any CalendarRelaySettingsProvider, authorizationStatus: any CalendarAuthorizationStatusPort,
+        calendarStore: any CalendarStorePort, now: @escaping @Sendable () -> Date = Date.init,
+        calendar: Calendar
+    ) {
+        self.init(
+            settingsProvider: settingsProvider, authorizationStatus: authorizationStatus, calendarStore: calendarStore,
+            now: now, calendarProvider: { calendar })
     }
 
     public func run() async throws -> CalendarManualDryRunSummary {

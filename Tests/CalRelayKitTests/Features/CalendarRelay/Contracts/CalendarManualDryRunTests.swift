@@ -4,6 +4,7 @@ import Foundation
 enum CalendarManualDryRunTests {
     static func runAll() async throws {
         try await testDryRunLoadsFreshSettingsAndReturnsAggregateCountsWithoutMutation()
+        try await testRetainedUseCaseReadsFreshCalendarForEachRun()
         try await testLaterMissingConfigurationDoesNotUsePreviousValidSettings()
         try await testMigrationPendingFailsBeforeCalendarAccess()
         try testFormatterReportsOnlyAggregateCounts()
@@ -30,6 +31,33 @@ enum CalendarManualDryRunTests {
         try expect(await provider.callCount() == 2, "Manual dry run should load fresh settings for each invocation")
         try expect((await store.createdEvents()).isEmpty, "Manual dry run should not create events")
         try expect((await store.deletedEvents()).isEmpty, "Manual dry run should not delete events")
+    }
+
+    private static func testRetainedUseCaseReadsFreshCalendarForEachRun() async throws {
+        let fixture = dryRunFixture()
+        let store = CommandHandlerCalendarStore(
+            calendars: [fixture.hubCalendar, fixture.workCalendar],
+            eventsByCalendarID: [fixture.workCalendar.id: [fixture.workEvent]])
+        let firstCalendar = testCalendar(secondsFromGMT: 0)
+        let secondCalendar = testCalendar(secondsFromGMT: -10 * 60 * 60)
+        let calendarProvider = TestCalendarProvider(firstCalendar)
+        let useCase = CalendarManualDryRunUseCase(
+            settingsProvider: CountingManualDryRunSettingsProvider(settings: fixture.settings),
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { fixture.now },
+            calendarProvider: { calendarProvider.value() })
+
+        _ = try await useCase.run()
+        calendarProvider.replace(secondCalendar)
+        _ = try await useCase.run()
+
+        let firstWindow = OrdinaryReconciliationWindow.calculate(
+            referenceDate: fixture.now, calendar: firstCalendar, syncWindowDays: fixture.settings.syncWindowDays)
+        let secondWindow = OrdinaryReconciliationWindow.calculate(
+            referenceDate: fixture.now, calendar: secondCalendar, syncWindowDays: fixture.settings.syncWindowDays)
+        try expect(calendarProvider.readCount() == 2, "Each manual dry run should sample a fresh calendar once")
+        try expect(
+            await store.eventRequestWindows() == [firstWindow, firstWindow, secondWindow, secondWindow],
+            "A retained manual dry-run use case should forward the fresh calendar into each run")
     }
 
     private static func testLaterMissingConfigurationDoesNotUsePreviousValidSettings() async throws {

@@ -4,6 +4,7 @@ import Foundation
 enum CalendarManualApplyTests {
     static func runAll() async throws {
         try await testReviewRequiresOneUseConfirmationAndFreshPreflight()
+        try await testRetainedUseCaseReadsFreshCalendarForEachReview()
         try await testChangedPlanRequiresReviewEvenWithSameCounts()
         try await runSafetyTests()
         try await runFreshSnapshotTests()
@@ -27,6 +28,31 @@ enum CalendarManualApplyTests {
             _ = try await useCase.confirm(reviewID: review.id)
             throw TestFailure("Review must be consumed after apply")
         } catch CalendarManualApplyError.reviewRequired {}
+    }
+
+    private static func testRetainedUseCaseReadsFreshCalendarForEachReview() async throws {
+        let fixture = ManualApplyFixture()
+        let store = fixture.store()
+        let firstCalendar = testCalendar(secondsFromGMT: 0)
+        let secondCalendar = testCalendar(secondsFromGMT: -10 * 60 * 60)
+        let calendarProvider = TestCalendarProvider(firstCalendar)
+        let useCase = CalendarManualApplyUseCase(
+            settingsProvider: ManualApplySettingsProvider(settings: fixture.settings),
+            authorizationStatus: TestCalendarAuthorizationStatus(), calendarStore: store, now: { fixture.now },
+            calendarProvider: { calendarProvider.value() })
+
+        _ = try await useCase.review()
+        calendarProvider.replace(secondCalendar)
+        _ = try await useCase.review()
+
+        let firstWindow = OrdinaryReconciliationWindow.calculate(
+            referenceDate: fixture.now, calendar: firstCalendar, syncWindowDays: fixture.settings.syncWindowDays)
+        let secondWindow = OrdinaryReconciliationWindow.calculate(
+            referenceDate: fixture.now, calendar: secondCalendar, syncWindowDays: fixture.settings.syncWindowDays)
+        try expect(calendarProvider.readCount() == 2, "Each manual review should sample a fresh calendar once")
+        try expect(
+            await store.eventRequestWindows() == [firstWindow, firstWindow, secondWindow, secondWindow],
+            "A retained manual-apply use case should forward the fresh calendar into each review")
     }
 
     private static func testChangedPlanRequiresReviewEvenWithSameCounts() async throws {
