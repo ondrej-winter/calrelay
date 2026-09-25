@@ -34,6 +34,23 @@ public enum CalendarControlPanelPrimaryState: Equatable, Sendable {
     case ready
 }
 
+public enum CalendarControlPanelPresentationState: Equatable, Sendable {
+    case configurationMissing
+    case configurationInvalid
+    case calendarAccessUnavailable(CalendarAuthorizationState)
+    case topologyNotReady
+    case migrationPending
+    case standingAuthorizationRequired
+    case launchAtLoginUnavailable
+    case schedulingDisabled
+    case schedulingPaused
+    case retryPending(attempt: Int)
+    case partialMutation
+    case transientFailure
+    case freshnessOverdue
+    case healthy
+}
+
 public struct CalendarControlPanelStatus: Equatable, Sendable {
     public let primaryState: CalendarControlPanelPrimaryState
     public let configurationState: CalendarControlPanelConfigurationState

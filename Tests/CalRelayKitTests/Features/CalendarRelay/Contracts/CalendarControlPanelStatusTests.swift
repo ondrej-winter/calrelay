@@ -10,6 +10,10 @@ enum CalendarControlPanelStatusTests {
         try await testTopologyFailurePrecedesMigrationPending()
         try await testMigrationPendingRequiresReadyTopology()
         try await testHealthyStatusRequiresReadyNonMigrationConfiguration()
+        try testComposedPrimaryStateUsesCompleteDependencyOrder()
+        try testPartialOperationHistoryDoesNotHideEarlierPrerequisites()
+        try testSchedulingRecoveryStatesRemainDistinct()
+        try testExhaustedAutomaticFailuresRemainActionable()
     }
 
     private static func testMissingConfigurationPrecedesAuthorizationAndCalendarAccess() async throws {
@@ -71,23 +75,25 @@ enum CalendarControlPanelStatusTests {
     }
 
     private static func testUnavailableAuthorizationPrecedesTopologyWithoutPrompting() async throws {
-        let provider = FakeSettingsProvider(settings: settings())
-        let authorization = CountingAuthorizationStatus(state: .writeOnly)
-        let store = CommandHandlerCalendarStore(calendars: readyCalendars())
+        for state in CalendarAuthorizationState.allCases where state != .fullAccess {
+            let provider = FakeSettingsProvider(settings: settings())
+            let authorization = CountingAuthorizationStatus(state: state)
+            let store = CommandHandlerCalendarStore(calendars: readyCalendars())
 
-        let status = try await useCase(provider: provider, authorization: authorization, store: store).run()
+            let status = try await useCase(provider: provider, authorization: authorization, store: store).run()
 
-        try expect(
-            status.primaryState == .calendarAccessUnavailable(.writeOnly),
-            "Write-only access should be the primary recovery state")
-        try expect(
-            status.configurationState == .valid(displayPath: "~/.config/calrelay/config.yaml"),
-            "Configuration should remain visibly valid")
-        try expect(status.readinessState == .notChecked, "Unavailable authorization should prevent topology reads")
-        try expect(await authorization.callCount() == 1, "Status should inspect authorization without requesting")
-        try expect(
-            await store.listCalendarsCallCount() == 0,
-            "Unavailable authorization should prevent EventKit inventory access")
+            try expect(
+                status.primaryState == .calendarAccessUnavailable(state),
+                "\(state) should be the primary recovery state")
+            try expect(
+                status.configurationState == .valid(displayPath: "~/.config/calrelay/config.yaml"),
+                "Configuration should remain visibly valid")
+            try expect(status.readinessState == .notChecked, "Unavailable authorization should prevent topology reads")
+            try expect(await authorization.callCount() == 1, "Status should inspect authorization without requesting")
+            try expect(
+                await store.listCalendarsCallCount() == 0,
+                "Unavailable authorization should prevent EventKit inventory access")
+        }
     }
 
     private static func testTopologyFailurePrecedesMigrationPending() async throws {
@@ -136,6 +142,118 @@ enum CalendarControlPanelStatusTests {
         try expect(!status.isMigrationPending, "Healthy status should not report migration pending")
     }
 
+    private static func testComposedPrimaryStateUsesCompleteDependencyOrder() throws {
+        let policy = CalendarControlPanelPresentationPolicy()
+        let authorized = automationState(
+            preference: .enabled, authorized: true, outcome: .partialMutation,
+            retryState: .none, lastSuccessAt: now.addingTimeInterval(-2 * CalendarAutomationSchedulingPolicy.freshnessInterval))
+        let cases = [
+            ControlPanelPresentationCase(.configurationMissing, .valid, authorized, false, .configurationMissing),
+            ControlPanelPresentationCase(.configurationInvalid, .valid, authorized, false, .configurationInvalid),
+            ControlPanelPresentationCase(
+                .calendarAccessUnavailable(.denied), .valid, authorized, false, .calendarAccessUnavailable(.denied)
+            ),
+            ControlPanelPresentationCase(.topologyNotReady, .valid, authorized, false, .topologyNotReady),
+            ControlPanelPresentationCase(.migrationPending, .valid, authorized, false, .migrationPending),
+            ControlPanelPresentationCase(
+                .ready, .notGranted, automationState(preference: .enabled, authorized: false), false,
+                .standingAuthorizationRequired),
+            ControlPanelPresentationCase(.ready, .invalidated, authorized, false, .standingAuthorizationRequired),
+            ControlPanelPresentationCase(.ready, .valid, authorized, false, .launchAtLoginUnavailable),
+            ControlPanelPresentationCase(
+                .ready, .valid,
+                automationState(preference: .paused, authorized: true, outcome: .partialMutation), false,
+                .launchAtLoginUnavailable),
+            ControlPanelPresentationCase(
+                .ready, .valid,
+                automationState(preference: .paused, authorized: true, outcome: .partialMutation), true,
+                .schedulingPaused),
+            ControlPanelPresentationCase(
+                .ready, .valid,
+                automationState(
+                    preference: .enabled, authorized: true, outcome: .transientFailure,
+                    retryState: .scheduled(attempt: 2, nextAttemptAt: now.addingTimeInterval(60))), true,
+                .retryPending(attempt: 2)),
+            ControlPanelPresentationCase(
+                .ready, .valid,
+                automationState(
+                    preference: .enabled, authorized: true, outcome: .applied,
+                    lastSuccessAt: now.addingTimeInterval(-CalendarAutomationSchedulingPolicy.freshnessInterval - 1)),
+                true, .freshnessOverdue),
+            ControlPanelPresentationCase(
+                .ready, .valid, automationState(preference: .enabled, authorized: true), true, .healthy)
+        ]
+
+        for testCase in cases {
+            let actual = policy.primaryState(
+                controlPanelState: testCase.controlPanelState,
+                standingAuthorizationValidation: testCase.authorizationValidation,
+                automationState: testCase.automationState,
+                launchAtLoginHealthy: testCase.launchAtLoginHealthy, now: now)
+            try expect(
+                actual == testCase.expected,
+                "The composed primary state should follow the complete dependency order")
+        }
+    }
+
+    private static func testPartialOperationHistoryDoesNotHideEarlierPrerequisites() throws {
+        let partialState = automationState(
+            preference: .enabled, authorized: true, outcome: .partialMutation, retryState: .none,
+            lastSuccessAt: now.addingTimeInterval(-2 * CalendarAutomationSchedulingPolicy.freshnessInterval))
+
+        let primary = CalendarControlPanelPresentationPolicy().primaryState(
+            controlPanelState: .calendarAccessUnavailable(.writeOnly), standingAuthorizationValidation: .valid,
+            automationState: partialState,
+            launchAtLoginHealthy: false, now: now)
+
+        try expect(
+            primary == .calendarAccessUnavailable(.writeOnly),
+            "A partial prior result must not hide an earlier recoverable prerequisite")
+        try expect(
+            partialState.operationalStatus.latestOutcome == .partialMutation,
+            "Selecting an earlier primary prerequisite must preserve the separate operation history")
+    }
+
+    private static func testSchedulingRecoveryStatesRemainDistinct() throws {
+        let policy = CalendarControlPanelPresentationPolicy()
+        let disabled = policy.primaryState(
+            controlPanelState: .ready, standingAuthorizationValidation: .valid,
+            automationState: automationState(preference: .disabled, authorized: true),
+            launchAtLoginHealthy: true, now: now)
+        let paused = policy.primaryState(
+            controlPanelState: .ready, standingAuthorizationValidation: .valid,
+            automationState: automationState(preference: .paused, authorized: true),
+            launchAtLoginHealthy: true, now: now)
+        let retrying = policy.primaryState(
+            controlPanelState: .ready, standingAuthorizationValidation: .valid,
+            automationState: automationState(
+                preference: .enabled, authorized: true, outcome: .partialMutation,
+                retryState: .scheduled(attempt: 1, nextAttemptAt: now.addingTimeInterval(60))),
+            launchAtLoginHealthy: true, now: now)
+
+        try expect(disabled == .schedulingDisabled, "Disabled scheduling should remain distinct from healthy state")
+        try expect(paused == .schedulingPaused, "Paused scheduling should remain an intentional degraded state")
+        try expect(retrying == .retryPending(attempt: 1), "A bounded retry should remain distinct from overdue state")
+    }
+
+    private static func testExhaustedAutomaticFailuresRemainActionable() throws {
+        let policy = CalendarControlPanelPresentationPolicy()
+        for (outcome, expected) in [
+            (CalendarAutomationOutcomeCategory.partialMutation, CalendarControlPanelPresentationState.partialMutation),
+            (.transientFailure, .transientFailure)
+        ] {
+            let state = automationState(
+                preference: .enabled, authorized: true, outcome: outcome, retryState: .none,
+                lastSuccessAt: now.addingTimeInterval(-30 * 60))
+
+            let primary = policy.primaryState(
+                controlPanelState: .ready, standingAuthorizationValidation: .valid,
+                automationState: state, launchAtLoginHealthy: true, now: now)
+
+            try expect(primary == expected, "An exhausted automatic failure must not be presented as healthy")
+        }
+    }
+
     private static func useCase(
         provider: any CalendarRelaySettingsProvider, authorization: CountingAuthorizationStatus,
         store: CommandHandlerCalendarStore
@@ -170,8 +288,57 @@ enum CalendarControlPanelStatusTests {
         return calendar
     }
 
+    private static let now = Date(timeIntervalSince1970: 10_000)
+
+    private static func automationState(
+        preference: CalendarSchedulingPreference, authorized: Bool,
+        outcome: CalendarAutomationOutcomeCategory = .applied,
+        retryState: CalendarAutomationRetryState = .none,
+        lastSuccessAt: Date? = now.addingTimeInterval(-30 * 60)
+    ) -> CalendarAutomationPersistentState {
+        CalendarAutomationPersistentState(
+            schedulingPreference: preference,
+            standingAuthorization: authorized ? authorizationBinding() : nil,
+            operationalStatus: CalendarAutomationOperationalStatus(
+                lastAttemptAt: now.addingTimeInterval(-5 * 60), latestOutcome: outcome,
+                confirmedCounts: .zero, retryState: retryState,
+                freshness: CalendarAutomationFreshnessMetadata(
+                    lastSuccessAt: lastSuccessAt, nextNominalRunAt: now.addingTimeInterval(10 * 60))))
+    }
+
+    private static func authorizationBinding() -> CalendarStandingAuthorizationBinding {
+        CalendarStandingAuthorizationBinding.derive(
+            settings: settings(),
+            resolvedCalendars: [
+                PhysicalCalendarReference(providerIdentifier: "hub"),
+                PhysicalCalendarReference(providerIdentifier: "work")
+            ], policyVersion: .current)
+    }
+
     private static func expect(_ condition: Bool, _ message: String) throws {
         guard condition else { throw TestFailure(message) }
+    }
+}
+
+private struct ControlPanelPresentationCase {
+    let controlPanelState: CalendarControlPanelPrimaryState
+    let authorizationValidation: CalendarStandingAuthorizationValidation
+    let automationState: CalendarAutomationPersistentState
+    let launchAtLoginHealthy: Bool
+    let expected: CalendarControlPanelPresentationState
+
+    init(
+        _ controlPanelState: CalendarControlPanelPrimaryState,
+        _ authorizationValidation: CalendarStandingAuthorizationValidation,
+        _ automationState: CalendarAutomationPersistentState,
+        _ launchAtLoginHealthy: Bool,
+        _ expected: CalendarControlPanelPresentationState
+    ) {
+        self.controlPanelState = controlPanelState
+        self.authorizationValidation = authorizationValidation
+        self.automationState = automationState
+        self.launchAtLoginHealthy = launchAtLoginHealthy
+        self.expected = expected
     }
 }
 

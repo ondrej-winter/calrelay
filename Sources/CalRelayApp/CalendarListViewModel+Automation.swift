@@ -26,10 +26,12 @@ extension CalendarListViewModel {
         Task {
             do {
                 guard try await standingAuthorization.validateCurrentAuthorization() == .valid else {
+                    standingAuthorizationValidation = .invalidated
                     output = "Scheduled sync cannot resume until a fresh dry run is reviewed and authorized."
                     finishOperation()
                     return
                 }
+                standingAuthorizationValidation = .valid
                 try await automationState.setSchedulingPreference(.enabled)
                 enableLaunchAtLoginForScheduling()
                 await refreshAutomationPresentation()
@@ -157,9 +159,10 @@ extension CalendarListViewModel {
         }
 
         let status = state.operationalStatus
+        let now = Date()
         let policy = CalendarAutomationSchedulingPolicy()
         let overdue = policy.isFreshnessOverdue(
-            schedulingPreference: state.schedulingPreference, lastSuccessAt: status.freshness.lastSuccessAt, now: Date())
+            schedulingPreference: state.schedulingPreference, lastSuccessAt: status.freshness.lastSuccessAt, now: now)
         automaticOperationSummary = [
             "Last attempt: \(Self.format(status.lastAttemptAt))",
             "Latest outcome: \(Self.outcomeDescription(status.latestOutcome))",
@@ -169,8 +172,8 @@ extension CalendarListViewModel {
             "Retry: \(Self.retryDescription(status.retryState))",
             "Freshness: \(overdue ? "overdue" : "not overdue")"
         ].joined(separator: "\n")
-        applyAutomationAttention(state, overdue: overdue)
-        applyAutomationPrimaryState(state, overdue: overdue)
+        applyAutomationAttention(state, overdue: overdue, now: now)
+        applyAutomationPrimaryState(state, now: now)
     }
 
     func refreshLaunchAtLoginSummary() {
@@ -222,32 +225,24 @@ extension CalendarListViewModel {
         resolveInitialLaunchPresentation(presentation)
     }
 
-    private func applyAutomationAttention(_ state: CalendarAutomationPersistentState, overdue: Bool) {
+    private func applyAutomationAttention(_ state: CalendarAutomationPersistentState, overdue: Bool, now: Date) {
         let reason = CalendarAutomationAttentionPolicy().reason(
             schedulingPreference: state.schedulingPreference,
             hasStandingAuthorization: state.standingAuthorization != nil,
             launchAtLoginHealthy: launchAtLogin.currentState() == .enabled,
             operationalStatus: state.operationalStatus,
-            now: Date())
+            now: now)
         automationAttention.update(reason: reason)
         automationAttentionSummary = Self.attentionDescription(reason, overdue: overdue)
     }
 
-    private func applyAutomationPrimaryState(_ state: CalendarAutomationPersistentState, overdue: Bool) {
-        guard controlPanelPrimaryState == .ready else { return }
-        if state.standingAuthorization == nil {
-            primaryStatus = "Scheduled sync requires a fresh reviewed authorization."
-        } else if state.schedulingPreference == .enabled, launchAtLogin.currentState() != .enabled {
-            primaryStatus = "Scheduling is enabled, but launch at login requires recovery."
-        } else if state.schedulingPreference == .paused {
-            primaryStatus = "Scheduled sync is paused and freshness is not being maintained."
-        } else if case .scheduled(let attempt, _) = state.operationalStatus.retryState {
-            primaryStatus = "Scheduled sync is active with bounded retry attempt \(attempt) pending."
-        } else if overdue {
-            primaryStatus = "Scheduled sync freshness is overdue."
-        } else if state.schedulingPreference == .enabled {
-            primaryStatus = "Scheduled sync is healthy while the normal app is running."
-        }
+    private func applyAutomationPrimaryState(_ state: CalendarAutomationPersistentState, now: Date) {
+        guard let controlPanelPrimaryState else { return }
+        let presentation = CalendarControlPanelPresentationPolicy().primaryState(
+            controlPanelState: controlPanelPrimaryState,
+            standingAuthorizationValidation: standingAuthorizationValidation, automationState: state,
+            launchAtLoginHealthy: launchAtLogin.currentState() == .enabled, now: now)
+        primaryStatus = Self.primaryStatus(for: presentation)
     }
 
     private static func attentionDescription(_ reason: CalendarAutomationAttentionReason?, overdue: Bool) -> String {

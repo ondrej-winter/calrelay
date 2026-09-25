@@ -56,6 +56,7 @@ import SwiftUI
     var didResolveInitialLaunchPresentation = false
     var isAwaitingInitialAutomaticAttempt = false
     var controlPanelPrimaryState: CalendarControlPanelPrimaryState?
+    var standingAuthorizationValidation = CalendarStandingAuthorizationValidation.notGranted
 
     init(
         inventory: CalendarInventoryUseCase, setup: CalendarAccessSetupUseCase,
@@ -189,6 +190,37 @@ import SwiftUI
         }
     }
 
+    static func primaryStatus(for state: CalendarControlPanelPresentationState) -> String {
+        if let status = prerequisiteStatus(for: state) { return status }
+        return automationStatus(for: state)
+    }
+
+    private static func prerequisiteStatus(for state: CalendarControlPanelPresentationState) -> String? {
+        switch state {
+        case .configurationMissing: "Configuration is missing. Create the canonical YAML file first."
+        case .configurationInvalid: "Configuration is invalid. Fix the YAML before checking Calendar access."
+        case .calendarAccessUnavailable: "Full Calendar access is unavailable. Use the setup or recovery action."
+        case .topologyNotReady: "Configured calendars are not currently ready. Review the readiness issues."
+        case .migrationPending: "Configured topology is ready, but explicit legacy cleanup is required."
+        default: nil
+        }
+    }
+
+    private static func automationStatus(for state: CalendarControlPanelPresentationState) -> String {
+        switch state {
+        case .standingAuthorizationRequired: "Scheduled sync requires a fresh reviewed authorization."
+        case .launchAtLoginUnavailable: "Scheduling is enabled, but launch at login requires recovery."
+        case .schedulingDisabled: "Scheduled sync is disabled. Review a fresh dry run to enable it."
+        case .schedulingPaused: "Scheduled sync is paused and freshness is not being maintained."
+        case .retryPending(let attempt): "Scheduled sync is active with bounded retry attempt \(attempt) pending."
+        case .partialMutation: "A partial scheduled sync result requires attention after retries were exhausted."
+        case .transientFailure: "Scheduled sync requires attention after transient retries were exhausted."
+        case .freshnessOverdue: "Scheduled sync freshness is overdue."
+        case .healthy: "Scheduled sync is healthy while the normal app is running."
+        default: "Calendar access and the complete configured topology are currently ready."
+        }
+    }
+
     private static func configurationSummary(for state: CalendarControlPanelConfigurationState) -> String {
         switch state {
         case .missing(let displayPath): "Missing: \(displayPath)"
@@ -291,6 +323,7 @@ import SwiftUI
                     return
                 case .granted:
                     standingAuthorizationReview = nil
+                    standingAuthorizationValidation = .valid
                     standingAuthorizationSummary =
                         "Enabled for the current configuration, reconciliation policy, and resolved calendar topology."
                     output =
@@ -439,7 +472,9 @@ import SwiftUI
 
     private func refreshStandingAuthorizationSummary() async {
         do {
-            switch try await standingAuthorization.validateCurrentAuthorization() {
+            let validation = try await standingAuthorization.validateCurrentAuthorization()
+            standingAuthorizationValidation = validation
+            switch validation {
             case .notGranted:
                 standingAuthorizationSummary = "Not enabled. Review a fresh dry run before authorizing scheduled sync."
             case .valid:
@@ -449,6 +484,7 @@ import SwiftUI
                 standingAuthorizationSummary = "Invalidated. Review a fresh dry run to enable scheduled sync again."
             }
         } catch {
+            standingAuthorizationValidation = .invalidated
             standingAuthorizationSummary =
                 "Could not validate standing authorization. Resolve the earlier configuration, access, or readiness state."
         }
