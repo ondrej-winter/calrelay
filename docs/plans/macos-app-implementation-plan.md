@@ -2,7 +2,8 @@
 
 ## Plan record
 
-- **Status:** Proposed and implementation-ready.
+- **Status:** In progress. `APP-P01` and `APP-P02` are complete; later slices
+  remain pending.
 - **Prepared:** September 25, 2026.
 - **Canonical requirements:**
   [`../specs/macos-app-spec.md`](../specs/macos-app-spec.md), revision 6,
@@ -23,9 +24,12 @@
   deterministic coverage already exist. Work therefore starts with current-HEAD
   verification and permits production changes only when a failing acceptance
   test demonstrates a concrete defect or uncovered behavior.
-- **Verification status:** Not run while preparing this plan. Existing source and
-  test locations below are evidence candidates, not claims that current HEAD has
-  passed the app acceptance contract.
+- **Verification status:** `APP-P01` and `APP-P02` passed on September 25, 2026.
+  The complete deterministic gate, production app-bundle build, control-panel
+  and permission-focused suite, and supplemental app-inventory formatter suite
+  passed. No production correction was justified. Later app-specific,
+  isolated-UI, and live macOS evidence remains assigned to `APP-P03` through
+  `APP-P08` and `APP-LIVE-01` through `APP-LIVE-10`.
 
 ## Outcome
 
@@ -99,8 +103,13 @@ contract.
 
 ## Evidence and acceptance traceability
 
-The source and test columns identify current evidence candidates. `APP-P01`
-must verify each mapping before any row is treated as satisfied.
+The source and test columns identify the implementation surface and observable
+verification path confirmed by `APP-P01`. Existing capability evidence is
+reused without treating it as automatic completion of later app-specific tasks.
+Rows assigned to `APP-P03` through `APP-P07` are missing that later app-specific
+evidence, not demonstrated production defects. Operating-system integration
+claims remain explicitly live-only under `APP-P08` and the separate live macOS
+checkpoint.
 
 | Requirement | Current source evidence candidates | Current test evidence candidates | Planned task |
 | --- | --- | --- | --- |
@@ -161,16 +170,27 @@ contract tests, UI tests, `docs/development.md`, and the `Makefile`.
 - Reuse completed capability evidence without treating it as automatic proof of
   the app-level acceptance contract.
 
-- [ ] **APP-P01-AC1:** Every accepted app requirement maps to an implementation
+- [x] **APP-P01-AC1:** Every accepted app requirement maps to an implementation
   surface and an observable verification path.
-- [ ] **APP-P01-AC2:** Missing evidence is distinguished from failing behavior.
-- [ ] **APP-P01-AC3:** Existing capability plans and tests are referenced rather
+- [x] **APP-P01-AC2:** Missing evidence is distinguished from failing behavior.
+- [x] **APP-P01-AC3:** Existing capability plans and tests are referenced rather
   than duplicated or rewritten.
-- [ ] **APP-P01-V1:** `make check` passes on the pre-change baseline, or each
+- [x] **APP-P01-V1:** `make check` passes on the pre-change baseline, or each
   failure is recorded with its exact command and observed result.
-- [ ] **APP-P01-V2:** `make app` produces and strictly verifies the production
+- [x] **APP-P01-V2:** `make app` produces and strictly verifies the production
   app bundle, or the failure is recorded with its exact command and observed
   result.
+
+**Passing evidence (September 25, 2026):** The workspace was clean before the
+baseline. `make check` completed with zero SwiftLint violations, a successful
+SwiftPM build, `CalRelayKitTests passed`, and all four CLI help smoke checks.
+`make app` built the production bundle under the external cache, replaced its
+ad-hoc signature, and completed strict signature verification. SwiftPM emitted
+only the existing non-fatal linker warnings for absent Command Line Tools search
+paths. The traceability review confirmed an implementation surface and
+verification path for every requirement. Evidence still assigned to later
+slices or the live checkpoint was classified as missing app-specific or live
+evidence rather than failing behavior.
 
 **Expected result:** A trustworthy current-HEAD evidence map and a bounded list
 of demonstrated gaps, if any.
@@ -210,19 +230,31 @@ block app verification. This task should not change production behavior.
 - If private app composition prevents credible deterministic verification,
   extract only the smallest pure presentation policy needed for testing.
 
-- [ ] **APP-P02-AC1:** Primary recovery state follows the accepted dependency
+- [x] **APP-P02-AC1:** Primary recovery state follows the accepted dependency
   order for simultaneous failures.
-- [ ] **APP-P02-AC2:** Configuration, inventory, readiness, migration,
+- [x] **APP-P02-AC2:** Configuration, inventory, readiness, migration,
   authorization, scheduling, and operation history remain semantically distinct.
-- [ ] **APP-P02-AC3:** A partial prior result remains prominent without hiding an
+- [x] **APP-P02-AC3:** A partial prior result remains prominent without hiding an
   earlier unmet prerequisite.
-- [ ] **APP-P02-AC4:** Only the setup/recovery workflow can prompt for full
+- [x] **APP-P02-AC4:** Only the setup/recovery workflow can prompt for full
   Calendar access.
-- [ ] **APP-P02-AC5:** Inventory is ID-free and separate from configured
+- [x] **APP-P02-AC5:** Inventory is ID-free and separate from configured
   readiness.
-- [ ] **APP-P02-V1:**
+- [x] **APP-P02-V1:**
   `swift run CalRelayKitTests CalendarAuthorizationTests CalendarNoPromptContractTests CalendarControlPanelStatusTests CalendarAccessPrivacyTests`
   passes.
+
+**Passing evidence (September 25, 2026):** The exact required focused suite
+union completed with `CalRelayKitTests passed`. It covers the complete composed
+dependency order, simultaneous failures, preserved partial-operation history,
+all authorization states, and the non-prompting boundary. The supplemental
+`swift run CalRelayKitTests CalendarListCommandHandlerTests` command also passed,
+confirming that app inventory omits EventKit calendar identifiers and remains
+explicitly separate from configuration validity and configured readiness. The
+status view presents configuration, authorization, readiness, migration,
+standing authorization, scheduling, launch-at-login, operation history,
+attention, and notification state as separate rows. No acceptance failure
+justified a production or test change.
 
 **Expected result:** Either current behavior receives complete deterministic
 evidence, or the smallest tested policy/presentation correction restores it.
@@ -629,8 +661,8 @@ automated passes.
 
 ## Handoff
 
-- **Readiness:** Ready.
-- **Next executable task:** `APP-P01`.
+- **Readiness:** In progress; `APP-P01` and `APP-P02` are complete.
+- **Next executable task:** `APP-P03`.
 - **Unresolved product decisions:** None.
 - **Blocked work:** None.
 - **Expected implementation posture:** Verification-first; production changes
