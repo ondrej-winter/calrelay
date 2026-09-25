@@ -2,8 +2,8 @@
 
 ## Plan record
 
-- **Status:** In progress. `APP-P01` through `APP-P04` are complete; later
-  slices remain pending.
+- **Status:** Complete. `APP-P01` through `APP-P08` have current passing automated
+  evidence. Separate live macOS checks remain optional and unchecked.
 - **Prepared:** September 25, 2026.
 - **Canonical requirements:**
   [`../specs/macos-app-spec.md`](../specs/macos-app-spec.md), revision 6,
@@ -24,13 +24,13 @@
   deterministic coverage already exist. Work therefore starts with current-HEAD
   verification and permits production changes only when a failing acceptance
   test demonstrates a concrete defect or uncovered behavior.
-- **Verification status:** `APP-P01` through `APP-P04` passed on September 25,
-  2026. The complete deterministic gate, production app-bundle build,
-  control-panel and permission-focused suites, manual ordinary and cleanup
-  suites, standing-authorization binding and persistence suites, and supplemental
-  app-inventory formatter suite passed. No production correction was justified.
-  Later app-specific, isolated-UI, and live macOS evidence remains assigned to
-  `APP-P05` through `APP-P08` and `APP-LIVE-01` through `APP-LIVE-10`.
+- **Verification status:** `APP-P01` through `APP-P08` passed on September 25,
+  2026. The complete deterministic gate, production app-bundle build, focused
+  control-panel, permission, manual-operation, standing-authorization,
+  automation, persistence, lifecycle, bundle-metadata, and isolated UI suites
+  passed. No production correction, accepted-contract update, policy-version
+  increment, or ADR was justified. Live macOS evidence remains assigned to the
+  unchecked `APP-LIVE-01` through `APP-LIVE-10` checkpoint.
 
 ## Outcome
 
@@ -444,21 +444,32 @@ the automatic portion of `APP-AC-13`, and the automatic-repair portion of
 - Confirm statically that no cross-process lock or EventKit-change trigger is
   claimed.
 
-- [ ] **APP-P05-AC1:** Launch, wake, timer, and retry use the accepted gates and
+- [x] **APP-P05-AC1:** Launch, wake, timer, and retry use the accepted gates and
   fresh data.
-- [ ] **APP-P05-AC2:** App-owned operations never overlap and pending automatic
+- [x] **APP-P05-AC2:** App-owned operations never overlap and pending automatic
   triggers coalesce into at most one fresh follow-up.
-- [ ] **APP-P05-AC3:** Configuration recovery has priority over pending automatic
+- [x] **APP-P05-AC3:** Configuration recovery has priority over pending automatic
   reconciliation.
-- [ ] **APP-P05-AC4:** User-action failures remain actionable without aggressive
+- [x] **APP-P05-AC4:** User-action failures remain actionable without aggressive
   retry.
-- [ ] **APP-P05-AC5:** Automatic repair after partial state occurs only through a
+- [x] **APP-P05-AC5:** Automatic repair after partial state occurs only through a
   later normal fresh authorized run.
-- [ ] **APP-P05-AC6:** Plan size does not independently block apply, and EventKit
+- [x] **APP-P05-AC6:** Plan size does not independently block apply, and EventKit
   notifications do not trigger reconciliation.
-- [ ] **APP-P05-V1:**
+- [x] **APP-P05-V1:**
   `swift run CalRelayKitTests CalendarAutomaticReconciliationTests CalendarAutomationCoordinationTests CalendarConfigurationObservationTests`
   passes.
+
+**Passing evidence (September 25, 2026):** The exact required focused suite
+completed with `CalRelayKitTests passed`. It covers fixed timer and overdue
+boundaries; unconditional launch and wake attempts while scheduling is enabled;
+bounded retry exhaustion; fresh reloads of configuration, authorization,
+preflight, topology, snapshots, and plans; stale-data rejection; success
+freshness; plan-size independence; and prompt-free automatic apply. Coordination
+coverage proves process-local serialization, one coalesced fresh follow-up, and
+configuration-recovery priority. Static inspection confirmed that EventKit
+notifications do not trigger reconciliation and that no cross-process lock is
+claimed. No acceptance failure justified a production or test change.
 
 **Expected result:** Scheduling and coordination have deterministic evidence for
 freshness, retry, coalescing, stale-data rejection, and no-overlap behavior.
@@ -508,22 +519,36 @@ behavior.
 - Verify the stable production bundle identifier and the absence of menu-bar,
   helper, LaunchAgent, accessory-only, or closed-app execution artifacts.
 
-- [ ] **APP-P06-AC1:** Persistence and presentation obey the approved privacy
+- [x] **APP-P06-AC1:** Persistence and presentation obey the approved privacy
   allowlist.
-- [ ] **APP-P06-AC2:** Notification denial leaves scheduling available with
+- [x] **APP-P06-AC2:** Notification denial leaves scheduling available with
   in-app and Dock-visible fallback status.
-- [ ] **APP-P06-AC3:** Login launch presentation follows the healthy and recovery
+- [x] **APP-P06-AC3:** Login launch presentation follows the healthy and recovery
   state matrix.
-- [ ] **APP-P06-AC4:** Launch-at-login degradation is actionable and prevents a
+- [x] **APP-P06-AC4:** Launch-at-login degradation is actionable and prevents a
   fully healthy presentation.
-- [ ] **APP-P06-AC5:** Explicit Quit and closed-app behavior match ADR 0001.
-- [ ] **APP-P06-AC6:** The production app remains Dock-visible with bundle
+- [x] **APP-P06-AC5:** Explicit Quit and closed-app behavior match ADR 0001.
+- [x] **APP-P06-AC6:** The production app remains Dock-visible with bundle
   identifier `dev.owinter.CalRelay` and no helper-based execution.
-- [ ] **APP-P06-V1:**
+- [x] **APP-P06-V1:**
   `swift run CalRelayKitTests CalendarAutomationPersistenceTests CalendarAutomationCoordinationTests CalendarLoginLaunchPolicyTests CalendarAppBundleMetadataTests`
   passes.
-- [ ] **APP-P06-V2:** Static inspection finds no menu-bar, helper, LaunchAgent,
+- [x] **APP-P06-V2:** Static inspection finds no menu-bar, helper, LaunchAgent,
   background-only, or EventKit-triggered reconciliation artifact.
+
+**Passing evidence (September 25, 2026):** The exact required focused suite
+completed with `CalRelayKitTests passed`. Persistence tests enforce the approved
+privacy allowlist, opaque standing-authorization identity, and fail-closed
+handling for corrupt or unsupported state. Coordination and login-policy tests
+cover privacy-safe attention, notification-denial fallback, launch-at-login
+degradation, healthy versus actionable login presentation, preference retention
+across Quit, and the normal-app lifecycle boundary. Bundle-metadata tests and
+static inspection confirmed the Dock-visible `dev.owinter.CalRelay` app and the
+absence of menu-bar, helper, LaunchAgent, accessory-only, background-only, and
+EventKit-triggered reconciliation artifacts. Live ServiceManagement,
+UserNotifications, wake, Dock, and process-exit behavior remains explicitly
+assigned to the separate `APP-LIVE-*` checkpoint. No production correction was
+justified.
 
 **Expected result:** Operational state, privacy, attention, launch presentation,
 and the normal-app-only lifecycle boundary receive app-specific evidence.
@@ -566,15 +591,27 @@ thin, fail visibly, and defer claims about live integration to `APP-P08`.
 - Preserve fake-host isolation from EventKit, permissions, notifications,
   ServiceManagement, timers, wake events, and production persistence.
 
-- [ ] **APP-P07-AC1:** Primary panel and review workflows expose stable
+- [x] **APP-P07-AC1:** Primary panel and review workflows expose stable
   accessibility identifiers.
-- [ ] **APP-P07-AC2:** Review cancellation, completion, failure, and relaunch
+- [x] **APP-P07-AC2:** Review cancellation, completion, failure, and relaunch
   disposal behavior is covered.
-- [ ] **APP-P07-AC3:** UI output obeys inventory, ordinary-review,
+- [x] **APP-P07-AC3:** UI output obeys inventory, ordinary-review,
   cleanup-review, and notification privacy boundaries.
-- [ ] **APP-P07-AC4:** UI-test composition remains isolated from production
+- [x] **APP-P07-AC4:** UI-test composition remains isolated from production
   macOS services and personal state.
-- [ ] **APP-P07-V1:** `make ui-test` passes using the isolated UI-test host.
+- [x] **APP-P07-V1:** `make ui-test` passes using the isolated UI-test host.
+
+**Passing evidence (September 25, 2026):** The isolated fake-backed UI host ran
+10 XCUITests with zero failures. Coverage includes missing configuration,
+unavailable Calendar access, ID-free inventory, privacy-safe dry run, manual and
+cleanup confirmation, cancellation, failure, transient-review disposal after
+relaunch, scheduling authorization, pause/resume, notification denial, and
+attention state. A focused test was added for the remaining acceptance gap:
+pressing Escape dismisses both the manual-sync and migration-cleanup review
+sheets and reports that no calendar mutation occurred. One initial full run was
+interrupted by VS Code covering a cleanup confirmation button; the exact failing
+test then passed in isolation, and the complete canonical rerun passed all 10
+tests. No production UI correction was required.
 
 **Expected result:** The user-visible workflows receive stable fake-backed smoke
 coverage without turning XCUITest into live system integration testing.
@@ -611,21 +648,37 @@ checks in XCUITest.
 - Preserve unrelated work and leave agent-created changes unstaged.
 - Perform live macOS checks separately from the deterministic gate.
 
-- [ ] **APP-P08-AC1:** Every `APP-AC-01` through `APP-AC-15` row has current
+- [x] **APP-P08-AC1:** Every `APP-AC-01` through `APP-AC-15` row has current
   deterministic, isolated UI, or explicitly identified live-only evidence.
-- [ ] **APP-P08-AC2:** Documentation agrees with verified app behavior and
+- [x] **APP-P08-AC2:** Documentation agrees with verified app behavior and
   lifecycle boundaries.
-- [ ] **APP-P08-AC3:** No unrelated cleanup, dependency update, or silent
+- [x] **APP-P08-AC3:** No unrelated cleanup, dependency update, or silent
   accepted-contract change was introduced.
-- [ ] **APP-P08-V1:** `make format-check` passes.
-- [ ] **APP-P08-V2:** `make check` passes.
-- [ ] **APP-P08-V3:** `make app` passes with strict signature verification.
-- [ ] **APP-P08-V4:** `make ui-test` passes when app UI, accessibility, fake
+- [x] **APP-P08-V1:** `make format-check` passes.
+- [x] **APP-P08-V2:** `make check` passes.
+- [x] **APP-P08-V3:** `make app` passes with strict signature verification.
+- [x] **APP-P08-V4:** `make ui-test` passes when app UI, accessibility, fake
   composition, or the UI-test harness changed; otherwise the passing `APP-P07-V1`
   evidence is referenced.
-- [ ] **APP-P08-V5:** `git --no-pager diff HEAD --check` passes.
-- [ ] **APP-P08-V6:** Final Git status and diff review confirm that unrelated
+- [x] **APP-P08-V5:** `git --no-pager diff HEAD --check` passes.
+- [x] **APP-P08-V6:** Final Git status and diff review confirm that unrelated
   work was preserved.
+
+**Passing evidence (September 25, 2026):** `make format-check` exited
+successfully; it reported the repository's existing broad advisory
+`swift-format` warning set, while the changed UI-test file passed focused
+`swift-format lint`. `make check` completed with zero SwiftLint violations, a
+successful SwiftPM build, `CalRelayKitTests passed`, and all four CLI help smoke
+checks. `make app` rebuilt the production bundle, replaced its ad-hoc signature,
+and completed the repository's strict bundle verification. The final-source
+`make ui-test` result bundle reports 10 passed tests, zero failures, and zero
+skips. `git --no-pager diff HEAD --check` passed, and final diff review found only
+the focused Escape-key acceptance test and this evidence record. No dependency,
+production behavior, accepted specification, reconciliation-policy identity, or
+ADR change was required. `APP-LIVE-01` through `APP-LIVE-10` remain unchecked
+because TCC, ServiceManagement, UserNotifications, wake, Dock attention,
+dedicated-calendar cleanup, and process-exit behavior were not exercised as
+automated checks.
 
 **Expected result:** A complete app acceptance record, aligned documentation, and
 a clean handoff that distinguishes automated proof from live macOS observations.
@@ -688,8 +741,10 @@ automated passes.
 
 ## Handoff
 
-- **Readiness:** In progress; `APP-P01` through `APP-P04` are complete.
-- **Next executable task:** `APP-P05`.
+- **Readiness:** Complete; `APP-P01` through `APP-P08` have passing automated
+  evidence.
+- **Next executable task:** Optional `APP-LIVE-01` through `APP-LIVE-10` checks
+  on a suitable Mac with harmless dedicated calendars.
 - **Unresolved product decisions:** None.
 - **Blocked work:** None.
 - **Expected implementation posture:** Verification-first; production changes

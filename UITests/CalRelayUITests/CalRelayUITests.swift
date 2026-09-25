@@ -61,6 +61,33 @@ import XCTest
             "operation-output", in: app, contains: "Sync review cancelled. No calendar mutations were performed.")
     }
 
+    func testReviewSheetsCanBeCancelledWithEscapeWithoutMutation() {
+        let manualApp = launch(scenario: "ready")
+        waitUntilEnabled(element("run-sync-now", in: manualApp))
+        element("run-sync-now", in: manualApp).click()
+        assertElement("manual-review-title", in: manualApp, contains: "Review Sync Plan")
+
+        manualApp.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+
+        waitUntilMissing(element("manual-review-title", in: manualApp))
+        assertElement(
+            "operation-output", in: manualApp, contains: "Sync review cancelled. No calendar mutations were performed.")
+        manualApp.terminate()
+
+        let cleanupApp = launch(scenario: "migration-pending")
+        defer { cleanupApp.terminate() }
+        waitUntilEnabled(element("run-legacy-cleanup", in: cleanupApp))
+        element("run-legacy-cleanup", in: cleanupApp).click()
+        assertElement("cleanup-review-title", in: cleanupApp, contains: "Review Legacy Cleanup")
+
+        cleanupApp.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+
+        waitUntilMissing(element("cleanup-review-title", in: cleanupApp))
+        assertElement(
+            "operation-output", in: cleanupApp, contains: "Cleanup review closed. No calendar mutations were performed."
+        )
+    }
+
     func testManualSyncReviewIsDisposedAfterCompletionAndFailure() {
         let successfulApp = launch(scenario: "ready")
         waitUntilEnabled(element("run-sync-now", in: successfulApp))
