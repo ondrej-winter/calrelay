@@ -5,7 +5,7 @@ This page is the canonical local development reference for requirements, build c
 ## Requirements
 
 - macOS 26+
-- Swift 6.2+
+- Swift 6.4+
 - Xcode 27+ for macOS UI tests
 - `make` for the canonical local development commands
 - `swift-format` for formatting checks
@@ -26,7 +26,7 @@ make app
 make commit
 ```
 
-`make check` runs linting, a SwiftPM build, the deterministic SwiftPM executable test runner, and help smoke checks for the root command, calendar inventory, configuration readiness, and reconciliation. The underlying commands remain ordinary SwiftPM commands and can still be run directly when debugging a specific step:
+`make check` runs linting, a SwiftPM build, the deterministic SwiftPM executable test runner, a synchronized version smoke, and help smoke checks for the root command, calendar inventory, configuration readiness, and reconciliation. The underlying commands remain ordinary SwiftPM commands and can still be run directly when debugging a specific step:
 
 ```sh
 make format-check
@@ -34,6 +34,7 @@ make format
 make lint
 make build
 make test
+swift run calrelay --version
 swift run calrelay --help
 swift run calrelay calendars --help
 swift run calrelay config check --help
@@ -98,3 +99,43 @@ open .build/CalRelay.app
 ```
 
 Real EventKit validation is explicit local work. Use only harmless, dedicated test calendars and never treat live calendar mutation as an ordinary automated check.
+
+## Release policy tooling
+
+The checked-in `0.0.0` version is an unreleased bootstrap baseline. The first
+public-beta release is explicitly prepared as `1.0.0`; later automatic releases
+are limited to patch and minor transitions within `1.x`. Releasing `2.0.0`
+requires an accepted product-policy revision.
+
+Run the deterministic repository-owned policy against the current Git history:
+
+```sh
+node scripts/release/release-policy.mjs select
+node scripts/release/release-policy.mjs notes
+```
+
+The standalone policy helper can model the exact bootstrap in a disposable or
+otherwise controlled repository. Its `prepare` command creates a release commit
+and tag, so it is for deterministic policy verification rather than a step to run
+before semantic-release:
+
+```sh
+node scripts/release/release-policy.mjs select --bootstrap
+node scripts/release/release-policy.mjs prepare --bootstrap
+```
+
+Ordinary semantic-release execution uses the exact Node and semantic-release
+versions recorded in `scripts/release/toolchain.json` through
+`scripts/release/run-semantic-release.sh`. `.releaserc.json` is the sole
+semantic-release configuration artifact; do not add a Node package manifest or
+lockfile solely for release automation.
+
+The protected production bootstrap runs semantic-release itself with the
+explicit bootstrap flag, from a clean checkout with no release tags:
+
+```sh
+scripts/release/run-semantic-release.sh --bootstrap
+```
+
+The runner consumes `--bootstrap` and exposes it only to the repository-owned
+plugins. It is not forwarded as an unsupported semantic-release CLI option.

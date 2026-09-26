@@ -1,0 +1,9 @@
+{
+  "node": "24.21.0",
+  "semanticRelease": "25.0.9",
+  "plugins": {
+    "./scripts/release/analyze-commits.mjs": "1.2.0",
+    "./scripts/release/generate-notes.mjs": "1.2.0",
+    "./scripts/release/prepare-release.mjs": "1.2.0"
+  }
+}

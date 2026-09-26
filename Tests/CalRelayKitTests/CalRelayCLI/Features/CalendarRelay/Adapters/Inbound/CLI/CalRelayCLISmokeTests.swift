@@ -2,6 +2,7 @@ import Foundation
 
 enum CalRelayCLISmokeTests {
     static func runAll() throws {
+        try testRootVersionMatchesReleaseVersion()
         try testRootHelpListsCalendarRelaySubcommands()
         try testCalendarsHelpDescribesCalendarListingCommand()
         try testConfigCheckHelpDescribesReadinessCommand()
@@ -23,6 +24,17 @@ enum CalRelayCLISmokeTests {
         try testOrdinaryPartialFailureRetainsOnlyCompletedConfirmations()
         try testDirectCleanupApplyReviewsConfirmsAndVerifies()
         try testCleanupPartialFailureRetainsOnlyCompletedConfirmations()
+    }
+
+    private static func testRootVersionMatchesReleaseVersion() throws {
+        let expected = try String(
+            contentsOf: repositoryRoot().appendingPathComponent("VERSION"), encoding: .utf8
+        ).trimmingCharacters(in: .newlines)
+        let result = try runCalRelay(arguments: ["--version"])
+
+        try expect(result.status == 0, "Root version should exit successfully")
+        try expect(result.stderr.isEmpty, "Successful root version should not write to stderr")
+        try expect(result.stdout == expected + "\n", "Root version should report the exact packaged release version")
     }
 
     private static func testRootHelpListsCalendarRelaySubcommands() throws {
@@ -457,6 +469,17 @@ enum CalRelayCLISmokeTests {
         let output = String(data: stdout.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
         let errorOutput = String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
         return CommandResult(status: process.terminationStatus, stdout: output, stderr: errorOutput)
+    }
+
+    private static func repositoryRoot() throws -> URL {
+        var candidate = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while candidate.path != "/" {
+            if FileManager.default.fileExists(atPath: candidate.appendingPathComponent("Package.swift").path) {
+                return candidate
+            }
+            candidate = candidate.deletingLastPathComponent()
+        }
+        throw TestFailure("Unable to resolve the repository root from #filePath")
     }
 
     private static func expect(_ condition: Bool, _ message: String) throws {

@@ -3,7 +3,7 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 8 — accepted on September 25, 2026 with the Homebrew distribution contract; stable release version reporting was added without changing reconciliation behavior.
+- **Revision:** 9 — accepted on September 26, 2026 with distribution-spec revision 3; public-beta release version reporting is retained without changing reconciliation behavior.
 - **Canonical artifact:** `docs/specs/cli-spec.md`.
 - **Scope:** `calrelay` command behavior, user-facing output, command validation, and legacy-marker cleanup controls.
 
@@ -79,11 +79,11 @@
 - The root command supports `calrelay --version`.
 - Successful version output reports the stable product release version, writes to standard output, and exits with status `0`.
 - Version reporting requires no configuration or EventKit access and never requests Calendar permission.
-- A Homebrew-installed CLI reports the same version as its formula and owning stable release, as defined by [`distribution-spec.md`](distribution-spec.md).
+- A Homebrew-installed CLI reports the same version as its formula and owning public-beta release, as defined by [`distribution-spec.md`](distribution-spec.md).
 
 ## Compatibility and breaking changes
 
-- Revision 8 adds non-mutating root `--version` reporting and binds its value to the owning stable release without changing existing command names, reconciliation arguments, status semantics, or mutation authority.
+- Revision 8 added non-mutating root `--version` reporting. Revision 9 aligns its terminology with the owning public-beta distribution contract without changing existing command names, reconciliation arguments, status semantics, or mutation authority.
 - Revision 7 makes ordinary dry-run, ordinary explanation planned-action rows, and cleanup review rows follow actual execution order. Ordinary `--apply` remains sufficient non-interactive authorization despite the delete-first behavior defined by the reconciliation specification.
 - Revision 7 defines ordinary CLI success as local confirmation of the ordered mutations, without a post-apply verification claim; cleanup retains verified no-match success.
 - Revision 6 changes successful cleanup presentation from aggregate-only output to transient per-event title, configured-role, and time-range review. It retains the existing command arguments and treats `--cleanup-legacy --apply` as sufficient non-interactive mutation authorization.
@@ -117,4 +117,4 @@
 - **CLI-AC-13:** Direct cleanup `--apply` displays the fresh detailed plan and proceeds without interactive confirmation or proof of an earlier dry-run.
 - **CLI-AC-14:** Ordinary dry-run, ordinary explanation planned-action rows, cleanup dry-run, and the fresh cleanup plan display actions in execution order while retaining presentation-text freedom outside that semantic sequence.
 - **CLI-AC-15:** Direct ordinary `--apply` remains non-interactive and succeeds after confirming every ordered action without performing or claiming a post-apply verification read.
-- **CLI-AC-16:** `calrelay --version` succeeds without configuration or EventKit access, writes the packaged stable release version to standard output, returns `0`, and matches the version required by the distribution specification.
+- **CLI-AC-16:** `calrelay --version` succeeds without configuration or EventKit access, writes the packaged public-beta release version to standard output, returns `0`, and matches the version required by the distribution specification.

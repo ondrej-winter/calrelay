@@ -53,6 +53,7 @@ lint: require-swiftlint
 	DEVELOPER_DIR="$(XCODE_DEVELOPER_DIR)" $(SWIFTLINT) lint --strict --config .swiftlint.yml $(SWIFTLINT_PATHS)
 
 check: lint build test
+	swift run calrelay --version >/dev/null
 	swift run calrelay --help >/dev/null
 	swift run calrelay calendars --help >/dev/null
 	swift run calrelay config check --help >/dev/null

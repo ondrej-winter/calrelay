@@ -4,5 +4,6 @@ import ArgumentParser
     static let configuration = CommandConfiguration(
         commandName: "calrelay", abstract: "Relay Apple Calendar availability blockers across configured calendars.",
         discussion: "Calendar listing and reconciliation commands use EventKit-backed Apple Calendar access.",
+        version: GeneratedReleaseVersion.value,
         subcommands: [CalendarsCommand.self, ConfigCommand.self, ReconcileCommand.self])
 }

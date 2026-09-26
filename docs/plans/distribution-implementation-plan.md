@@ -7,7 +7,7 @@
   and GitHub App are provisioned.
 - **Prepared:** September 26, 2026.
 - **Canonical requirements:**
-  [`../specs/distribution-spec.md`](../specs/distribution-spec.md), revision 2,
+  [`../specs/distribution-spec.md`](../specs/distribution-spec.md), revision 3,
   accepted September 26, 2026.
 - **Related accepted contracts:**
   [`../specs/cli-spec.md`](../specs/cli-spec.md),
@@ -29,9 +29,9 @@ Implement the accepted public-beta distribution contract so CalRelay can:
    Gatekeeper verification;
 4. install the CLI and app independently or together through the public
    `ondrej-winter/tap` Homebrew tap;
-5. select and publish qualifying `0.x` releases automatically and atomically;
+5. select and publish qualifying `1.x` releases automatically and atomically;
 6. resume interrupted releases without replacing immutable content; and
-7. bootstrap `v0.1.0` manually, then prove a later qualifying `master` push
+7. bootstrap `v1.0.0` manually, then prove a later qualifying `master` push
    releases automatically through the same gate.
 
 ## Current-state basis
@@ -68,7 +68,7 @@ Implement the accepted public-beta distribution contract so CalRelay can:
 - Secure GitHub Actions orchestration and cross-repository tap publication.
 - Deterministic release-policy, failure, privacy, and recovery tests.
 - User installation and release-operator documentation.
-- Manual `v0.1.0` bootstrap and evidence from one later automatic release.
+- Manual `v1.0.0` bootstrap and evidence from one later automatic release.
 
 ### Out of scope
 
@@ -94,7 +94,7 @@ Implement the accepted public-beta distribution contract so CalRelay can:
 4. Local ad-hoc app packaging remains separate from production Developer ID
    signing and notarization.
 5. An unreleased pre-bootstrap version, recommended as `0.0.0`, may be used so
-   the `v0.1.0` release commit records the first public version transition. The
+   the `v1.0.0` release commit records the first public version transition. The
    implementation must document and test the selected bootstrap mechanism.
 6. Once signing or publication begins, retries reuse the exact verified artifact
    bytes. They do not rebuild an artifact under the same version.
@@ -157,18 +157,28 @@ validation. `DIST-P10` and `DIST-P11` are external rollout checkpoints.
 - Run and record the pre-change source and local app baseline before production
   edits.
 
-- [ ] **DIST-P01:** The accepted decision and prerequisite baseline is complete.
-- [ ] **DIST-P01-AC1:** ADR 0004 records only architecture and credential-custody
+- [x] **DIST-P01:** The accepted decision and prerequisite baseline is complete.
+- [x] **DIST-P01-AC1:** ADR 0004 records only architecture and credential-custody
   decisions already accepted by the owning specification.
-- [ ] **DIST-P01-AC2:** Every external repository, runner, credential class,
+- [x] **DIST-P01-AC2:** Every external repository, runner, credential class,
   variable, permission, and branch-policy prerequisite is named without exposing
   a secret value.
-- [ ] **DIST-P01-AC3:** Local and production packaging entry points remain
+- [x] **DIST-P01-AC3:** Local and production packaging entry points remain
   explicitly separate.
-- [ ] **DIST-P01-V1:** Pre-change `make format-check`, `make check`, and `make app`
+- [x] **DIST-P01-V1:** Pre-change `make format-check`, `make check`, and `make app`
   results are recorded accurately.
-- [ ] **DIST-P01-V2:** The production build environment proves Apple Silicon,
+- [x] **DIST-P01-V2:** The production build environment proves Apple Silicon,
   Xcode 27, Swift 6.4, the macOS 27 SDK, and a macOS 26 deployment target.
+
+**Implementation evidence (September 26, 2026):** ADR 0004 records the accepted
+architecture and external prerequisite inventory. Before production edits,
+`make format-check`, `make check`, and `make app` all passed at source revision
+`a1d1619`. The verified local release-capable environment is Apple Silicon on
+macOS 27.0 with Xcode 27.0 (build 27A266a), Swift 6.4, and the macOS 27 SDK;
+`Package.swift` retains macOS 26 as the deployment minimum. The public source
+repository is available, no release tags exist, and the required public tap is
+not yet provisioned, so external rollout remains blocked without affecting
+repository implementation.
 
 ### DIST-P02 — Establish release version identity
 
@@ -199,22 +209,33 @@ validation. `DIST-P10` and `DIST-P11` are external rollout checkpoints.
 - Add drift tests across source version, CLI output, app metadata, tag, formula,
   and cask inputs.
 
-- [ ] **DIST-P02:** Shared release version identity is implemented.
-- [ ] **DIST-P02-AC1:** `VERSION` contains exactly one valid `X.Y.Z` value without
+- [x] **DIST-P02:** Shared release version identity is implemented.
+- [x] **DIST-P02-AC1:** `VERSION` contains exactly one valid `X.Y.Z` value without
   a leading `v` or surrounding content.
-- [ ] **DIST-P02-AC2:** `calrelay --version` reports the synchronized version on
+- [x] **DIST-P02-AC2:** `calrelay --version` reports the synchronized version on
   standard output with status zero and performs no configuration or EventKit
   access.
-- [ ] **DIST-P02-AC3:** Built app short and bundle versions derive from the same
+- [x] **DIST-P02-AC3:** Built app short and bundle versions derive from the same
   root version.
-- [ ] **DIST-P02-AC4:** The bundle-version mapping is deterministic, Apple-valid,
+- [x] **DIST-P02-AC4:** The bundle-version mapping is deterministic, Apple-valid,
   and strictly monotonic for all accepted version transitions.
-- [ ] **DIST-P02-AC5:** Production app name, executable, bundle identifier,
+- [x] **DIST-P02-AC5:** Production app name, executable, bundle identifier,
   deployment target, and sandbox state remain compatible.
-- [ ] **DIST-P02-V1:** Focused CLI version and app bundle-metadata suites pass
+- [x] **DIST-P02-V1:** Focused CLI version and app bundle-metadata suites pass
   through the custom test runner.
-- [ ] **DIST-P02-V2:** `swift run calrelay --version`, the existing help smokes,
+- [x] **DIST-P02-V2:** `swift run calrelay --version`, the existing help smokes,
   and `make app` pass locally.
+
+**Implementation evidence (September 26, 2026):** Root `VERSION` is initialized
+to the unreleased value `0.0.0` and is mirrored in the checked-in CLI version
+source. The package now requires Swift tools 6.4 while retaining macOS 26. App
+assembly strictly validates `VERSION`, injects it into both
+`CFBundleShortVersionString` and `CFBundleVersion`, and preserves the production
+name, executable, identifier, deployment minimum, and unsandboxed local bundle.
+The direct `X.Y.Z` bundle-version mapping is deterministic and lexicographically
+monotonic by numeric component for every accepted semantic-version transition.
+Focused distribution, CLI smoke, and app-metadata suites pass; `make check` and
+`make app` report the synchronized `0.0.0` identity.
 
 ### DIST-P03 — Implement release selection and preparation
 
@@ -232,33 +253,48 @@ of `DIST-AC-18`.
 **Work:**
 
 - Configure semantic-release only through `.releaserc.json`.
-- Implement the accepted `0.x` policy: `fix` and `fix!` select patch; `feat` and
+- Implement the accepted `1.x` policy: `fix` and `fix!` select patch; `feat` and
   `feat!` select minor; breaking markers contribute notes but never select major;
   all other commit types select no release.
-- Reject every automatic path to `1.0.0`.
-- Implement the explicit no-tag bootstrap path for `0.1.0`.
+- Reject every automatic path outside `1.x`, including `2.0.0`.
+- Implement the explicit no-tag bootstrap path for `1.0.0`.
 - Generate privacy-safe release notes.
 - Prepare exactly one `chore(release): vX.Y.Z` source commit that synchronizes
   version artifacts, and tag that exact commit.
 - Exercise the policy against temporary Git histories rather than only parsing
   isolated commit strings.
 
-- [ ] **DIST-P03:** Release selection and preparation are implemented.
-- [ ] **DIST-P03-AC1:** The full qualifying and non-qualifying commit matrix
+- [x] **DIST-P03:** Release selection and preparation are implemented.
+- [x] **DIST-P03-AC1:** The full qualifying and non-qualifying commit matrix
   produces the required bump or no-release result.
-- [ ] **DIST-P03-AC2:** No tested history, including breaking-marked commits,
-  selects `1.0.0`.
-- [ ] **DIST-P03-AC3:** Bootstrap selects only `0.1.0` and only before a public
+- [x] **DIST-P03-AC2:** No ordinary tested history, including breaking-marked
+  commits, selects `2.0.0`; pre-`1.0.0` and `2.x` histories fail closed.
+- [x] **DIST-P03-AC3:** Bootstrap selects only `1.0.0` and only before a public
   release exists.
-- [ ] **DIST-P03-AC4:** A selected release prepares one exact release commit and
+- [x] **DIST-P03-AC4:** A selected release prepares one exact release commit and
   tag without unrelated source changes.
-- [ ] **DIST-P03-AC5:** Node, semantic-release, plugin, and action versions are
+- [x] **DIST-P03-AC5:** Node, semantic-release, plugin, and action versions are
   explicitly pinned without a Node package manifest.
-- [ ] **DIST-P03-V1:** Temporary-history tests cover `fix`, `fix!`, `feat`,
+- [x] **DIST-P03-V1:** Temporary-history tests cover `fix`, `fix!`, `feat`,
   `feat!`, breaking-only, non-qualifying, release-commit, and forbidden-major
   histories.
-- [ ] **DIST-P03-V2:** Repository checks prove `.releaserc.json` is the only
+- [x] **DIST-P03-V2:** Repository checks prove `.releaserc.json` is the only
   semantic-release configuration artifact.
+
+**Implementation evidence (September 26, 2026):** `.releaserc.json` is the sole
+semantic-release configuration and delegates analysis, aggregate privacy-safe
+notes, and source preparation to repository-owned plugins. `toolchain.json` pins
+Node 24.21.0, semantic-release 25.0.9, and plugin revision 1.2.0; GitHub Action
+pins remain deferred to DIST-P07, where workflows first exist. The explicit
+repository helper handles no-tag `1.0.0` bootstrap, while ordinary automation is
+limited to patch/minor transitions within `1.x`. Temporary Git histories prove
+the complete selection matrix, unsupported-release-line rejection, preparation
+rejection outside `1.x`, one exact
+`chore(release): vX.Y.Z` commit, exact tag target, and version-artifact-only
+preparation. The explicit bootstrap is propagated through the pinned
+semantic-release runner, and semantic-release 25.0.9's prepare pipeline re-reads
+Git HEAD after the prepare plugin creates the release commit so that exact commit
+is tagged. No Node package manifest or lockfile was added.
 
 ### DIST-P04 — Implement resumable immutable release state
 
@@ -554,7 +590,7 @@ paths or modifying it.
 - [ ] **DIST-P09-V2:** `git --no-pager diff HEAD --check`, `make format-check`,
   `make check`, and `make app` pass.
 
-### DIST-P10 — Provision infrastructure and bootstrap `v0.1.0`
+### DIST-P10 — Provision infrastructure and bootstrap `v1.0.0`
 
 **Requirements:** `DIST-01`, `DIST-02`, `DIST-07`, `DIST-08`, `DIST-AC-01`
 through `DIST-AC-10`, and `DIST-AC-15` through `DIST-AC-18`.
@@ -574,19 +610,19 @@ through `DIST-AC-10`, and `DIST-AC-15` through `DIST-AC-18`.
 
 - Provision the tap, runners, GitHub App, Apple credentials, release environment,
   and non-secret Team ID invariant.
-- Dispatch the bootstrap workflow for `0.1.0`.
+- Dispatch the bootstrap workflow for `1.0.0`.
 - Verify the release commit, tag, immutable assets, checksums, and one atomic tap
   update.
 - Install both packages using the fully qualified commands from a clean untapped
   supported environment.
 - Record privacy-safe bootstrap evidence.
 
-- [ ] **DIST-P10:** The public `v0.1.0` bootstrap is complete.
-- [ ] **DIST-P10-AC1:** The release commit is `chore(release): v0.1.0`, contains
-  synchronized version state, and is tagged `v0.1.0`.
+- [ ] **DIST-P10:** The public `v1.0.0` bootstrap is complete.
+- [ ] **DIST-P10-AC1:** The release commit is `chore(release): v1.0.0`, contains
+  synchronized version state, and is tagged `v1.0.0`.
 - [ ] **DIST-P10-AC2:** Published assets pass checksum, signature, notarization,
   stapler, Gatekeeper, architecture, deployment-target, and version checks.
-- [ ] **DIST-P10-AC3:** Formula and cask are published together at `0.1.0`.
+- [ ] **DIST-P10-AC3:** Formula and cask are published together at `1.0.0`.
 - [ ] **DIST-P10-AC4:** Both documented installation commands succeed without a
   preconfigured tap.
 - [ ] **DIST-P10-AC5:** Installation and ordinary uninstallation leave user
@@ -610,7 +646,7 @@ through `DIST-AC-10`, and `DIST-AC-15` through `DIST-AC-18`.
 - Verify the selected patch or minor version matches the qualifying history and
   requires no manual dispatch.
 - Verify a non-qualifying push publishes nothing.
-- Exercise real formula and cask upgrades from `0.1.0` while preserving
+- Exercise real formula and cask upgrades from `1.0.0` while preserving
   configuration, app identity, and independent package operation.
 - Retain simulated defective-release evidence from `DIST-P08`; do not
   intentionally publish a defective release.

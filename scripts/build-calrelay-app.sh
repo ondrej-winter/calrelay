@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="${0:A:h:h}"
 CONFIGURATION="${CONFIGURATION:-debug}"
+VERSION_FILE="${ROOT_DIR}/VERSION"
 APP_NAME="CalRelay"
 EXECUTABLE_NAME="CalRelayApp"
 BUILD_DIR="${ROOT_DIR}/.build/${CONFIGURATION}"
@@ -18,6 +19,25 @@ RESOURCES_DIR="${CONTENTS_DIR}/Resources"
 
 cd "${ROOT_DIR}"
 
+if [[ ! -f "${VERSION_FILE}" ]]; then
+    echo "error: VERSION is missing at ${VERSION_FILE}." >&2
+    exit 1
+fi
+
+RELEASE_VERSION="$(/bin/cat "${VERSION_FILE}")"
+if ! printf '%s' "${RELEASE_VERSION}" | /usr/bin/cmp -s - "${VERSION_FILE}" \
+    || [[ "${RELEASE_VERSION}" == *$'\n'* ]] \
+    || ! printf '%s\n' "${RELEASE_VERSION}" \
+        | /usr/bin/grep -Eq '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+    echo "error: VERSION must contain exactly one canonical X.Y.Z value without surrounding content." >&2
+    exit 1
+fi
+
+# Apple compares CFBundleVersion as up to three period-separated integers. Using
+# the canonical release version directly is deterministic and monotonic for every
+# permitted later semantic-version transition.
+BUNDLE_VERSION="${RELEASE_VERSION}"
+
 swift build --product "${EXECUTABLE_NAME}" -c "${CONFIGURATION}"
 
 rm -rf "${APP_BUNDLE}"
@@ -28,6 +48,8 @@ cp "${ROOT_DIR}/Resources/CalRelayApp/Info.plist" "${CONTENTS_DIR}/Info.plist"
 
 INFO_PLIST="${CONTENTS_DIR}/Info.plist"
 /usr/bin/plutil -lint "${INFO_PLIST}" >/dev/null
+/usr/bin/plutil -replace CFBundleShortVersionString -string "${RELEASE_VERSION}" "${INFO_PLIST}"
+/usr/bin/plutil -replace CFBundleVersion -string "${BUNDLE_VERSION}" "${INFO_PLIST}"
 for key in NSCalendarsFullAccessUsageDescription NSCalendarsUsageDescription; do
     if ! value=$(/usr/bin/plutil -extract "${key}" raw -expect string "${INFO_PLIST}" 2>/dev/null) || [[ -z "${value//[[:space:]]/}" ]]; then
         echo "error: ${key} must be a nonempty string in ${INFO_PLIST}." >&2

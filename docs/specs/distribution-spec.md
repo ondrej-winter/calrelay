@@ -3,8 +3,8 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 2 — accepted on September 26, 2026; replaces the source-built, partly manual stable-release contract with an automated, prebuilt, signed and notarized `0.x` public-beta channel.
-- **Acceptance basis:** The project owner completed and approved the public-beta distribution interview on September 26, 2026, including release automation, versioning, packaging, credential, recovery, and Homebrew channel decisions.
+- **Revision:** 3 — accepted on September 26, 2026; retains the automated, prebuilt, signed and notarized public-beta architecture from revision 2 while moving the first public release to `1.0.0` and limiting automatic releases to patch and minor transitions within `1.x`.
+- **Acceptance basis:** The project owner completed and approved the public-beta distribution interview on September 26, 2026, including release automation, versioning, packaging, credential, recovery, and Homebrew channel decisions, then explicitly approved the `1.0.0` bootstrap and `1.x` automation boundary on September 26, 2026.
 - **Canonical artifact:** `docs/specs/distribution-spec.md`.
 - **Scope:** Public-beta releases, release identity, upstream binary artifacts, Homebrew formula and cask installation, distribution signing and notarization, package coexistence, upgrades, uninstallation, release automation and security, and recovery from incomplete or defective releases.
 
@@ -35,7 +35,8 @@ brew install --cask ondrej-winter/tap/calrelay
 - One release version identifies both the CLI and GUI products for that release.
 - The root `VERSION`, release tag, formula version, cask version, `calrelay --version`, and `CalRelay.app` `CFBundleShortVersionString` all identify the same `X.Y.Z` release.
 - `CFBundleVersion` is derived deterministically from `X.Y.Z`, is valid Apple bundle metadata, and increases monotonically for every later release.
-- Bootstrap the public channel manually at `v0.1.0`. Later qualifying pushes to `master` are released automatically under `DIST-07`.
+- Bootstrap the public channel manually at `v1.0.0`. Later qualifying pushes to `master` are released automatically under `DIST-07`.
+- `1.0.0` and later `1.x` versions remain public-beta releases under this contract; the major version does not create a separate stable distribution channel.
 - The production app retains the application name `CalRelay`, bundle identifier `dev.owinter.CalRelay`, executable identity expected by its bundle, and one stable Apple Developer Team identity after the first public release.
 - Changing the bundle identifier or Developer Team identity is a distribution migration because it can affect Calendar permission, persisted app state, and launch-at-login continuity.
 
@@ -91,12 +92,13 @@ brew install --cask ondrej-winter/tap/calrelay
 
 ### DIST-07 — Automated release policy and atomic publication
 
-- The manually initiated `v0.1.0` bootstrap passes the same build, signing, notarization, verification, and publication gates as later automated releases.
+- The manually initiated `v1.0.0` bootstrap passes the same build, signing, notarization, verification, and publication gates as later automated releases.
 - After bootstrap, every qualifying push to `master` starts the release workflow. Non-qualifying pushes complete without publishing a release.
 - Configure semantic-release only through a root `.releaserc.json`. Do not add a `package.json`, JavaScript lockfile, or `CHANGELOG.md` solely for release automation.
 - Pin the Node runtime, semantic-release, every semantic-release plugin, and every GitHub Action to explicit reviewed versions or immutable commit identifiers in the workflow.
-- While the current version is `0.x`, `fix` and `fix!` commits select a patch release, while `feat` and `feat!` commits select a minor release. A breaking marker contributes a release warning or note but never changes the selected `0.x` bump by itself. Other commit types do not select a release unless a later accepted revision says otherwise.
-- Releasing `1.0.0` requires an explicit product decision and a revised release rule; automation must not infer `1.0.0` from a breaking marker.
+- While the current version is `1.x`, `fix` and `fix!` commits select a patch release, while `feat` and `feat!` commits select a minor release. A breaking marker contributes a release warning or note but never changes the selected `1.x` bump by itself. Other commit types do not select a release unless a later accepted revision says otherwise.
+- The explicit no-tag bootstrap is the only path that selects `1.0.0`. Ordinary automation rejects release histories outside `1.x` and must never select `2.0.0`.
+- Releasing `2.0.0` requires an explicit product decision and a revised release rule; automation must not infer `2.0.0` from a breaking marker.
 - For a selected release, create one source commit with subject `chore(release): vX.Y.Z` that records the new root `VERSION`; tag that commit `vX.Y.Z`.
 - Serialize release executions without cancelling an in-progress release. A newer queued push must not supersede or interrupt the run currently publishing.
 - Capture the intended source revision and fail closed before source publication if remote `master` has advanced. Do not tag or publish a different source revision under the computed version.
@@ -146,6 +148,7 @@ brew install --cask ondrej-winter/tap/calrelay
 ## Compatibility and breaking changes
 
 - Revision 2 intentionally removes the Revision 1 contract for source-built formula installation, explicitly tapped short installation commands, optional artifact formats, optional release execution environments, and partly manual release publication.
+- Revision 3 intentionally replaces revision 2's `0.x` public-beta numbering with a `1.0.0` bootstrap and patch/minor-only `1.x` automation. This aligns the accepted policy with the pinned semantic-release main-branch model without changing the public-beta channel designation.
 - Renaming the `calrelay` executable, formula token, cask token, `CalRelay.app`, or its bundle identifier is a distribution-breaking change.
 - Changing the Developer Team signing identity, canonical configuration path, release version semantics, supported fully qualified installation commands, or formula/cask coexistence is a distribution-breaking change.
 - Removing support for Apple Silicon or macOS 26 requires explicit compatibility documentation and an accepted specification revision.
@@ -169,7 +172,7 @@ brew install --cask ondrej-winter/tap/calrelay
 - Verify the CLI release archive and non-EventKit process smoke checks.
 - Verify Homebrew formula and cask style, audit, install, upgrade, uninstall, architecture, and minimum-operating-system behavior in CI.
 - Verify formula/cask coexistence, atomic tap publication, version equality, and checksums against re-downloaded published artifacts.
-- Verify semantic-release selection for qualifying, non-qualifying, breaking-marked `0.x`, and forbidden automatic `1.0.0` histories.
+- Verify semantic-release selection for qualifying, non-qualifying, and breaking-marked `1.x` histories; exact `1.0.0` bootstrap; rejection of pre-`1.0.0` and `2.x` automatic histories; and forbidden automatic `2.0.0` selection.
 - Verify interruption and retry at each publication boundary resumes the same version without replacing immutable content.
 - Do not use real EventKit mutation as routine release automation. Optional manual validation does not substitute for a failed or missing CI gate.
 
@@ -185,15 +188,15 @@ brew install --cask ondrej-winter/tap/calrelay
 - **DIST-AC-08:** Formula and cask upgrades preserve the canonical YAML configuration, and the app upgrade retains its bundle identifier and Developer Team identity and either preserves launch-at-login health or presents the existing recovery state.
 - **DIST-AC-09:** Ordinary uninstallation removes the selected package but retains user configuration and leaves the other package, when installed, operational.
 - **DIST-AC-10:** Release logs, caches, and artifacts contain none of the prohibited credentials, configuration, calendar data, or EventKit identifiers.
-- **DIST-AC-11:** The release-policy test matrix proves `fix`/`fix!` produce a patch, `feat`/`feat!` produce a minor, breaking markers alone do not produce a major, non-qualifying commits publish nothing, and no history automatically selects `1.0.0`.
+- **DIST-AC-11:** The release-policy test matrix proves `fix`/`fix!` produce a patch within `1.x`, `feat`/`feat!` produce a minor within `1.x`, breaking markers alone do not produce a major, non-qualifying commits publish nothing, histories outside `1.x` fail closed, and no ordinary history automatically selects `2.0.0`.
 - **DIST-AC-12:** Concurrent qualifying pushes are queued without cancelling the active release, and a release fails before source publication when remote `master` no longer matches its captured source revision.
 - **DIST-AC-13:** A simulated interruption after each publication stage resumes the same version, accepts matching immutable state, rejects mismatched state, and updates the formula and cask together only after both artifacts are verified.
 - **DIST-AC-14:** A simulated defective tap-published release is corrected only through a higher patch version and performs no automatic calendar rollback.
 - **DIST-AC-15:** Documentation installation commands work exactly as documented for users who have not previously configured the tap, and unsupported short installation forms are not presented as supported.
 - **DIST-AC-16:** The production app remains unsandboxed, reads the canonical configuration path after intentional launch, and requests Calendar permission only through the explicit setup or recovery action defined by the calendar-access and macOS-app specifications.
 - **DIST-AC-17:** The CI release gate can produce all required acceptance evidence without real Calendar data or mandatory manual real-Mac validation.
-- **DIST-AC-18:** `v0.1.0` is bootstrapped manually through the complete release gate, and a later qualifying `master` push publishes automatically through the same gate.
+- **DIST-AC-18:** `v1.0.0` is bootstrapped manually through the complete release gate, and a later qualifying `master` push publishes automatically through the same gate.
 
 ## Open decisions
 
-- None. Revision 2 fixes the first public-beta architecture, release policy, artifact formats, toolchain, platform, credential classes, automation boundary, and recovery behavior. Implementation details explicitly listed as freedoms do not block planning.
+- None. Revision 3 fixes the first public-beta architecture, `1.0.0` bootstrap, `1.x` release policy, artifact formats, toolchain, platform, credential classes, automation boundary, and recovery behavior. Implementation details explicitly listed as freedoms do not block planning.

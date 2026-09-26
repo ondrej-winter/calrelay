@@ -61,6 +61,7 @@ enum CalendarAppBundleMetadataTests {
 
         let script = fixtureRoot.appendingPathComponent("scripts/build-calrelay-app.sh")
         try fileManager.copyItem(at: root.appendingPathComponent("scripts/build-calrelay-app.sh"), to: script)
+        try fileManager.copyItem(at: root.appendingPathComponent("VERSION"), to: fixtureRoot.appendingPathComponent("VERSION"))
 
         var metadata = try propertyList(at: root.appendingPathComponent("Resources/CalRelayApp/Info.plist"))
         if let replacement { metadata[key] = replacement } else { metadata.removeValue(forKey: key) }
