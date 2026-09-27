@@ -30,6 +30,7 @@ enum DistributionReleaseWorkflowTests {
             "group: calrelay-public-beta-release", "cancel-in-progress: false", "permissions:", "actions: read",
             "contents: read", "environment: public-beta-release", "runs-on: xcode-27",
             "persist-credentials: false", "node-version: 24.21.0", "package-manager-cache: false",
+            "CALRELAY_SIGNING_CERTIFICATE_SHA1", "vars.CALRELAY_SIGNING_CERTIFICATE_SHA1",
             "permission-contents: write", "CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY",
             "CALRELAY_RELEASE_GITHUB_APP_ID", "ondrej-winter/homebrew-tap", "if: always()",
             "compression-level: 0", "if-no-files-found: error", "retention-days: 30",
@@ -51,6 +52,9 @@ enum DistributionReleaseWorkflowTests {
         try expect(
             !workflow.contains("pull_request_target") && !workflow.contains("permissions: write-all"),
             "Release workflow must not expose privileged execution to untrusted triggers")
+        try expect(
+            !workflow.contains("CALRELAY_SIGNING_IDENTITY"),
+            "Release workflow must not select the signing certificate by its display name")
         try expect(
             !workflow.contains("runs-on: [self-hosted"),
             "Release workflow must use the ephemeral GitHub-hosted Apple Silicon runner")

@@ -20,11 +20,17 @@ enum DistributionProductionArtifactTests {
         for required in [
             "CALRELAY_DEVELOPER_ID_P12", "CALRELAY_DEVELOPER_ID_P12_PASSWORD", "CALRELAY_NOTARY_API_KEY_P8",
             "CALRELAY_NOTARY_KEY_ID", "CALRELAY_NOTARY_ISSUER_ID", "CALRELAY_DEVELOPER_TEAM_ID",
-            "CALRELAY_SIGNING_IDENTITY"
+            "CALRELAY_SIGNING_CERTIFICATE_SHA1"
         ] { try expect(script.contains(required), "Production packaging must require \(required)") }
+        try expect(
+            !script.contains("CALRELAY_SIGNING_IDENTITY"),
+            "Production signing must not select a certificate by its potentially non-ASCII display name")
         try expect(
             script.contains("create-keychain") && script.contains("delete-keychain"),
             "Production signing must use an ephemeral keychain with cleanup")
+        try expect(
+            script.contains("find-identity") && script.contains("codesigning"),
+            "Production signing must verify the configured certificate fingerprint in the ephemeral keychain")
         try expect(
             script.contains("--options runtime") && script.contains("--timestamp"),
             "Both products must use hardened runtime and secure timestamps")
@@ -74,6 +80,10 @@ enum DistributionProductionArtifactTests {
             log.contains("codesign --force --options runtime --timestamp"),
             "Signing must request hardened runtime and timestamp")
         try expect(
+            log.contains("security find-identity -v -p codesigning")
+                && log.contains("--sign \(fixture.signingCertificateSHA1)"),
+            "Signing must verify and select the imported certificate by its SHA-1 fingerprint")
+        try expect(
             log.contains("notarytool submit") && log.contains("stapler staple") && log.contains("spctl --assess"),
             "Protected verification stages must all run")
         try expect(log.contains("security delete-keychain"), "The ephemeral keychain must be removed after success")
@@ -85,7 +95,7 @@ enum DistributionProductionArtifactTests {
     }
 
     private static func testFakeReleaseBuildRejectsBoundaryFailuresAndCleansKeychain() throws {
-        for failure in ["toolchain", "architecture", "team", "codesign", "notary", "stapler"] {
+        for failure in ["toolchain", "identity", "architecture", "team", "codesign", "notary", "stapler"] {
             let fixture = try ProductionArtifactFixture(version: "1.2.4", failure: failure)
             let result = try fixture.run()
             let log = (try? String(contentsOf: fixture.toolLog, encoding: .utf8)) ?? ""
@@ -105,6 +115,14 @@ enum DistributionProductionArtifactTests {
             try expect(
                 !result.output.contains(fixture.secretSentinel),
                 "Failure diagnostics must not disclose protected values")
+            if failure == "identity" {
+                try expect(
+                    result.output.contains("expected Developer ID Application signing certificate"),
+                    "Identity mismatch diagnostics must explain the missing configured certificate")
+                try expect(
+                    !log.contains("swift build"),
+                    "A missing imported signing identity must fail before compiling release products")
+            }
         }
 
         let malformed = try ProductionArtifactFixture(version: "v1.2.3")
@@ -113,6 +131,15 @@ enum DistributionProductionArtifactTests {
         try expect(
             result.status != 0 && result.output.contains("canonical X.Y.Z"),
             "Malformed release versions must fail before packaging")
+
+        let malformedCertificate = try ProductionArtifactFixture(
+            version: "1.2.3", signingCertificateSHA1: "not-a-certificate-fingerprint")
+        defer { malformedCertificate.remove() }
+        let malformedCertificateResult = try malformedCertificate.run()
+        try expect(
+            malformedCertificateResult.status != 0
+                && malformedCertificateResult.output.contains("40 hexadecimal characters"),
+            "Malformed signing certificate fingerprints must fail before keychain import")
     }
 
     private static func testProhibitedProductDataLeavesNoFinalArtifacts() throws {
@@ -190,6 +217,7 @@ private final class ProductionArtifactFixture {
     let root: URL
     let output: URL
     let toolLog: URL
+    let signingCertificateSHA1: String
     let secretSentinel = "PRIVATE-SENTINEL"
     let prohibitedSentinels = [
         "CONFIGURATION-CONTENT-SENTINEL", "CALENDAR-NAME-SENTINEL", "EVENT-TITLE-SENTINEL",
@@ -200,10 +228,14 @@ private final class ProductionArtifactFixture {
     private let prohibitedProductSentinel: String?
     private let version: String
 
-    init(version: String, failure: String? = nil, prohibitedProductSentinel: String? = nil) throws {
+    init(
+        version: String, failure: String? = nil, prohibitedProductSentinel: String? = nil,
+        signingCertificateSHA1: String = "0123456789ABCDEF0123456789ABCDEF01234567"
+    ) throws {
         self.version = version
         self.failure = failure
         self.prohibitedProductSentinel = prohibitedProductSentinel
+        self.signingCertificateSHA1 = signingCertificateSHA1
         let source = try DistributionProductionArtifactTests.repositoryRoot()
         root = FileManager.default.temporaryDirectory.appendingPathComponent(
             "DistributionProductionArtifactTests-\(UUID().uuidString)")
@@ -245,7 +277,7 @@ private final class ProductionArtifactFixture {
         environment["CALRELAY_NOTARY_KEY_ID"] = "KEY123"
         environment["CALRELAY_NOTARY_ISSUER_ID"] = "ISSUER123"
         environment["CALRELAY_DEVELOPER_TEAM_ID"] = "TEAM123456"
-        environment["CALRELAY_SIGNING_IDENTITY"] = "Developer ID Application: CalRelay Test"
+        environment["CALRELAY_SIGNING_CERTIFICATE_SHA1"] = signingCertificateSHA1
         environment["CALRELAY_RELEASE_PROHIBITED_SENTINELS"] = prohibitedSentinels.joined(separator: "\n")
         return try command(
             "/bin/zsh", [root.appendingPathComponent("scripts/release/build-production-artifacts.sh").path],
@@ -284,7 +316,10 @@ private final class ProductionArtifactFixture {
             common
                 + "if [[ \"$1\" == --version ]]; then print \"Apple Swift version 6.4\"; print \"Target: arm64-apple-macosx27.0.0\"; exit 0; fi\nproduct=\"\"\nwhile (( $# )); do [[ \"$1\" == --product ]] && { shift; product=\"$1\"; }; shift || true; done\nmkdir -p .build/release\nif [[ \"$product\" == calrelay ]]; then printf \"%s\\n\" \"#!/bin/zsh\" \"[[ \\\"\\$1\\\" == --version ]] && print \(version)\" \"exit 0\" > .build/release/calrelay; [[ -n \"${CALRELAY_RELEASE_FAKE_PROHIBITED_SENTINEL}\" ]] && print -r -- \"# ${CALRELAY_RELEASE_FAKE_PROHIBITED_SENTINEL}\" >> .build/release/calrelay; chmod 755 .build/release/calrelay; else printf \"%s\\n\" \"#!/bin/zsh\" \"exit 0\" > .build/release/CalRelayApp; chmod 755 .build/release/CalRelayApp; fi\n"
         )
-        try writeTool("security", common + "[[ \"$1\" == create-keychain ]] && touch \"${@: -1}\"\nexit 0\n")
+        try writeTool(
+            "security",
+            common
+                + "if [[ \"$1\" == create-keychain ]]; then touch \"${@: -1}\"; fi\nif [[ \"$1\" == find-identity ]]; then\n    if [[ \"${CALRELAY_RELEASE_FAKE_FAILURE}\" == identity ]]; then\n        print \"     0 valid identities found\"\n    else\n        print \"  1) ${CALRELAY_SIGNING_CERTIFICATE_SHA1} \\\"Developer ID Application: CalRelay Test\\\"\"\n        print \"     1 valid identities found\"\n    fi\nfi\nexit 0\n")
         try writeTool(
             "codesign",
             common

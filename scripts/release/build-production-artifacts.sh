@@ -12,12 +12,17 @@ KEYCHAIN_PATH="${WORK_DIR}/calrelay-release.keychain-db"
 KEYCHAIN_PASSWORD="calrelay-$(/usr/bin/uuidgen)"
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 
-for name in CALRELAY_DEVELOPER_ID_P12 CALRELAY_DEVELOPER_ID_P12_PASSWORD CALRELAY_NOTARY_API_KEY_P8 CALRELAY_NOTARY_KEY_ID CALRELAY_NOTARY_ISSUER_ID CALRELAY_DEVELOPER_TEAM_ID CALRELAY_SIGNING_IDENTITY; do
+for name in CALRELAY_DEVELOPER_ID_P12 CALRELAY_DEVELOPER_ID_P12_PASSWORD CALRELAY_NOTARY_API_KEY_P8 CALRELAY_NOTARY_KEY_ID CALRELAY_NOTARY_ISSUER_ID CALRELAY_DEVELOPER_TEAM_ID CALRELAY_SIGNING_CERTIFICATE_SHA1; do
     if [[ -z "${(P)name:-}" ]]; then
         print -u2 -- "error: ${name} is required for production artifact packaging."
         exit 1
     fi
 done
+if ! print -r -- "${CALRELAY_SIGNING_CERTIFICATE_SHA1}" | /usr/bin/grep -Eq "^[0-9A-Fa-f]{40}$"; then
+    print -u2 -- "error: CALRELAY_SIGNING_CERTIFICATE_SHA1 must contain exactly 40 hexadecimal characters."
+    exit 1
+fi
+SIGNING_CERTIFICATE_SHA1="${CALRELAY_SIGNING_CERTIFICATE_SHA1:u}"
 if [[ ! -f "${VERSION_FILE}" ]]; then
     print -u2 -- "error: VERSION is missing at ${VERSION_FILE}."
     exit 1
@@ -121,6 +126,12 @@ KEYCHAIN_CREATED=1
 "${SECURITY}" unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}" >/dev/null
 "${SECURITY}" import "${SECRETS_DIR}/developer-id.p12" -k "${KEYCHAIN_PATH}" -P "${CALRELAY_DEVELOPER_ID_P12_PASSWORD}" -T /usr/bin/codesign >/dev/null
 "${SECURITY}" set-key-partition-list -S apple-tool:,apple: -s -k "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}" >/dev/null
+SIGNING_IDENTITIES="$("${SECURITY}" find-identity -v -p codesigning "${KEYCHAIN_PATH}")"
+MATCHING_IDENTITY_COUNT="$(print -r -- "${SIGNING_IDENTITIES}" | /usr/bin/grep -Eic "^[[:space:]]*[0-9]+\)[[:space:]]+${SIGNING_CERTIFICATE_SHA1}[[:space:]]+\"Developer ID Application:" || true)"
+if [[ "${MATCHING_IDENTITY_COUNT}" != 1 ]]; then
+    print -u2 -- "error: the ephemeral keychain does not contain exactly one valid expected Developer ID Application signing certificate."
+    exit 1
+fi
 
 cd "${ROOT_DIR}"
 /bin/rm -f "${CLI_BUILD_PRODUCT}" "${APP_BUILD_PRODUCT}"
@@ -137,7 +148,7 @@ MACOSX_DEPLOYMENT_TARGET=26.0 "${SWIFT}" build -c release --arch arm64 --product
 
 sign_and_verify() {
     local target="$1"
-    "${CODESIGN}" --force --options runtime --timestamp --sign "${CALRELAY_SIGNING_IDENTITY}" --keychain "${KEYCHAIN_PATH}" "${target}"
+    "${CODESIGN}" --force --options runtime --timestamp --sign "${SIGNING_CERTIFICATE_SHA1}" --keychain "${KEYCHAIN_PATH}" "${target}"
     "${CODESIGN}" --verify --strict --verbose=2 "${target}"
     local metadata="$("${CODESIGN}" -dv --verbose=4 "${target}" 2>&1)"
     if [[ "${metadata}" != *"TeamIdentifier=${CALRELAY_DEVELOPER_TEAM_ID}"* || "${metadata}" != *runtime* || "${metadata}" != *Timestamp=* ]]; then

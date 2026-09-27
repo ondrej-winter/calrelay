@@ -39,10 +39,15 @@ recording their values in repository files:
 | `CALRELAY_NOTARY_KEY_ID` | Protected notarization key identifier. |
 | `CALRELAY_NOTARY_ISSUER_ID` | Protected notarization issuer identifier. |
 | `CALRELAY_DEVELOPER_TEAM_ID` | Protected environment variable and stable, non-secret signing invariant. |
-| `CALRELAY_SIGNING_IDENTITY` | Protected environment variable naming the expected Developer ID Application identity. |
+| `CALRELAY_SIGNING_CERTIFICATE_SHA1` | Protected environment variable containing the expected Developer ID Application certificate's canonical 40-character SHA-1 certificate fingerprint. It selects the imported identity without depending on its locale-sensitive display name. |
 | `CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY` | Protected secret for the dedicated source/tap publication app. |
 | `CALRELAY_RELEASE_GITHUB_APP_ID` | Protected environment variable identifying that GitHub App. |
 | `CALRELAY_TAP_REPOSITORY` | Protected environment variable set exactly to `ondrej-winter/homebrew-tap`. |
+
+The release build verifies that the ephemeral keychain contains exactly one valid
+Developer ID Application identity with the configured fingerprint before any
+release product is compiled. The fingerprint is a non-secret identity selector;
+the certificate export and its password remain protected secrets.
 
 The release job uses GitHub's standard hosted Apple Silicon `xcode-27` image. As
 of September 27, 2026, that image is in public preview and provides an ephemeral

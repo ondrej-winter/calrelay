@@ -101,7 +101,7 @@ roles only and do not contain credential values.
 
 ### Repository or environment variables
 
-- `CALRELAY_DEVELOPER_TEAM_ID` and `CALRELAY_SIGNING_IDENTITY`.
+- `CALRELAY_DEVELOPER_TEAM_ID` and `CALRELAY_SIGNING_CERTIFICATE_SHA1`.
 - `CALRELAY_RELEASE_GITHUB_APP_ID`.
 - `CALRELAY_TAP_REPOSITORY`, fixed to `ondrej-winter/homebrew-tap` for the initial
   public beta.
