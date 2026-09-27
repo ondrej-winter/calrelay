@@ -12,10 +12,11 @@ import Foundation
         "CalendarManualDryRunTests", "CalendarMutationExecutorTests", "CalendarNoPromptContractTests",
         "CalendarReviewedActionTests", "CalendarStandingAuthorizationTests", "CalRelayCLISmokeTests",
         "CalRelayContractTests", "ConfigCheckCommandHandlerTests", "EventKitExactEventOccurrenceResolverTests",
-        "DistributionReleasePolicyTests", "DistributionVersionTests", "FileCalendarRelaySettingsProviderTests",
-        "OrdinaryReconciliationCalendarCaptureTests",
-        "OrdinaryReconciliationWindowTests", "ReconcileCommandHandlerTests",
-        "ReconciliationConvergenceTests", "ReconciliationSpecificationTests", "RoutingSpecificationTests", "ConfigurationFileSelectionTests"
+        "DistributionProductionArtifactTests", "DistributionReleasePolicyTests", "DistributionReleaseStateTests",
+        "DistributionVersionTests", "FileCalendarRelaySettingsProviderTests",
+        "OrdinaryReconciliationCalendarCaptureTests", "OrdinaryReconciliationWindowTests",
+        "ReconcileCommandHandlerTests", "ReconciliationConvergenceTests", "ReconciliationSpecificationTests",
+        "RoutingSpecificationTests", "ConfigurationFileSelectionTests"
     ]
 
     static func main() async throws {
@@ -143,12 +144,16 @@ import Foundation
     }
 
     private static func runContractSuites(filters: Set<String>) async throws {
+        if filters.isEmpty || filters.contains("DistributionProductionArtifactTests") {
+            try DistributionProductionArtifactTests.runAll()
+        }
         if filters.isEmpty || filters.contains("DistributionReleasePolicyTests") {
             try DistributionReleasePolicyTests.runAll()
         }
-        if filters.isEmpty || filters.contains("DistributionVersionTests") {
-            try DistributionVersionTests.runAll()
+        if filters.isEmpty || filters.contains("DistributionReleaseStateTests") {
+            try DistributionReleaseStateTests.runAll()
         }
+        if filters.isEmpty || filters.contains("DistributionVersionTests") { try DistributionVersionTests.runAll() }
         if filters.isEmpty || filters.contains("OrdinaryReconciliationCalendarCaptureTests") {
             try await OrdinaryReconciliationCalendarCaptureTests.runAll()
         }

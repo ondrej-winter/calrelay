@@ -139,3 +139,35 @@ scripts/release/run-semantic-release.sh --bootstrap
 
 The runner consumes `--bootstrap` and exposes it only to the repository-owned
 plugins. It is not forwarded as an unsupported semantic-release CLI option.
+
+## Production release artifacts and resumable state
+
+Local `make app` remains an ad-hoc development build and never reads production
+signing credentials. The separate protected production entry point is:
+
+```sh
+make release-artifacts
+```
+
+It requires the protected credential and identity roles named in ADR 0004:
+`CALRELAY_DEVELOPER_ID_P12`, `CALRELAY_DEVELOPER_ID_P12_PASSWORD`,
+`CALRELAY_NOTARY_API_KEY_P8`, `CALRELAY_NOTARY_KEY_ID`,
+`CALRELAY_NOTARY_ISSUER_ID`, `CALRELAY_DEVELOPER_TEAM_ID`, and
+`CALRELAY_SIGNING_IDENTITY`. Do not place their values in repository files, shell
+traces, caches, or task handoffs. The command validates the release toolchain,
+builds arm64 macOS 26-compatible products, uses an ephemeral keychain, signs and
+notarizes both products, staples and assesses the app, and writes immutable
+versioned archives plus `candidate-manifest.json` under
+`.build/release-artifacts/`. Existing final artifacts are never replaced.
+
+`scripts/release/release-state.mjs` owns deterministic state transitions for a
+staged release. Its `create`, `resume`, `advance`, `disable`, and `corrective`
+commands preserve exact artifact digests, reject stale or mismatched remote state,
+require formula and cask publication together, retain the prior known-good version
+until completion, and permit defective-release correction only through a higher
+patch. The later release-orchestration slice will supply observed GitHub and tap
+state to this fail-closed boundary.
+
+Real Developer ID, notarization, stapler, and Gatekeeper evidence requires the
+protected release environment. The default deterministic suite uses fake tools and
+no production credentials or Calendar data.

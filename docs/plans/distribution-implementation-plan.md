@@ -327,23 +327,34 @@ is tagged. No Node package manifest or lockfile was added.
 - Preserve the prior known-good version until the atomic tap commit succeeds.
 - Model defective tap-published versions as higher-patch roll-forward only.
 
-- [ ] **DIST-P04:** Release publication is resumable and immutable.
-- [ ] **DIST-P04-AC1:** Exact artifact bytes and digests survive retries without
+- [x] **DIST-P04:** Release publication is resumable and immutable.
+- [x] **DIST-P04-AC1:** Exact artifact bytes and digests survive retries without
   same-version rebuilding.
-- [ ] **DIST-P04-AC2:** Every publication stage accepts matching state and fails
+- [x] **DIST-P04-AC2:** Every publication stage accepts matching state and fails
   closed on mismatching state.
-- [ ] **DIST-P04-AC3:** Remote `master` advancement aborts before release commit
+- [x] **DIST-P04-AC3:** Remote `master` advancement aborts before release commit
   or tag publication.
-- [ ] **DIST-P04-AC4:** Incomplete releases resume the same version before later
+- [x] **DIST-P04-AC4:** Incomplete releases resume the same version before later
   commits are considered.
-- [ ] **DIST-P04-AC5:** The tap cannot expose only one package at the new version.
-- [ ] **DIST-P04-AC6:** A defective published version can only be corrected by a
+- [x] **DIST-P04-AC5:** The tap cannot expose only one package at the new version.
+- [x] **DIST-P04-AC6:** A defective published version can only be corrected by a
   higher patch release and never triggers calendar rollback.
-- [ ] **DIST-P04-V1:** Fault-injection tests cover interruption after every
+- [x] **DIST-P04-V1:** Fault-injection tests cover interruption after every
   publication stage.
-- [ ] **DIST-P04-V2:** Tests cover matching retries, mismatches, stale source,
+- [x] **DIST-P04-V2:** Tests cover matching retries, mismatches, stale source,
   partial assets, partial tap state, defective releases, and compromised-artifact
   handling.
+
+**Implementation evidence (September 26, 2026):**
+`scripts/release/release-state.mjs` now persists a schema-versioned state manifest
+and exact staged CLI and app bytes, accepts matching retries at every publication
+stage, and rejects rebuilt artifacts or mismatched source, tag, asset, and tap
+state. The state boundary aborts stale `master`, requires formula and cask state
+together, retains the prior known-good version until completion, supports explicit
+security disablement, and limits defective-release correction to a higher patch
+without calendar rollback. `DistributionReleaseStateTests` covers stage retries,
+interruption resumption, mismatches, stale source, partial publication, compromise,
+and corrective-version policy.
 
 ### DIST-P05 — Build, sign, notarize, and verify artifacts
 
@@ -381,25 +392,37 @@ is tagged. No Node package manifest or lockfile was added.
   dumps from entering artifacts, caches, or logs.
 
 - [ ] **DIST-P05:** Production CLI and app artifacts are generated safely.
-- [ ] **DIST-P05-AC1:** The CLI archive contains exactly one executable named
+- [x] **DIST-P05-AC1:** The CLI archive contains exactly one executable named
   `calrelay`.
-- [ ] **DIST-P05-AC2:** The app archive contains the correctly named and
+- [x] **DIST-P05-AC2:** The app archive contains the correctly named and
   identified `CalRelay.app`.
 - [ ] **DIST-P05-AC3:** Both products are Apple Silicon, macOS 26 compatible,
   Developer ID signed, hardened, securely timestamped, and notarization accepted.
 - [ ] **DIST-P05-AC4:** The app additionally has a valid stapled ticket and
   passes normal Gatekeeper assessment.
-- [ ] **DIST-P05-AC5:** Checksums are computed only after all byte-changing
+- [x] **DIST-P05-AC5:** Checksums are computed only after all byte-changing
   signing, stapling, and packaging operations.
-- [ ] **DIST-P05-AC6:** The production app remains unsandboxed and retains
+- [x] **DIST-P05-AC6:** The production app remains unsandboxed and retains
   canonical configuration-path compatibility.
-- [ ] **DIST-P05-AC7:** Signing material exists only in the ephemeral keychain
+- [x] **DIST-P05-AC7:** Signing material exists only in the ephemeral keychain
   and is cleaned up on success and failure.
-- [ ] **DIST-P05-V1:** Fake-tool process tests cover malformed versions,
+- [x] **DIST-P05-V1:** Fake-tool process tests cover malformed versions,
   toolchain mismatch, wrong architecture or Team ID, signing failure,
   notarization failure, stapling failure, and cleanup.
 - [ ] **DIST-P05-V2:** The protected release lane passes real signature,
   notarization, stapler, Gatekeeper, metadata, and checksum checks.
+
+**Repository implementation evidence (September 26, 2026):**
+`scripts/release/build-production-artifacts.sh` is a production-only entry point
+separate from `make app`. It validates the required Apple Silicon/Xcode 27/Swift
+6.4/macOS 27 SDK environment, builds macOS 26-compatible products, imports signing
+material into an ephemeral keychain, signs with hardened runtime and timestamp,
+submits both products for notarization, staples and assesses the app, verifies
+identity and unsandboxed metadata, then creates final archives and checksums. Fake
+tool process tests prove archive shape, operation ordering, malformed-input and
+boundary failures, secret-redacted output, and cleanup on success and failure. The
+protected real Developer ID, notarization, stapler, and Gatekeeper lane remains
+unchecked until the external credentials and release environment are provisioned.
 
 ### DIST-P06 — Generate and validate the formula and cask
 
@@ -717,7 +740,10 @@ and document whether it is included in `make check`.
 
 ## Readiness and next action
 
-Repository implementation is ready to begin with `DIST-P01`. After that task,
-`DIST-P02` and `DIST-P03` are the next parallelizable slices. `DIST-P10` and
+Repository implementation through `DIST-P04` is complete. `DIST-P05` has its
+production entry point and deterministic fake-backed evidence; only its protected
+real signing, notarization, stapler, and Gatekeeper validation remains externally
+blocked. `DIST-P06` is the next repository slice and may begin with fixture
+artifacts while protected production validation is provisioned. `DIST-P10` and
 `DIST-P11` remain externally blocked until their listed infrastructure and
 credential prerequisites exist.
