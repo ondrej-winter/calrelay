@@ -371,7 +371,7 @@ private final class ReleaseWorkflowFixture {
         fakeGH = root.appendingPathComponent("gh")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
 
-        try command("/usr/bin/git", ["init", "--bare", sourceRemote.path], at: root).requireSuccess()
+        try initializeBareRepository(sourceRemote)
         try command("/usr/bin/git", ["init", "-b", "master", source.path], at: root).requireSuccess()
         try git(source, ["config", "user.name", "CalRelay Tests"])
         try git(source, ["config", "user.email", "tests@example.invalid"])
@@ -394,7 +394,7 @@ private final class ReleaseWorkflowFixture {
         try git(source, ["tag", "v1.0.1"])
 
         let tap = root.appendingPathComponent("tap")
-        try command("/usr/bin/git", ["init", "--bare", tapRemote.path], at: root).requireSuccess()
+        try initializeBareRepository(tapRemote)
         try command("/usr/bin/git", ["init", "-b", "master", tap.path], at: root).requireSuccess()
         try git(tap, ["config", "user.name", "CalRelay Tests"])
         try git(tap, ["config", "user.email", "tests@example.invalid"])
@@ -413,6 +413,16 @@ private final class ReleaseWorkflowFixture {
     }
 
     func remove() { try? FileManager.default.removeItem(at: root) }
+
+    private func initializeBareRepository(_ repository: URL) throws {
+        try command("/usr/bin/git", ["init", "--bare", "-b", "master", repository.path], at: root).requireSuccess()
+        let head = try command(
+            "/usr/bin/git", ["--git-dir", repository.path, "symbolic-ref", "HEAD"], at: root
+        ).requiringOutput().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard head == "refs/heads/master" else {
+            throw TestFailure("Bare release fixture repository must use master as its default branch")
+        }
+    }
 
     func runFreshnessPlugin() throws -> ReleaseWorkflowProcessResult {
         let plugin = sourceRoot.appendingPathComponent("scripts/release/verify-release-source.mjs").absoluteString
