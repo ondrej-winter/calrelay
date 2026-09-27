@@ -68,7 +68,8 @@ roles only and do not contain credential values.
 ### Repositories and branch policy
 
 - Public source repository `ondrej-winter/calrelay`, with protected `master` and
-  an immutable release-tag policy.
+  GitHub immutable releases enabled before bootstrap so published release tags
+  and assets cannot be replaced or deleted.
 - Public tap repository `ondrej-winter/homebrew-tap`, with a protected default
   branch, no force-push publication, and GitHub App write access.
 - A protected `public-beta-release` environment for credential-bearing jobs and
@@ -95,14 +96,14 @@ roles only and do not contain credential values.
 
 - `CALRELAY_DEVELOPER_TEAM_ID` and `CALRELAY_SIGNING_IDENTITY`.
 - `CALRELAY_RELEASE_GITHUB_APP_ID`.
-- `CALRELAY_SOURCE_APP_INSTALLATION_ID` and
-  `CALRELAY_TAP_APP_INSTALLATION_ID`.
 - `CALRELAY_TAP_REPOSITORY`, fixed to `ondrej-winter/homebrew-tap` for the initial
   public beta.
 
 The GitHub App is installed only on the source and tap repositories and receives
 only the metadata, contents, and release permissions needed by the authorized
-publication stages. Non-qualifying analysis jobs receive none of the protected
+publication stages. The workflow resolves installation scope from the fixed
+repository owner and repository names rather than retaining installation IDs as
+configuration. Non-qualifying analysis jobs receive none of the protected
 signing, notarization, or publication credentials.
 
 ## Consequences

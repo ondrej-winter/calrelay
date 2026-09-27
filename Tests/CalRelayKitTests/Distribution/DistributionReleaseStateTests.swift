@@ -131,6 +131,7 @@ private struct ReleaseState: Decodable {
         let app: ReleaseArtifact
     }
     let version: String
+    let releaseCommit: String
     let previousKnownGoodVersion: String
     let stage: String
     let artifacts: Artifacts
@@ -150,6 +151,9 @@ private final class ReleaseStateFixture {
     let releaseDirectory: URL
     let cliArtifact: URL
     let appArtifact: URL
+    let sourceBundle: URL
+    let manifest: URL
+    let releaseNotes: URL
     private let sourceRoot: URL
     private let sourceRevision = String(repeating: "a", count: 40)
     private let releaseCommit = String(repeating: "c", count: 40)
@@ -166,9 +170,15 @@ private final class ReleaseStateFixture {
         releaseDirectory = root.appendingPathComponent(version)
         cliArtifact = root.appendingPathComponent("calrelay-\(version)-arm64.tar.gz")
         appArtifact = root.appendingPathComponent("CalRelay-\(version)-arm64.zip")
+        sourceBundle = root.appendingPathComponent("source.bundle")
+        manifest = root.appendingPathComponent("candidate-manifest.json")
+        releaseNotes = root.appendingPathComponent("release-notes.md")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try Data("cli-v1".utf8).write(to: cliArtifact)
         try Data("app-v1".utf8).write(to: appArtifact)
+        try Data("source-bundle-v1".utf8).write(to: sourceBundle)
+        try Data("{\"schemaVersion\":1}\n".utf8).write(to: manifest)
+        try Data("release notes\n".utf8).write(to: releaseNotes)
     }
 
     func remove() { try? FileManager.default.removeItem(at: root) }
@@ -176,7 +186,9 @@ private final class ReleaseStateFixture {
     func create() throws -> ReleaseStateProcessResult {
         try run([
             "create", "--directory", releaseDirectory.path, "--version", version, "--source-revision", sourceRevision,
-            "--previous-version", "1.0.0", "--cli-artifact", cliArtifact.path, "--app-artifact", appArtifact.path
+            "--release-commit", releaseCommit, "--previous-version", "1.0.0", "--cli-artifact", cliArtifact.path,
+            "--app-artifact", appArtifact.path, "--source-bundle", sourceBundle.path, "--manifest", manifest.path,
+            "--release-notes", releaseNotes.path
         ])
     }
 
@@ -187,9 +199,9 @@ private final class ReleaseStateFixture {
     {
         try run([
             "advance", "--directory", releaseDirectory.path, "--to", "source-published", "--remote-master",
-            remoteBranchRevision ?? sourceRevision, "--release-commit", releaseCommit, "--observed-version", version,
-            "--observed-release-commit", releaseCommit, "--observed-tag", "v\(version)", "--observed-tag-target",
-            observedTagTarget ?? releaseCommit
+            remoteBranchRevision ?? sourceRevision, "--publication-mode", "fresh", "--release-commit", releaseCommit,
+            "--observed-version", version, "--observed-release-commit", releaseCommit, "--observed-tag", "v\(version)",
+            "--observed-tag-target", observedTagTarget ?? releaseCommit
         ])
     }
 

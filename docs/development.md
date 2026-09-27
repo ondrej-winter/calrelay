@@ -162,11 +162,104 @@ versioned archives plus `candidate-manifest.json` under
 
 `scripts/release/release-state.mjs` owns deterministic state transitions for a
 staged release. Its `create`, `resume`, `advance`, `disable`, and `corrective`
-commands preserve exact artifact digests, reject stale or mismatched remote state,
-require formula and cask publication together, retain the prior known-good version
-until completion, and permit defective-release correction only through a higher
-patch. The later release-orchestration slice will supply observed GitHub and tap
-state to this fail-closed boundary.
+commands preserve exact artifact and source-bundle digests, bind the prepared
+release commit to the captured source revision, reject stale or mismatched remote
+state, require formula and cask publication together, retain the prior known-good
+version until completion, and permit defective-release correction only through a
+higher patch. Release-state schema 3 is the source-bound retained-candidate format
+that also seals the exact production manifest and release notes; candidate
+manifests remain schema 1.
+
+## Homebrew and release workflow validation
+
+Generate formula and cask content only through the repository generator. It
+requires the production `candidate-manifest.json` and verifies the artifact bytes
+before writing both packages atomically:
+
+```sh
+node scripts/release/generate-homebrew-packages.mjs \
+  --manifest .build/release-artifacts/candidate-manifest.json \
+  --artifacts-directory .build/release-artifacts \
+  --output-directory .build/homebrew-packages
+```
+
+The protected release workflow runs real Homebrew `style`, `audit`, `fetch`,
+install, test, upgrade, reinstall, coexistence, and ordinary uninstall checks on
+the clean Apple Silicon release environment. The deterministic local equivalents
+and release orchestration fixtures run with:
+
+```sh
+swift run CalRelayKitTests \
+  DistributionHomebrewPackageTests \
+  DistributionReleaseStateTests \
+  DistributionReleaseWorkflowTests \
+  DistributionReleasePolicyTests
+```
+
+When changing release JavaScript or the workflow, also run:
+
+```sh
+node --check scripts/release/generate-homebrew-packages.mjs
+node --check scripts/release/validate-homebrew-packages.mjs
+node --check scripts/release/verify-release-source.mjs
+node --check scripts/release/stage-release-candidate.mjs
+node --check scripts/release/publish-release.mjs
+actionlint .github/workflows/release.yml
+```
+
+`actionlint` is an additional provider-aware check and must run in a configured
+developer or CI environment; it is not currently a repository-managed dependency.
+
+## Protected release workflow setup and operation
+
+Before the first bootstrap, configure all of the following:
+
+1. Enable GitHub immutable releases for `ondrej-winter/calrelay`, protect
+   `master`, and disallow force-push replacement of release history.
+2. Keep `ondrej-winter/homebrew-tap` public with protected `master`, no
+   force-push publication, and the expected `Formula/` and `Casks/` paths.
+3. Create the protected `public-beta-release` environment with required review or
+   deployment controls.
+4. Provide an ephemeral self-hosted runner labeled `macOS`, `ARM64`, and
+   `calrelay-release`, with macOS 27+, Xcode 27, Swift 6.4, Homebrew, `gh`, and
+   the pinned Node runtime available.
+5. Install the dedicated release GitHub App only on `ondrej-winter/calrelay` and
+   `ondrej-winter/homebrew-tap`. Grant only repository contents/release access
+   needed for source refs, release assets, and the tap commit.
+6. Configure protected secret `CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY`; configure
+   variable `CALRELAY_RELEASE_GITHUB_APP_ID`; and set
+   `CALRELAY_TAP_REPOSITORY` exactly to `ondrej-winter/homebrew-tap`.
+7. Configure the signing/notarization secrets and identity variables listed above.
+
+The workflow has one non-cancelling concurrency group. Non-qualifying pushes stop
+after the unprivileged analysis job and cannot access signing or publication
+credentials. Bootstrap `v1.0.0` manually with:
+
+```sh
+gh workflow run release.yml -f bootstrap=true
+```
+
+The workflow retains the exact source-bound candidate as the
+`release-candidate` Actions artifact for 30 days. To resume an interrupted run,
+use the original workflow run ID and do not set `bootstrap`:
+
+```sh
+gh workflow run release.yml -f resume_run_id=123456789
+```
+
+Resumption never rebuilds the same version. It downloads the retained candidate,
+verifies that its source revision and artifact came from the named completed
+release workflow run on `ondrej-winter/calrelay` `master`, checks out that captured
+revision, and restores the prepared release commit and tag from `source.bundle`.
+It then reruns source quality gates and verifies the manifest, artifact digests,
+checksums, generated packages, source bundle, and remote state before continuing.
+This also permits recovery when interruption happened before the release commit
+was published to GitHub. After source publication, a later descendant of `master`
+is accepted only when the immutable release tag still identifies the retained
+release commit. Mismatched workflow provenance, tags, assets, tap content, or
+candidate bytes fail closed. If the Actions artifact has expired or is missing,
+do not rebuild the same version; investigate and use the accepted higher-patch
+corrective path where applicable.
 
 Real Developer ID, notarization, stapler, and Gatekeeper evidence requires the
 protected release environment. The default deterministic suite uses fake tools and

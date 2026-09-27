@@ -44,22 +44,34 @@ function createState(options) {
   const directory = resolve(required(options, "directory"));
   const version = parseVersion(required(options, "version")).value;
   const sourceRevision = validateRevision(required(options, "source-revision"), "captured source revision");
+  const releaseCommit = validateRevision(required(options, "release-commit"), "release commit");
   const previousKnownGoodVersion = parseVersion(required(options, "previous-version")).value;
   const cliSource = resolve(required(options, "cli-artifact"));
   const appSource = resolve(required(options, "app-artifact"));
+  const sourceBundleSource = resolve(required(options, "source-bundle"));
+  const manifestSource = resolve(required(options, "manifest"));
+  const releaseNotesSource = resolve(required(options, "release-notes"));
   const artifacts = {
     cli: describeArtifact(cliSource),
     app: describeArtifact(appSource),
   };
+  if (!existsSync(sourceBundleSource)) throw new Error(`Source bundle does not exist at ${sourceBundleSource}.`);
+  const sourceBundle = { name: "source.bundle", sha256: sha256File(sourceBundleSource) };
+  const manifest = describeRetainedFile(manifestSource, "candidate-manifest.json", "Candidate manifest");
+  const releaseNotes = describeRetainedFile(releaseNotesSource, "release-notes.md", "Release notes");
 
   if (existsSync(join(directory, stateFileName))) {
     const existing = readState(directory);
     assertImmutable(existing.version, version, "release version");
     assertImmutable(existing.sourceRevision, sourceRevision, "captured source revision");
+    assertImmutable(existing.releaseCommit, releaseCommit, "release commit");
     assertImmutable(existing.previousKnownGoodVersion, previousKnownGoodVersion, "previous known-good version");
     assertArtifact(existing.artifacts.cli, artifacts.cli, "CLI artifact");
     assertArtifact(existing.artifacts.app, artifacts.app, "app artifact");
-    verifyStagedArtifacts(existing, directory);
+    assertArtifact(existing.sourceBundle, sourceBundle, "source bundle");
+    assertArtifact(existing.manifest, manifest, "candidate manifest");
+    assertArtifact(existing.releaseNotes, releaseNotes, "release notes");
+    verifyStagedCandidate(existing, directory);
     return existing;
   }
   if (existsSync(directory)) {
@@ -73,16 +85,22 @@ function createState(options) {
     mkdirSync(join(temporary, "artifacts"), { recursive: true });
     copyFileSync(cliSource, join(temporary, "artifacts", artifacts.cli.name), constants.COPYFILE_EXCL);
     copyFileSync(appSource, join(temporary, "artifacts", artifacts.app.name), constants.COPYFILE_EXCL);
+    copyFileSync(sourceBundleSource, join(temporary, sourceBundle.name), constants.COPYFILE_EXCL);
+    copyFileSync(manifestSource, join(temporary, manifest.name), constants.COPYFILE_EXCL);
+    copyFileSync(releaseNotesSource, join(temporary, releaseNotes.name), constants.COPYFILE_EXCL);
     const state = {
-      schemaVersion: 1,
+      schemaVersion: 3,
       version,
       tag: `v${version}`,
       sourceRevision,
       previousKnownGoodVersion,
       knownGoodVersion: previousKnownGoodVersion,
-      releaseCommit: null,
+      releaseCommit,
       stage: "artifacts-staged",
       artifacts,
+      sourceBundle,
+      manifest,
+      releaseNotes,
       source: null,
       releaseAssets: null,
       tap: null,
@@ -114,7 +132,7 @@ function findIncompleteState(statesRoot) {
     return { version: null, directory: null, stage: null };
   }
   const [{ directory, state }] = incomplete;
-  verifyStagedArtifacts(state, directory);
+  verifyStagedCandidate(state, directory);
   return { version: state.version, directory, stage: state.stage };
 }
 
@@ -129,7 +147,7 @@ function advanceState(options) {
   if (state.securityDisposition === "disabled") {
     throw new Error("A security-disabled release cannot advance publication.");
   }
-  verifyStagedArtifacts(state, directory);
+  verifyStagedCandidate(state, directory);
   const currentIndex = stageOrder.indexOf(state.stage);
   if (currentIndex < 0) {
     throw new Error(`Unknown persisted publication stage ${state.stage}.`);
@@ -173,10 +191,15 @@ function advanceState(options) {
 
 function validateSourcePublication(state, options) {
   const remoteMaster = validateRevision(required(options, "remote-master"), "remote master revision");
-  if (remoteMaster !== state.sourceRevision) {
+  const publicationMode = required(options, "publication-mode");
+  if (!["fresh", "resume"].includes(publicationMode)) {
+    throw new Error("Source publication mode must be fresh or resume.");
+  }
+  if (publicationMode === "fresh" && remoteMaster !== state.sourceRevision) {
     throw new Error(`Captured source revision does not match remote master; refusing source publication.`);
   }
   const releaseCommit = validateRevision(required(options, "release-commit"), "release commit");
+  assertImmutable(releaseCommit, state.releaseCommit, "release commit");
   const observed = {
     version: parseVersion(required(options, "observed-version")).value,
     releaseCommit: validateRevision(required(options, "observed-release-commit"), "observed release commit"),
@@ -189,9 +212,7 @@ function validateSourcePublication(state, options) {
   assertImmutable(observed.tagTarget, releaseCommit, "published tag target");
   if (state.source) {
     assertJsonImmutable(state.source, observed, "source publication");
-    assertImmutable(state.releaseCommit, releaseCommit, "release commit");
   } else {
-    state.releaseCommit = releaseCommit;
     state.source = observed;
   }
 }
@@ -259,12 +280,37 @@ function describeArtifact(path) {
   return { name: basename(path), sha256: sha256File(path) };
 }
 
-function verifyStagedArtifacts(state, directory) {
+function describeRetainedFile(path, name, label) {
+  if (!existsSync(path)) throw new Error(`${label} does not exist at ${path}.`);
+  return { name, sha256: sha256File(path) };
+}
+
+function verifyStagedCandidate(state, directory) {
   for (const [label, artifact] of Object.entries(state.artifacts)) {
     const path = join(directory, "artifacts", artifact.name);
     if (!existsSync(path) || sha256File(path) !== artifact.sha256) {
       throw new Error(`Staged ${label} artifact no longer matches immutable release state.`);
     }
+  }
+  validateRevision(state.releaseCommit, "retained release commit");
+  if (state.sourceBundle?.name !== "source.bundle" || !digestPattern.test(state.sourceBundle.sha256 ?? "")) {
+    throw new Error("Retained source bundle metadata no longer matches immutable release state.");
+  }
+  const sourceBundle = join(directory, state.sourceBundle.name);
+  if (!existsSync(sourceBundle) || sha256File(sourceBundle) !== state.sourceBundle.sha256) {
+    throw new Error("Staged source bundle no longer matches immutable release state.");
+  }
+  verifyRetainedFile(state.manifest, directory, "candidate-manifest.json", "candidate manifest");
+  verifyRetainedFile(state.releaseNotes, directory, "release-notes.md", "release notes");
+}
+
+function verifyRetainedFile(metadata, directory, expectedName, label) {
+  if (metadata?.name !== expectedName || !digestPattern.test(metadata.sha256 ?? "")) {
+    throw new Error(`Retained ${label} metadata no longer matches immutable release state.`);
+  }
+  const path = join(directory, expectedName);
+  if (!existsSync(path) || sha256File(path) !== metadata.sha256) {
+    throw new Error(`Staged ${label} no longer matches immutable release state.`);
   }
 }
 
@@ -274,7 +320,7 @@ function readState(directory) {
     throw new Error(`Release state is missing at ${path}.`);
   }
   const state = JSON.parse(readFileSync(path, "utf8"));
-  if (state.schemaVersion !== 1) {
+  if (state.schemaVersion !== 3) {
     throw new Error(`Unsupported release-state schema ${state.schemaVersion}.`);
   }
   return state;

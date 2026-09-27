@@ -12,7 +12,8 @@ import Foundation
         "CalendarManualDryRunTests", "CalendarMutationExecutorTests", "CalendarNoPromptContractTests",
         "CalendarReviewedActionTests", "CalendarStandingAuthorizationTests", "CalRelayCLISmokeTests",
         "CalRelayContractTests", "ConfigCheckCommandHandlerTests", "EventKitExactEventOccurrenceResolverTests",
-        "DistributionProductionArtifactTests", "DistributionReleasePolicyTests", "DistributionReleaseStateTests",
+        "DistributionHomebrewPackageTests", "DistributionProductionArtifactTests", "DistributionReleasePolicyTests",
+        "DistributionReleaseStateTests", "DistributionReleaseWorkflowTests",
         "DistributionVersionTests", "FileCalendarRelaySettingsProviderTests",
         "OrdinaryReconciliationCalendarCaptureTests", "OrdinaryReconciliationWindowTests",
         "ReconcileCommandHandlerTests", "ReconciliationConvergenceTests", "ReconciliationSpecificationTests",
@@ -144,16 +145,7 @@ import Foundation
     }
 
     private static func runContractSuites(filters: Set<String>) async throws {
-        if filters.isEmpty || filters.contains("DistributionProductionArtifactTests") {
-            try DistributionProductionArtifactTests.runAll()
-        }
-        if filters.isEmpty || filters.contains("DistributionReleasePolicyTests") {
-            try DistributionReleasePolicyTests.runAll()
-        }
-        if filters.isEmpty || filters.contains("DistributionReleaseStateTests") {
-            try DistributionReleaseStateTests.runAll()
-        }
-        if filters.isEmpty || filters.contains("DistributionVersionTests") { try DistributionVersionTests.runAll() }
+        try runDistributionSuites(filters: filters)
         if filters.isEmpty || filters.contains("OrdinaryReconciliationCalendarCaptureTests") {
             try await OrdinaryReconciliationCalendarCaptureTests.runAll()
         }
@@ -168,6 +160,25 @@ import Foundation
         }
         if filters.isEmpty || filters.contains("CalRelayContractTests") { try await CalRelayContractTests.runAll() }
         if filters.isEmpty || filters.contains("CalRelayCLISmokeTests") { try CalRelayCLISmokeTests.runAll() }
+    }
+
+    private static func runDistributionSuites(filters: Set<String>) throws {
+        if filters.isEmpty || filters.contains("DistributionHomebrewPackageTests") {
+            try DistributionHomebrewPackageTests.runAll()
+        }
+        if filters.isEmpty || filters.contains("DistributionProductionArtifactTests") {
+            try DistributionProductionArtifactTests.runAll()
+        }
+        if filters.isEmpty || filters.contains("DistributionReleasePolicyTests") {
+            try DistributionReleasePolicyTests.runAll()
+        }
+        if filters.isEmpty || filters.contains("DistributionReleaseStateTests") {
+            try DistributionReleaseStateTests.runAll()
+        }
+        if filters.isEmpty || filters.contains("DistributionReleaseWorkflowTests") {
+            try DistributionReleaseWorkflowTests.runAll()
+        }
+        if filters.isEmpty || filters.contains("DistributionVersionTests") { try DistributionVersionTests.runAll() }
     }
 }
 

@@ -3,6 +3,7 @@
   "tagFormat": "v${version}",
   "plugins": [
     "./scripts/release/analyze-commits.mjs",
+    "./scripts/release/verify-release-source.mjs",
     "./scripts/release/generate-notes.mjs",
     "./scripts/release/prepare-release.mjs"
   ]

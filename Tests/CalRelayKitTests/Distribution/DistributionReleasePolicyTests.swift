@@ -237,7 +237,8 @@ enum DistributionReleasePolicyTests {
         let plugins = configuration["plugins"] as? [String]
         try expect(
             plugins == [
-                "./scripts/release/analyze-commits.mjs", "./scripts/release/generate-notes.mjs",
+                "./scripts/release/analyze-commits.mjs", "./scripts/release/verify-release-source.mjs",
+                "./scripts/release/generate-notes.mjs",
                 "./scripts/release/prepare-release.mjs"
             ],
             "semantic-release must use only the repository-owned policy plugins")
@@ -247,6 +248,7 @@ enum DistributionReleasePolicyTests {
         try expect(
             pinnedPlugins == [
                 "./scripts/release/analyze-commits.mjs": "1.2.0",
+                "./scripts/release/verify-release-source.mjs": "1.0.0",
                 "./scripts/release/generate-notes.mjs": "1.2.0",
                 "./scripts/release/prepare-release.mjs": "1.2.0"
             ],

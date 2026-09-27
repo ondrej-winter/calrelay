@@ -2,10 +2,12 @@
 
 ## Plan record
 
-- **Status:** Ready for repository implementation. External release rollout is
-  blocked until the required public tap, runners, credentials, signing identity,
-  and GitHub App are provisioned.
+- **Status:** Repository implementation is complete through `DIST-P07` as of
+  September 27, 2026. Protected release evidence and public rollout remain
+  blocked until repository policy, runners, credentials, signing identity,
+  environment controls, and the GitHub App are provisioned and exercised.
 - **Prepared:** September 26, 2026.
+- **Updated:** September 27, 2026.
 - **Canonical requirements:**
   [`../specs/distribution-spec.md`](../specs/distribution-spec.md), revision 3,
   accepted September 26, 2026.
@@ -34,25 +36,28 @@ Implement the accepted public-beta distribution contract so CalRelay can:
 7. bootstrap `v1.0.0` manually, then prove a later qualifying `master` push
    releases automatically through the same gate.
 
-## Current-state basis
+## Current implementation state
 
-- The repository has no root `VERSION`, release tags, `.releaserc.json`, GitHub
-  Actions workflows, production release scripts, or Homebrew definitions.
-- `calrelay --version` is not implemented.
-- `Resources/CalRelayApp/Info.plist` hard-codes short version `0.1.0` and bundle
-  version `1`.
-- `Package.swift` declares Swift tools 6.2 rather than the required 6.4.
-- `scripts/build-calrelay-app.sh` builds an ad-hoc-signed local development app;
-  it does not create a Developer ID signed and notarized distribution artifact.
-- The local environment provides Apple Silicon, macOS 27, Xcode 27, Swift 6.4,
-  and the macOS 27 SDK.
-- The accepted distribution specification references
-  `docs/adr/0004-automate-signed-public-beta-releases.md`, but that ADR and its
-  index entry are absent.
-- The public `ondrej-winter/homebrew-tap` URL currently returns 404. It may be
-  absent or non-public; authenticated repository state was not available during
-  planning.
-- Local and remote tag inspection found no published version tags.
+- The root `VERSION`, synchronized CLI/app version behavior, release policy,
+  production artifact path, resumable release state, Homebrew package generator,
+  lifecycle validator, and protected release workflow are implemented.
+- `scripts/release/generate-homebrew-packages.mjs` emits the formula and cask
+  together from the production candidate manifest. The deterministic lifecycle
+  suite covers package metadata, both installation orders, upgrade/reinstall,
+  independent ordinary uninstallation, and retained-state sentinels.
+- `.github/workflows/release.yml` provides serialized manual bootstrap,
+  same-candidate resumption, and qualifying `master` push orchestration. Its
+  repository-owned publisher verifies the retained manifest, artifact bytes,
+  checksums, source bundle, release commit, published assets, and atomic tap
+  commit at every retry boundary.
+- The public `ondrej-winter/homebrew-tap` repository is accessible as of
+  September 27, 2026 and has a `master` branch, README, and license. Its branch
+  protection, GitHub App installation, and package publication path still require
+  protected-environment verification.
+- No public CalRelay release is visible yet. The `v1.0.0` bootstrap, production
+  Developer ID/notarization evidence, GitHub immutable-release setting, protected
+  environment, release runner, repository rules, and later automatic release
+  remain external rollout checkpoints.
 
 ## Scope boundaries
 
@@ -462,24 +467,31 @@ paths or modifying it.
 - Verify package operations do not launch either product, request permission,
   access calendars, or register launch-at-login.
 
-- [ ] **DIST-P06:** Formula and cask satisfy the installation contract.
-- [ ] **DIST-P06-AC1:** Both packages use token `calrelay` and coexist without
+- [x] **DIST-P06:** Formula and cask satisfy the repository installation contract.
+- [x] **DIST-P06-AC1:** Both packages use token `calrelay` and coexist without
   ownership collisions.
-- [ ] **DIST-P06-AC2:** The formula installs the prebuilt CLI without SwiftPM or
+- [x] **DIST-P06-AC2:** The formula installs the prebuilt CLI without SwiftPM or
   build-dependency downloads.
-- [ ] **DIST-P06-AC3:** The cask installs only the app and contains no destructive
+- [x] **DIST-P06-AC3:** The cask installs only the app and contains no destructive
   `zap`.
-- [ ] **DIST-P06-AC4:** Unsupported architecture and operating systems are
+- [x] **DIST-P06-AC4:** Unsupported architecture and operating systems are
   rejected through package metadata.
-- [ ] **DIST-P06-AC5:** Installation order does not affect either product.
-- [ ] **DIST-P06-AC6:** Upgrades and uninstallation preserve configuration and
+- [x] **DIST-P06-AC5:** Installation order does not affect either product.
+- [x] **DIST-P06-AC6:** Upgrades and uninstallation preserve configuration and
   do not remove the other package.
-- [ ] **DIST-P06-AC7:** Formula and cask are emitted together from the same
+- [x] **DIST-P06-AC7:** Formula and cask are emitted together from the same
   verified release manifest.
 - [ ] **DIST-P06-V1:** Homebrew style, audit, fetch, install, test, upgrade,
   uninstall, and coexistence checks pass in CI.
 - [ ] **DIST-P06-V2:** Re-downloaded production artifacts match committed package
   checksums exactly.
+
+**Repository evidence (September 27, 2026):**
+`DistributionHomebrewPackageTests` passes with a fake-backed local tap and proves
+the lifecycle command sequence and state-retention boundary. The protected
+workflow contains the corresponding real Homebrew lane. `DIST-P06-V1` remains
+open until that lane runs on the clean Apple Silicon package-test environment;
+`DIST-P06-V2` remains open until the first published assets are re-downloaded.
 
 ### DIST-P07 — Add secure GitHub Actions release orchestration
 
@@ -511,23 +523,37 @@ paths or modifying it.
   resumption rather than selecting another release.
 - Always clean up temporary credentials and keychains.
 
-- [ ] **DIST-P07:** CI securely orchestrates complete releases.
-- [ ] **DIST-P07-AC1:** Manual bootstrap and automatic `master` pushes use the
+- [x] **DIST-P07:** The repository securely orchestrates complete releases.
+- [x] **DIST-P07-AC1:** Manual bootstrap and automatic `master` pushes use the
   same release gate.
-- [ ] **DIST-P07-AC2:** Concurrent releases queue and never cancel active
+- [x] **DIST-P07-AC2:** Concurrent releases queue and never cancel active
   publication.
-- [ ] **DIST-P07-AC3:** Non-qualifying pushes publish nothing and cannot access
+- [x] **DIST-P07-AC3:** Non-qualifying pushes publish nothing and cannot access
   signing or publication secrets.
-- [ ] **DIST-P07-AC4:** Remote source advancement fails before source
+- [x] **DIST-P07-AC4:** Remote source advancement fails before source
   publication.
-- [ ] **DIST-P07-AC5:** Cross-repository writes use only the dedicated GitHub App
+- [x] **DIST-P07-AC5:** Cross-repository writes use only the dedicated GitHub App
   with least privilege.
-- [ ] **DIST-P07-AC6:** The complete release gate requires no real Calendar data
+- [x] **DIST-P07-AC6:** The complete release gate requires no real Calendar data
   or Calendar mutation.
 - [ ] **DIST-P07-V1:** Workflow syntax, permissions, and pinned-action policy
   checks pass.
 - [ ] **DIST-P07-V2:** A controlled dry run or disposable-repository exercise
   proves trigger, concurrency, token, source-check, and publication ordering.
+
+**Repository evidence (September 27, 2026):**
+`DistributionReleaseWorkflowTests`, `DistributionReleaseStateTests`, and
+`DistributionReleasePolicyTests` pass. They prove stale-source rejection before
+preparation, exact release-commit and source-bundle retention, byte-for-byte
+same-version retries, candidate tamper rejection before source mutation, atomic
+source/tag publication, published-asset re-download verification, later-`master`
+resumption, and one-commit formula/cask publication. YAML parsing, JavaScript
+syntax checks, pinned-action policy checks, and least-privilege workflow checks
+also pass. `DIST-P07-V1` remains open because `actionlint` was not installed in
+the local environment and GitHub has not executed the workflow. `DIST-P07-V2`
+remains open until a protected disposable or production exercise proves the
+GitHub trigger, queue, App token, and environment controls rather than only the
+repository-owned publication logic.
 
 ### DIST-P08 — Close acceptance, recovery, and security evidence
 

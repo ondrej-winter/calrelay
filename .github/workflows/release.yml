@@ -1,0 +1,318 @@
+name: Public-beta release
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      bootstrap:
+        description: Bootstrap the first public release at v1.0.0
+        required: false
+        type: boolean
+        default: false
+      resume_run_id:
+        description: Workflow run containing the immutable release-candidate artifact to resume
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: calrelay-public-beta-release
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.selection.outputs.release }}
+      source_revision: ${{ steps.selection.outputs.source_revision }}
+      previous_version: ${{ steps.selection.outputs.previous_version }}
+      resume: ${{ steps.selection.outputs.resume }}
+    steps:
+      - name: Check out captured source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up pinned Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.21.0
+          package-manager-cache: false
+      - name: Select release or resumption
+        id: selection
+        env:
+          BOOTSTRAP: ${{ inputs.bootstrap }}
+          RESUME_RUN_ID: ${{ inputs.resume_run_id }}
+        run: |
+          set -euo pipefail
+          printf 'source_revision=%s\n' "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+          previous="$(git tag --list 'v*' --sort=-version:refname | head -n 1)"
+          printf 'previous_version=%s\n' "${previous#v}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${RESUME_RUN_ID:-}" ]]; then
+            [[ "$RESUME_RUN_ID" =~ ^[1-9][0-9]*$ ]] || { echo 'resume_run_id must be a positive workflow run ID.' >&2; exit 1; }
+            [[ "${BOOTSTRAP:-false}" != true ]] || { echo 'bootstrap and resume_run_id are mutually exclusive.' >&2; exit 1; }
+            printf 'release=true\nresume=true\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          arguments=(select)
+          [[ "${BOOTSTRAP:-false}" == true ]] && arguments+=(--bootstrap)
+          selection="$(node scripts/release/release-policy.mjs "${arguments[@]}")"
+          release="$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.nextVersion ? "true" : "false")' "$selection")"
+          printf 'release=%s\nresume=false\n' "$release" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: analyze
+    if: needs.analyze.outputs.release == 'true'
+    runs-on: [self-hosted, macOS, ARM64, calrelay-release]
+    environment: public-beta-release
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Set up pinned Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.21.0
+          package-manager-cache: false
+      - name: Download resumable candidate
+        if: needs.analyze.outputs.resume == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-candidate
+          path: ${{ runner.temp }}/calrelay-release-candidate
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
+      - name: Resolve checkout revision
+        id: checkout
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESUME: ${{ needs.analyze.outputs.resume }}
+          RESUME_RUN_ID: ${{ inputs.resume_run_id }}
+          SOURCE_REVISION: ${{ needs.analyze.outputs.source_revision }}
+        run: |
+          set -euo pipefail
+          revision="$SOURCE_REVISION"
+          if [[ "$RESUME" == true ]]; then
+            command -v gh >/dev/null
+            metadata="${RUNNER_TEMP}/calrelay-resume-run.json"
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RESUME_RUN_ID}" > "$metadata"
+            node --input-type=module --eval '
+              import { appendFileSync, readFileSync } from "node:fs";
+              const [statePath, metadataPath, repository, runID, outputPath] = process.argv.slice(1);
+              const state = JSON.parse(readFileSync(statePath, "utf8"));
+              const run = JSON.parse(readFileSync(metadataPath, "utf8"));
+              const revision = /^[0-9a-f]{40}$/;
+              if (state.schemaVersion !== 3 || !revision.test(state.sourceRevision ?? "") || !revision.test(state.releaseCommit ?? "")) {
+                throw new Error("retained release source metadata is invalid");
+              }
+              if (state.tag !== `v${state.version}`) throw new Error("retained release tag is invalid");
+              if (
+                String(run.id) !== runID
+                || run.name !== "Public-beta release"
+                || run.path !== ".github/workflows/release.yml"
+                || !["push", "workflow_dispatch"].includes(run.event)
+                || run.status !== "completed"
+                || run.head_branch !== "master"
+                || run.repository?.full_name !== repository
+                || run.head_repository?.full_name !== repository
+                || run.head_sha !== state.sourceRevision
+              ) {
+                throw new Error("resume candidate does not match its protected release workflow run");
+              }
+              appendFileSync(outputPath, `revision=${state.sourceRevision}\nrelease_commit=${state.releaseCommit}\ntag=${state.tag}\n`);
+            ' "${RUNNER_TEMP}/calrelay-release-candidate/release-state.json" "$metadata" "$GITHUB_REPOSITORY" "$RESUME_RUN_ID" "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo 'Checkout revision must be a full lowercase Git revision.' >&2; exit 1; }
+          printf 'revision=%s\n' "$revision" >> "$GITHUB_OUTPUT"
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ steps.checkout.outputs.revision }}
+      - name: Restore resumable candidate after checkout
+        if: needs.analyze.outputs.resume == 'true'
+        run: |
+          mkdir -p .build
+          mv "${RUNNER_TEMP}/calrelay-release-candidate" .build/release-candidate
+      - name: Restore retained release commit from source bundle
+        if: needs.analyze.outputs.resume == 'true'
+        env:
+          RELEASE_COMMIT: ${{ steps.checkout.outputs.release_commit }}
+          RELEASE_TAG: ${{ steps.checkout.outputs.tag }}
+        run: |
+          set -euo pipefail
+          bundle=.build/release-candidate/source.bundle
+          node --input-type=module --eval '
+            import { createHash } from "node:crypto";
+            import { readFileSync } from "node:fs";
+            const [statePath, bundlePath] = process.argv.slice(1);
+            const state = JSON.parse(readFileSync(statePath, "utf8"));
+            const observed = createHash("sha256").update(readFileSync(bundlePath)).digest("hex");
+            if (state.sourceBundle?.name !== "source.bundle" || state.sourceBundle.sha256 !== observed) {
+              throw new Error("retained source bundle digest conflicts with release state");
+            }
+          ' .build/release-candidate/release-state.json "$bundle"
+          git bundle verify "$bundle"
+          git fetch --no-tags "$bundle" refs/heads/master:refs/remotes/calrelay-candidate/master
+          git fetch --no-tags "$bundle" "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+          [[ "$(git rev-parse refs/remotes/calrelay-candidate/master)" == "$RELEASE_COMMIT" ]]
+          [[ "$(git rev-parse "refs/tags/${RELEASE_TAG}")" == "$RELEASE_COMMIT" ]]
+          git checkout --detach "$RELEASE_COMMIT"
+      - name: Run source quality gates
+        run: |
+          make format-check
+          make check
+      - name: Validate protected release configuration
+        env:
+          TAP_REPOSITORY: ${{ vars.CALRELAY_TAP_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REPOSITORY" == ondrej-winter/calrelay ]] || { echo 'Release workflow is restricted to ondrej-winter/calrelay.' >&2; exit 1; }
+          [[ "$TAP_REPOSITORY" == ondrej-winter/homebrew-tap ]] || { echo 'CALRELAY_TAP_REPOSITORY must be ondrej-winter/homebrew-tap.' >&2; exit 1; }
+          command -v gh >/dev/null
+          command -v brew >/dev/null
+      - name: Prepare release notes
+        if: needs.analyze.outputs.resume != 'true'
+        env:
+          BOOTSTRAP: ${{ inputs.bootstrap }}
+        run: |
+          set -euo pipefail
+          mkdir -p .build/release-metadata
+          arguments=(notes)
+          [[ "${BOOTSTRAP:-false}" == true ]] && arguments+=(--bootstrap)
+          node scripts/release/release-policy.mjs "${arguments[@]}" > .build/release-metadata/release-notes.md
+      - name: Prepare local source publication remote
+        if: needs.analyze.outputs.resume != 'true'
+        env:
+          SOURCE_REVISION: ${{ needs.analyze.outputs.source_revision }}
+        run: |
+          set -euo pipefail
+          git switch -C master "$SOURCE_REVISION"
+          rm -rf "${RUNNER_TEMP}/calrelay-source-publication.git"
+          git clone --bare . "${RUNNER_TEMP}/calrelay-source-publication.git"
+      - name: Prepare release commit and tag through semantic-release
+        if: needs.analyze.outputs.resume != 'true'
+        env:
+          CALRELAY_RELEASE_SOURCE_REVISION: ${{ needs.analyze.outputs.source_revision }}
+          CALRELAY_RELEASE_SOURCE_REMOTE: https://github.com/${{ github.repository }}.git
+        run: |
+          set -euo pipefail
+          arguments=(--repository-url "file://${RUNNER_TEMP}/calrelay-source-publication.git")
+          [[ "${{ inputs.bootstrap }}" == true ]] && arguments+=(--bootstrap)
+          scripts/release/run-semantic-release.sh "${arguments[@]}"
+      - name: Build signed and notarized candidate
+        if: needs.analyze.outputs.resume != 'true'
+        env:
+          CALRELAY_DEVELOPER_ID_P12: ${{ secrets.CALRELAY_DEVELOPER_ID_P12 }}
+          CALRELAY_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.CALRELAY_DEVELOPER_ID_P12_PASSWORD }}
+          CALRELAY_NOTARY_API_KEY_P8: ${{ secrets.CALRELAY_NOTARY_API_KEY_P8 }}
+          CALRELAY_NOTARY_KEY_ID: ${{ secrets.CALRELAY_NOTARY_KEY_ID }}
+          CALRELAY_NOTARY_ISSUER_ID: ${{ secrets.CALRELAY_NOTARY_ISSUER_ID }}
+          CALRELAY_DEVELOPER_TEAM_ID: ${{ vars.CALRELAY_DEVELOPER_TEAM_ID }}
+          CALRELAY_SIGNING_IDENTITY: ${{ vars.CALRELAY_SIGNING_IDENTITY }}
+        run: make release-artifacts
+      - name: Stage immutable release candidate
+        if: needs.analyze.outputs.resume != 'true'
+        env:
+          PREVIOUS_VERSION: ${{ needs.analyze.outputs.previous_version }}
+          SOURCE_REVISION: ${{ needs.analyze.outputs.source_revision }}
+        run: |
+          set -euo pipefail
+          node scripts/release/stage-release-candidate.mjs \
+            --candidate-directory .build/release-candidate \
+            --artifacts-directory .build/release-artifacts \
+            --manifest .build/release-artifacts/candidate-manifest.json \
+            --version "$(cat VERSION)" \
+            --previous-version "${PREVIOUS_VERSION:-0.0.0}" \
+            --source-revision "$SOURCE_REVISION" \
+            --notes-file .build/release-metadata/release-notes.md
+      - name: Retain immutable candidate for resumption
+        if: needs.analyze.outputs.resume != 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-candidate
+          path: .build/release-candidate
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30
+      - name: Create least-privilege publication token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.CALRELAY_RELEASE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY }}
+          owner: ondrej-winter
+          repositories: calrelay,homebrew-tap
+          permission-contents: write
+      - name: Publish and verify immutable release assets
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          CALRELAY_GIT_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          node scripts/release/publish-release.mjs assets \
+            --candidate-directory .build/release-candidate \
+            --source-repository "$GITHUB_REPOSITORY" \
+            --tap-repository "${{ vars.CALRELAY_TAP_REPOSITORY }}" \
+            --source-remote "https://github.com/${GITHUB_REPOSITORY}.git" \
+            --tap-remote "https://github.com/${{ vars.CALRELAY_TAP_REPOSITORY }}.git" \
+            --work-directory .build/release-publication \
+            --gh "$(command -v gh)"
+      - name: Check out previous tap packages
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ vars.CALRELAY_TAP_REPOSITORY }}
+          token: ${{ steps.app-token.outputs.token }}
+          path: .build/previous-tap
+          persist-credentials: false
+      - name: Validate Homebrew lifecycle without Calendar access
+        run: |
+          set -euo pipefail
+          mkdir -p .build/homebrew-state
+          printf '%s\n' configuration-sentinel > .build/homebrew-state/config.yaml
+          printf '%s\n' app-state-sentinel > .build/homebrew-state/app-state
+          previous=()
+          formula_exists=false
+          cask_exists=false
+          [[ -f .build/previous-tap/Formula/calrelay.rb ]] && formula_exists=true
+          [[ -f .build/previous-tap/Casks/calrelay.rb ]] && cask_exists=true
+          [[ "$formula_exists" == "$cask_exists" ]] || { echo 'The previous tap must contain both CalRelay packages or neither.' >&2; exit 1; }
+          if [[ "$formula_exists" == true ]]; then
+            mkdir -p .build/previous-packages/Formula .build/previous-packages/Casks
+            cp .build/previous-tap/Formula/calrelay.rb .build/previous-packages/Formula/calrelay.rb
+            cp .build/previous-tap/Casks/calrelay.rb .build/previous-packages/Casks/calrelay.rb
+            previous=(--previous-packages-directory .build/previous-packages)
+          fi
+          node scripts/release/validate-homebrew-packages.mjs \
+            --packages-directory .build/release-candidate/packages \
+            "${previous[@]}" \
+            --work-directory .build/homebrew-validation \
+            --state-directory .build/homebrew-state \
+            --brew "$(command -v brew)"
+      - name: Publish formula and cask atomically
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          CALRELAY_GIT_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          node scripts/release/publish-release.mjs tap \
+            --candidate-directory .build/release-candidate \
+            --source-repository "$GITHUB_REPOSITORY" \
+            --tap-repository "${{ vars.CALRELAY_TAP_REPOSITORY }}" \
+            --source-remote "https://github.com/${GITHUB_REPOSITORY}.git" \
+            --tap-remote "https://github.com/${{ vars.CALRELAY_TAP_REPOSITORY }}.git" \
+            --work-directory .build/release-publication \
+            --gh "$(command -v gh)"
+      - name: Clean protected release material
+        if: always()
+        run: |
+          rm -rf .build/release-artifacts .build/release-candidate .build/release-metadata \
+            .build/release-publication .build/previous-tap .build/previous-packages \
+            .build/homebrew-validation .build/homebrew-state \
+            "${RUNNER_TEMP}/calrelay-release-candidate" "${RUNNER_TEMP}/calrelay-source-publication.git" \
+            "${RUNNER_TEMP}/calrelay-resume-run.json"
+          rm -f .build/release-publication.askpass-*
