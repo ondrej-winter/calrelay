@@ -3,6 +3,7 @@ import Foundation
 enum DistributionReleaseWorkflowTests {
     static func runAll() throws {
         try testWorkflowUsesSerializedLeastPrivilegeProtectedPublication()
+        try testWorkflowInstallsPinnedSwiftLintBeforeSourceGates()
         try testSourceFreshnessPluginFailsBeforePreparation()
         try testRetainedBundleRestoresReleaseCommitBeforeSourcePublication()
         try testDisposablePublicationOrdersAndResumesImmutableStages()
@@ -75,6 +76,44 @@ enum DistributionReleaseWorkflowTests {
         ] {
             try expect(!analyzeJob.contains(protectedName), "Analysis must not access protected value \(protectedName)")
         }
+    }
+
+    private static func testWorkflowInstallsPinnedSwiftLintBeforeSourceGates() throws {
+        let root = try repositoryRoot()
+        let workflow = try String(contentsOf: root.appendingPathComponent(".github/workflows/release.yml"), encoding: .utf8)
+        let toolchainData = try Data(contentsOf: root.appendingPathComponent("scripts/release/toolchain.json"))
+        guard
+            let toolchain = try JSONSerialization.jsonObject(with: toolchainData) as? [String: Any],
+            let swiftLint = toolchain["swiftLint"] as? [String: String]
+        else {
+            throw TestFailure("Release toolchain must declare pinned SwiftLint metadata")
+        }
+
+        try expect(
+            swiftLint == [
+                "version": "0.65.1",
+                "asset": "portable_swiftlint.zip",
+                "sha256": "c1e429b0599cf1b516f369a2d9ec04eaf0e436f3c12b637df8851fa52ff694d0",
+            ],
+            "Release SwiftLint must use the reviewed official portable artifact and SHA-256")
+        for required in [
+            "Set up pinned SwiftLint", "toolchain.swiftLint", "swiftLint.asset !== \"portable_swiftlint.zip\"",
+            "https://github.com/realm/SwiftLint/releases/download/${swiftlint_version}/${swiftlint_asset}",
+            "shasum -a 256 -c -", "observed_version", "printf 'SWIFTLINT=%s\\n'",
+        ] {
+            try expect(workflow.contains(required), "Release workflow must contain \(required)")
+        }
+        try expect(!workflow.contains("brew install swiftlint"), "Release workflow must not resolve SwiftLint through Homebrew")
+
+        guard
+            let checkout = workflow.range(of: "- name: Check out release source"),
+            let setup = workflow.range(of: "- name: Set up pinned SwiftLint"),
+            let qualityGates = workflow.range(of: "- name: Run source quality gates")
+        else {
+            throw TestFailure("Release workflow must declare checkout, SwiftLint setup, and source quality gates")
+        }
+        try expect(checkout.lowerBound < setup.lowerBound, "SwiftLint setup must read metadata from the checked-out release source")
+        try expect(setup.lowerBound < qualityGates.lowerBound, "SwiftLint must be available before source quality gates run")
     }
 
     private static func testSourceFreshnessPluginFailsBeforePreparation() throws {

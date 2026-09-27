@@ -130,6 +130,13 @@ versions recorded in `scripts/release/toolchain.json` through
 semantic-release configuration artifact; do not add a Node package manifest or
 lockfile solely for release automation.
 
+The same release toolchain metadata pins the official portable SwiftLint
+artifact by exact version, asset name, and SHA-256. The protected workflow
+downloads and verifies that artifact before source validation, checks the
+reported version, and exposes its executable through `SWIFTLINT`; it does not
+depend on SwiftLint being preinstalled on the hosted runner or resolve the
+current Homebrew formula version.
+
 The protected production bootstrap runs semantic-release itself with the
 explicit bootstrap flag, from a clean checkout with no release tags:
 

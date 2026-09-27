@@ -47,10 +47,13 @@ recording their values in repository files:
 The release job uses GitHub's standard hosted Apple Silicon `xcode-27` image. As
 of September 27, 2026, that image is in public preview and provides an ephemeral
 macOS 27 VM with Xcode 27, Swift 6.4, the macOS 27 SDK, Homebrew, and `gh`; the
-workflow installs the pinned Node runtime explicitly. Preview image contents and
-capacity may change. Before bootstrap and after an image rollout, verify the
-image inventory and let the production packaging preflight fail closed if the
-OS, architecture, Xcode, Swift, or SDK contract no longer matches.
+workflow installs the pinned Node runtime explicitly and downloads the exact
+official portable SwiftLint artifact recorded in `scripts/release/toolchain.json`.
+It verifies the artifact SHA-256 and reported SwiftLint version before running
+the source quality gate. Preview image contents and capacity may change. Before
+bootstrap and after an image rollout, verify the image inventory and let the
+workflow fail closed if the pinned tool or production OS, architecture, Xcode,
+Swift, or SDK contract no longer matches.
 
 ## Bootstrap `v1.0.0`
 

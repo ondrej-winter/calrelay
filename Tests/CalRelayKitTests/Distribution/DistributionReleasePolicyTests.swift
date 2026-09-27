@@ -244,6 +244,13 @@ enum DistributionReleasePolicyTests {
             "semantic-release must use only the repository-owned policy plugins")
         try expect(toolchain["node"] as? String == "24.21.0", "Node must be pinned to the reviewed LTS patch")
         try expect(toolchain["semanticRelease"] as? String == "25.0.9", "semantic-release must be pinned exactly")
+        try expect(
+            toolchain["swiftLint"] as? [String: String] == [
+                "version": "0.65.1",
+                "asset": "portable_swiftlint.zip",
+                "sha256": "c1e429b0599cf1b516f369a2d9ec04eaf0e436f3c12b637df8851fa52ff694d0",
+            ],
+            "Release SwiftLint must be pinned to the reviewed official artifact and SHA-256")
         let pinnedPlugins = toolchain["plugins"] as? [String: String]
         try expect(
             pinnedPlugins == [
