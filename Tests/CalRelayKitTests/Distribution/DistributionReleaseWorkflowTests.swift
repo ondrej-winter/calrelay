@@ -30,7 +30,7 @@ enum DistributionReleaseWorkflowTests {
             "group: calrelay-public-beta-release", "cancel-in-progress: false", "permissions:", "actions: read",
             "contents: read", "environment: public-beta-release", "runs-on: xcode-27",
             "persist-credentials: false", "node-version: 24.21.0", "package-manager-cache: false",
-            "CALRELAY_SIGNING_CERTIFICATE_SHA1", "vars.CALRELAY_SIGNING_CERTIFICATE_SHA1",
+            "CALRELAY_SIGNING_CERTIFICATE_SHA1", "secrets.CALRELAY_SIGNING_CERTIFICATE_SHA1",
             "permission-contents: write", "CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY",
             "CALRELAY_RELEASE_GITHUB_APP_ID", "ondrej-winter/homebrew-tap", "if: always()",
             "compression-level: 0", "if-no-files-found: error", "retention-days: 30",
@@ -56,6 +56,9 @@ enum DistributionReleaseWorkflowTests {
             !workflow.contains("CALRELAY_SIGNING_IDENTITY"),
             "Release workflow must not select the signing certificate by its display name")
         try expect(
+            !workflow.contains("vars.CALRELAY_SIGNING_CERTIFICATE_SHA1"),
+            "Release workflow must read the protected signing fingerprint from the secrets context")
+        try expect(
             !workflow.contains("runs-on: [self-hosted"),
             "Release workflow must use the ephemeral GitHub-hosted Apple Silicon runner")
         try expect(
@@ -76,7 +79,8 @@ enum DistributionReleaseWorkflowTests {
         let analyzeJob = String(workflow[analyzeRange.lowerBound..<releaseRange.lowerBound])
         for protectedName in [
             "CALRELAY_DEVELOPER_ID_P12", "CALRELAY_NOTARY_API_KEY_P8",
-            "CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY", "create-github-app-token",
+            "CALRELAY_SIGNING_CERTIFICATE_SHA1", "CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY",
+            "create-github-app-token",
         ] {
             try expect(!analyzeJob.contains(protectedName), "Analysis must not access protected value \(protectedName)")
         }

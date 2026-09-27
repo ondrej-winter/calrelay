@@ -250,7 +250,7 @@ jobs:
           CALRELAY_NOTARY_KEY_ID: ${{ secrets.CALRELAY_NOTARY_KEY_ID }}
           CALRELAY_NOTARY_ISSUER_ID: ${{ secrets.CALRELAY_NOTARY_ISSUER_ID }}
           CALRELAY_DEVELOPER_TEAM_ID: ${{ vars.CALRELAY_DEVELOPER_TEAM_ID }}
-          CALRELAY_SIGNING_CERTIFICATE_SHA1: ${{ vars.CALRELAY_SIGNING_CERTIFICATE_SHA1 }}
+          CALRELAY_SIGNING_CERTIFICATE_SHA1: ${{ secrets.CALRELAY_SIGNING_CERTIFICATE_SHA1 }}
         run: make release-artifacts
       - name: Stage immutable release candidate
         if: needs.analyze.outputs.resume != 'true'
