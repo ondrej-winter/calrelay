@@ -5,7 +5,7 @@
 - **Status:** Repository implementation is complete through `DIST-P09` as of
   September 27, 2026. Protected release evidence and public rollout remain
   blocked until repository policy, runners, credentials, signing identity,
-  environment controls, and the GitHub App are provisioned and exercised.
+  environment controls, and the configured GitHub App access are exercised.
 - **Prepared:** September 26, 2026.
 - **Updated:** September 27, 2026.
 - **Canonical requirements:**
@@ -59,8 +59,10 @@ Implement the accepted public-beta distribution contract so CalRelay can:
   until the protected `v1.0.0` bootstrap completes.
 - The public `ondrej-winter/homebrew-tap` repository is accessible as of
   September 27, 2026 and has a `master` branch, README, and license. Its branch
-  protection, GitHub App installation, and package publication path still require
-  protected-environment verification.
+  protection and package publication path still require protected-environment
+  verification. The dedicated GitHub App is installed and its protected
+  credential roles are configured; token minting for both the source and tap
+  repositories with effective `contents: write` access remains to be exercised.
 - No public CalRelay release is visible yet. The `v1.0.0` bootstrap, production
   Developer ID/notarization evidence, GitHub immutable-release setting, protected
   environment, release runner, repository rules, and later automatic release

@@ -7,9 +7,11 @@ workflow. It complements the accepted
 their product or security contracts.
 
 > **Availability:** As of September 27, 2026, the public channel is not live. The
-> GitHub App installation and access, the preview hosted-runner release lane,
-> production signing/notarization evidence, and initial `v1.0.0` publication
-> remain to be validated.
+> dedicated GitHub App is installed and its protected credential roles are
+> configured. Protected token minting for both `ondrej-winter/calrelay` and
+> `ondrej-winter/homebrew-tap` with effective `contents: write` access, the preview
+> hosted-runner release lane, production signing/notarization evidence, and initial
+> `v1.0.0` publication remain to be exercised or validated.
 
 ## Invariants
 
@@ -54,8 +56,9 @@ OS, architecture, Xcode, Swift, or SDK contract no longer matches.
 
 Before bootstrap, verify immutable GitHub releases, protected `master` branches,
 the `public-beta-release` environment, required reviewers or deployment controls,
-GitHub App installations, `xcode-27` availability and toolchain compatibility,
-and every protected role above.
+that the protected GitHub App identity can mint one installation token for both
+repositories with effective `contents: write` access, `xcode-27` availability and
+toolchain compatibility, and every protected role above.
 
 Dispatch the first release manually:
 
