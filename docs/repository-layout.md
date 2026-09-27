@@ -21,5 +21,7 @@ This page describes the main source, test, and documentation areas in the reposi
 
 - `docs/development.md`: canonical requirements, build, test, formatting, linting, and package workflow.
 - `docs/configuration.md`: YAML schema, selector semantics, CLI reconciliation commands, and safety notes.
+- `docs/distribution.md`: user-facing public-beta availability, Homebrew installation, upgrade, uninstallation, configuration retention, and Calendar-permission setup.
+- `docs/release-operations.md`: protected release bootstrap, automated operation, credential rotation, incomplete-release resumption, defective-release correction, and incident recovery.
 - `docs/specs/`: accepted feature-owned product and behavior contracts. Start with `docs/specs/README.md` for the canonical index and historical migration map.
 - `docs/adr/`: durable architecture and lifecycle decisions. Start with `docs/adr/README.md`.

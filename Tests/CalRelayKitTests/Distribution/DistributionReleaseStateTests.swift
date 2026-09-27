@@ -3,6 +3,7 @@ import Foundation
 enum DistributionReleaseStateTests {
     static func runAll() throws {
         try testStagesArtifactsOnceAndResumesIncompleteRelease()
+        try testEveryIncompletePublicationStageResumesSameVersion()
         try testPublicationStagesAcceptMatchingRetriesAndRejectMismatches()
         try testPublicationRejectsStaleSourceAndPartialPackageState()
         try testDefectiveAndCompromisedReleasesFailClosed()
@@ -67,6 +68,30 @@ enum DistributionReleaseStateTests {
         try fixture.requireSuccess(fixture.advanceComplete())
         try expect(
             try fixture.state().stage == "complete", "The release becomes complete only after the atomic tap stage")
+    }
+
+    private static func testEveryIncompletePublicationStageResumesSameVersion() throws {
+        let stages = ["artifacts-staged", "source-published", "assets-published", "assets-verified", "tap-published"]
+        for (index, expectedStage) in stages.enumerated() {
+            let fixture = try ReleaseStateFixture(version: "1.1.\(index + 1)")
+            defer { fixture.remove() }
+            try fixture.requireSuccess(fixture.create())
+            let digests = try fixture.state().artifacts
+            if index >= 1 { try fixture.requireSuccess(fixture.advanceSource()) }
+            if index >= 2 {
+                try fixture.requireSuccess(fixture.advanceAssets(cli: digests.cli.sha256, app: digests.app.sha256))
+            }
+            if index >= 3 {
+                try fixture.requireSuccess(fixture.advanceAssetsVerified(cli: digests.cli.sha256, app: digests.app.sha256))
+            }
+            if index >= 4 { try fixture.requireSuccess(fixture.advanceTap()) }
+
+            let result = try fixture.resume()
+            try fixture.requireSuccess(result)
+            let summary = try JSONDecoder().decode(ResumeSummary.self, from: Data(result.output.utf8))
+            try expect(summary.version == "1.1.\(index + 1)", "Resumption must retain the incomplete version")
+            try expect(summary.stage == expectedStage, "Resumption must retain incomplete stage \(expectedStage)")
+        }
     }
 
     private static func testPublicationRejectsStaleSourceAndPartialPackageState() throws {
@@ -139,7 +164,10 @@ private struct ReleaseState: Decodable {
     let installable: Bool
 }
 
-private struct ResumeSummary: Decodable { let version: String }
+private struct ResumeSummary: Decodable {
+    let version: String
+    let stage: String
+}
 private struct CorrectivePolicy: Decodable { let calendarRollback: Bool }
 private struct ReleaseStateProcessResult {
     let status: Int32

@@ -35,6 +35,8 @@ Use the app's explicit setup/recovery action when full Calendar access is unavai
 - [Development workflow](docs/development.md): local requirements, build/test commands, formatting, linting, and package notes.
 - [Repository layout](docs/repository-layout.md): source targets, test organization, and the `CalRelayKit` integration boundary.
 - [Configuration](docs/configuration.md): YAML file location, schema, selector semantics, CLI reconciliation commands, and safety notes.
+- [Distribution](docs/distribution.md): public-beta availability, supported Homebrew installation, upgrades, uninstallation, and permission setup.
+- [Release operations](docs/release-operations.md): protected bootstrap, automation, credential rotation, resumption, and incident recovery.
 - [Specifications](docs/specs/README.md): canonical feature-owned product, relay, configuration, CLI, and macOS app behavior contracts.
 - [Architecture decisions](docs/adr/README.md): durable architecture, lifecycle, packaging, and testing decisions.
 

@@ -6,6 +6,7 @@ enum DistributionHomebrewPackageTests {
         try testInvalidManifestAndMismatchedOutputFailClosed()
         try testManifestSchemaRejectsUnexpectedFields()
         try testLifecycleValidationCoversCoexistenceUpgradeAndCleanup()
+        try testLifecycleFailureCleansPackagesTapAndWorkDirectory()
     }
 
     private static func testVerifiedManifestRendersAtomicFormulaAndCask() throws {
@@ -125,6 +126,24 @@ enum DistributionHomebrewPackageTests {
         try expect(installedPackages.isEmpty, "Lifecycle validation must clean all installed test packages")
     }
 
+    private static func testLifecycleFailureCleansPackagesTapAndWorkDirectory() throws {
+        let fixture = try HomebrewLifecycleFixture(failureCommandPrefix: "upgrade --cask ondrej-winter/tap/calrelay")
+        defer { fixture.remove() }
+
+        let result = try fixture.run()
+        let preservedSentinel = try fixture.readSentinel()
+        let installedPackages = try fixture.installedPackages()
+
+        try expect(result.status != 0, "A Homebrew lifecycle command failure must fail validation")
+        try expect(preservedSentinel == fixture.sentinel, "Failed package validation must preserve user state")
+        try expect(installedPackages.isEmpty, "Failed package validation must uninstall temporary packages")
+        try expect(!FileManager.default.fileExists(atPath: fixture.work.path), "Failed package validation must remove work")
+        let log = try String(contentsOf: fixture.log, encoding: .utf8)
+        try expect(log.contains("uninstall --formula"), "Failure cleanup must remove the temporary formula")
+        try expect(log.contains("uninstall --cask"), "Failure cleanup must remove the temporary cask")
+        try expect(log.contains("untap ondrej-winter/tap"), "Failure cleanup must remove the temporary tap")
+    }
+
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {
         guard condition() else { throw TestFailure(message) }
     }
@@ -230,8 +249,10 @@ private final class HomebrewLifecycleFixture {
     let appDirectory: URL
     let sentinel = "CONFIGURATION-AND-APP-STATE-SENTINEL"
     private let brew: URL
+    private let failureCommandPrefix: String?
 
-    init() throws {
+    init(failureCommandPrefix: String? = nil) throws {
+        self.failureCommandPrefix = failureCommandPrefix
         sourceRoot = try Self.repositoryRoot()
         root = FileManager.default.temporaryDirectory.appendingPathComponent("calrelay-homebrew-lifecycle-\(UUID().uuidString)")
         currentPackages = root.appendingPathComponent("current")
@@ -262,6 +283,7 @@ private final class HomebrewLifecycleFixture {
         environment["CALRELAY_FAKE_BREW_LOG"] = log.path
         environment["CALRELAY_FAKE_BREW_STATE"] = root.appendingPathComponent("installed").path
         environment["CALRELAY_FAKE_TAP_CHECKOUT"] = root.appendingPathComponent("tap-checkout").path
+        environment["CALRELAY_FAKE_BREW_FAILURE_COMMAND_PREFIX"] = failureCommandPrefix ?? ""
         return try Self.run(
             executable: "/usr/bin/env",
             arguments: [
@@ -294,6 +316,11 @@ private final class HomebrewLifecycleFixture {
         #!/bin/sh
         set -eu
         printf '%s\\n' "$*" >> "$CALRELAY_FAKE_BREW_LOG"
+        case "$*" in
+          "${CALRELAY_FAKE_BREW_FAILURE_COMMAND_PREFIX:-}"*)
+            [ -n "${CALRELAY_FAKE_BREW_FAILURE_COMMAND_PREFIX:-}" ] && exit 70
+            ;;
+        esac
         mkdir -p "$CALRELAY_FAKE_BREW_STATE"
         command="$1"
         shift

@@ -5,6 +5,7 @@ enum DistributionProductionArtifactTests {
         try testProductionPackagingContractIsSeparateAndCredentialSafe()
         try testFakeReleaseBuildProducesVerifiedVersionedArtifacts()
         try testFakeReleaseBuildRejectsBoundaryFailuresAndCleansKeychain()
+        try testProhibitedProductDataLeavesNoFinalArtifacts()
     }
 
     private static func testProductionPackagingContractIsSeparateAndCredentialSafe() throws {
@@ -31,14 +32,16 @@ enum DistributionProductionArtifactTests {
             script.contains("notarytool") && script.contains("stapler") && script.contains("spctl"),
             "Production packaging must notarize, staple, and assess the app")
         guard let staple = script.range(of: "\"${STAPLER}\" staple")?.lowerBound,
+            let sensitiveScan = script.range(of: "scan_value \"${CALRELAY_DEVELOPER_ID_P12_PASSWORD}\"")?.lowerBound,
             let cliPackage = script.range(of: "COPYFILE_DISABLE=1 /usr/bin/tar -czf")?.lowerBound,
             let appPackage = script.range(
-                of: "COPYFILE_DISABLE=1 /usr/bin/ditto -c -k --keepParent \"${APP_BUNDLE}\" \"${APP_ARCHIVE}\"")?
+                of: "COPYFILE_DISABLE=1 /usr/bin/ditto -c -k --keepParent \"${APP_BUNDLE}\" \"${STAGED_APP_ARCHIVE}\"")?
                 .lowerBound, let checksums = script.range(of: "CLI_SHA=")?.lowerBound
         else { throw TestFailure("Production packaging must expose stapling, final packaging, and checksum stages") }
         try expect(
-            staple < cliPackage && staple < appPackage && cliPackage < checksums && appPackage < checksums,
-            "Checksums must be computed only after stapling and final packaging")
+            staple < sensitiveScan && sensitiveScan < cliPackage && sensitiveScan < appPackage && cliPackage < checksums
+                && appPackage < checksums,
+            "Products must be scanned before private archive staging, with checksums computed after final packaging")
     }
 
     private static func testFakeReleaseBuildProducesVerifiedVersionedArtifacts() throws {
@@ -112,6 +115,46 @@ enum DistributionProductionArtifactTests {
             "Malformed release versions must fail before packaging")
     }
 
+    private static func testProhibitedProductDataLeavesNoFinalArtifacts() throws {
+        let sentinels = [
+            "PRIVATE-SENTINEL", "CONFIGURATION-CONTENT-SENTINEL", "CALENDAR-NAME-SENTINEL",
+            "EVENT-TITLE-SENTINEL", "EVENTKIT-IDENTIFIER-SENTINEL",
+        ]
+        for (index, injectedSentinel) in sentinels.enumerated() {
+            let version = "1.2.\(index + 5)"
+            let fixture = try ProductionArtifactFixture(version: version, prohibitedProductSentinel: injectedSentinel)
+            defer { fixture.remove() }
+
+            let result = try fixture.run()
+            let log = (try? String(contentsOf: fixture.toolLog, encoding: .utf8)) ?? ""
+
+            try expect(result.status != 0, "Products containing prohibited private data must fail packaging")
+            try expect(
+                result.output.contains("prohibited sensitive release data"),
+                "Sensitive-data rejection must explain the privacy boundary without disclosing the value")
+            for sentinel in fixture.prohibitedSentinels {
+                try expect(!result.output.contains(sentinel), "Sensitive-data diagnostics must not disclose \(sentinel)")
+                try expect(!log.contains(sentinel), "Release tool logs must not disclose \(sentinel)")
+            }
+            try expect(!result.output.contains(fixture.secretSentinel), "Sensitive-data diagnostics must not disclose credentials")
+            try expect(!log.contains(fixture.secretSentinel), "Release tool logs must not disclose credentials")
+            for name in [
+                "calrelay-\(version)-arm64.tar.gz", "CalRelay-\(version)-arm64.zip", "candidate-manifest.json"
+            ] {
+                try expect(
+                    !FileManager.default.fileExists(atPath: fixture.output.appendingPathComponent(name).path),
+                    "Rejected private data must not leave final release output \(name)")
+            }
+            try expect(
+                !FileManager.default.fileExists(atPath: fixture.output.appendingPathComponent(".work").path),
+                "Sensitive-data failure must remove ephemeral signing work")
+            try expect(
+                !FileManager.default.fileExists(
+                    atPath: fixture.root.appendingPathComponent(".build/release/calrelay").path),
+                "Sensitive-data failure must remove the generated release product from the build cache")
+        }
+    }
+
     static func repositoryRoot() throws -> URL {
         var candidate = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         while candidate.path != "/" {
@@ -148,11 +191,19 @@ private final class ProductionArtifactFixture {
     let output: URL
     let toolLog: URL
     let secretSentinel = "PRIVATE-SENTINEL"
+    let prohibitedSentinels = [
+        "CONFIGURATION-CONTENT-SENTINEL", "CALENDAR-NAME-SENTINEL", "EVENT-TITLE-SENTINEL",
+        "EVENTKIT-IDENTIFIER-SENTINEL",
+    ]
     private let tools: URL
     private let failure: String?
+    private let prohibitedProductSentinel: String?
+    private let version: String
 
-    init(version: String, failure: String? = nil) throws {
+    init(version: String, failure: String? = nil, prohibitedProductSentinel: String? = nil) throws {
+        self.version = version
         self.failure = failure
+        self.prohibitedProductSentinel = prohibitedProductSentinel
         let source = try DistributionProductionArtifactTests.repositoryRoot()
         root = FileManager.default.temporaryDirectory.appendingPathComponent(
             "DistributionProductionArtifactTests-\(UUID().uuidString)")
@@ -187,6 +238,7 @@ private final class ProductionArtifactFixture {
         environment["CALRELAY_RELEASE_OUTPUT_DIR"] = output.path
         environment["CALRELAY_RELEASE_TOOL_LOG"] = toolLog.path
         environment["CALRELAY_RELEASE_FAKE_FAILURE"] = failure ?? ""
+        environment["CALRELAY_RELEASE_FAKE_PROHIBITED_SENTINEL"] = prohibitedProductSentinel ?? ""
         environment["CALRELAY_DEVELOPER_ID_P12"] = Data(secretSentinel.utf8).base64EncodedString()
         environment["CALRELAY_DEVELOPER_ID_P12_PASSWORD"] = secretSentinel
         environment["CALRELAY_NOTARY_API_KEY_P8"] = secretSentinel
@@ -194,6 +246,7 @@ private final class ProductionArtifactFixture {
         environment["CALRELAY_NOTARY_ISSUER_ID"] = "ISSUER123"
         environment["CALRELAY_DEVELOPER_TEAM_ID"] = "TEAM123456"
         environment["CALRELAY_SIGNING_IDENTITY"] = "Developer ID Application: CalRelay Test"
+        environment["CALRELAY_RELEASE_PROHIBITED_SENTINELS"] = prohibitedSentinels.joined(separator: "\n")
         return try command(
             "/bin/zsh", [root.appendingPathComponent("scripts/release/build-production-artifacts.sh").path],
             environment: environment)
@@ -229,7 +282,7 @@ private final class ProductionArtifactFixture {
         try writeTool(
             "swift",
             common
-                + "if [[ \"$1\" == --version ]]; then print \"Apple Swift version 6.4\"; print \"Target: arm64-apple-macosx27.0.0\"; exit 0; fi\nproduct=\"\"\nwhile (( $# )); do [[ \"$1\" == --product ]] && { shift; product=\"$1\"; }; shift || true; done\nmkdir -p .build/release\nif [[ \"$product\" == calrelay ]]; then printf \"%s\\n\" \"#!/bin/zsh\" \"[[ \\\"\\$1\\\" == --version ]] && print 1.2.3\" \"exit 0\" > .build/release/calrelay; chmod 755 .build/release/calrelay; else printf \"%s\\n\" \"#!/bin/zsh\" \"exit 0\" > .build/release/CalRelayApp; chmod 755 .build/release/CalRelayApp; fi\n"
+                + "if [[ \"$1\" == --version ]]; then print \"Apple Swift version 6.4\"; print \"Target: arm64-apple-macosx27.0.0\"; exit 0; fi\nproduct=\"\"\nwhile (( $# )); do [[ \"$1\" == --product ]] && { shift; product=\"$1\"; }; shift || true; done\nmkdir -p .build/release\nif [[ \"$product\" == calrelay ]]; then printf \"%s\\n\" \"#!/bin/zsh\" \"[[ \\\"\\$1\\\" == --version ]] && print \(version)\" \"exit 0\" > .build/release/calrelay; [[ -n \"${CALRELAY_RELEASE_FAKE_PROHIBITED_SENTINEL}\" ]] && print -r -- \"# ${CALRELAY_RELEASE_FAKE_PROHIBITED_SENTINEL}\" >> .build/release/calrelay; chmod 755 .build/release/calrelay; else printf \"%s\\n\" \"#!/bin/zsh\" \"exit 0\" > .build/release/CalRelayApp; chmod 755 .build/release/CalRelayApp; fi\n"
         )
         try writeTool("security", common + "[[ \"$1\" == create-keychain ]] && touch \"${@: -1}\"\nexit 0\n")
         try writeTool(

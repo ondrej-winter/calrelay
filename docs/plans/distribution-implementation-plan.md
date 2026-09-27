@@ -2,7 +2,7 @@
 
 ## Plan record
 
-- **Status:** Repository implementation is complete through `DIST-P07` as of
+- **Status:** Repository implementation is complete through `DIST-P09` as of
   September 27, 2026. Protected release evidence and public rollout remain
   blocked until repository policy, runners, credentials, signing identity,
   environment controls, and the GitHub App are provisioned and exercised.
@@ -50,6 +50,13 @@ Implement the accepted public-beta distribution contract so CalRelay can:
   repository-owned publisher verifies the retained manifest, artifact bytes,
   checksums, source bundle, release commit, published assets, and atomic tap
   commit at every retry boundary.
+- Deterministic acceptance evidence now covers every persisted resumption stage,
+  authentication-helper and Homebrew failure cleanup, prohibited credential and
+  private-data sentinels, and the existing no-prompt, app-identity,
+  configuration-selection, and login-launch recovery contracts.
+- `docs/distribution.md` and `docs/release-operations.md` are the canonical user
+  and operator guides. They explicitly state that the public channel is not live
+  until the protected `v1.0.0` bootstrap completes.
 - The public `ondrej-winter/homebrew-tap` repository is accessible as of
   September 27, 2026 and has a `master` branch, README, and license. Its branch
   protection, GitHub App installation, and package publication path still require
@@ -585,18 +592,53 @@ repository-owned publication logic.
 - Reuse existing no-prompt, configuration-path, bundle-identity, and
   launch-at-login recovery evidence instead of duplicating those behaviors.
 
-- [ ] **DIST-P08:** Required acceptance evidence is complete.
-- [ ] **DIST-P08-AC1:** Every distribution acceptance check maps to an automated
+- [x] **DIST-P08:** Required acceptance evidence is complete.
+- [x] **DIST-P08-AC1:** Every distribution acceptance check maps to an automated
   test, protected CI check, or external rollout checkpoint.
-- [ ] **DIST-P08-AC2:** Fault injection covers every publication transition and
+- [x] **DIST-P08-AC2:** Fault injection covers every publication transition and
   cleanup path.
-- [ ] **DIST-P08-AC3:** Sentinel tests prove prohibited values do not appear in
+- [x] **DIST-P08-AC3:** Sentinel tests prove prohibited values do not appear in
   outputs, logs, caches, or artifacts.
-- [ ] **DIST-P08-AC4:** Existing no-prompt, app identity, configuration-path, and
+- [x] **DIST-P08-AC4:** Existing no-prompt, app identity, configuration-path, and
   launch-at-login recovery tests remain passing.
-- [ ] **DIST-P08-V1:** All focused distribution suites pass.
-- [ ] **DIST-P08-V2:** The complete deterministic test runner passes without
+- [x] **DIST-P08-V1:** All focused distribution suites pass.
+- [x] **DIST-P08-V2:** The complete deterministic test runner passes without
   EventKit access or real calendars.
+
+**Acceptance evidence map (September 27, 2026):**
+
+| Acceptance check | Repository-automated evidence | Protected or external evidence still required |
+| --- | --- | --- |
+| `DIST-AC-01` | `DistributionVersionTests`, `CalRelayCLISmokeTests`, `DistributionHomebrewPackageTests`, and retained-candidate workflow tests prove synchronized version inputs, CLI output, app metadata, and generated package versions. | `DIST-P10` verifies the published `v1.0.0` tag and tap definitions against the protected artifacts. |
+| `DIST-AC-02` | `DistributionReleaseWorkflowTests` verifies retained bytes, immutable mismatch rejection, asset redownload, and checksum comparison in disposable repositories. | The protected release lane and `DIST-P10`/`DIST-P11` verify public GitHub assets and immutability. |
+| `DIST-AC-03` | `DistributionHomebrewPackageTests`, `CalRelayCLISmokeTests`, and `CalendarNoPromptContractTests` prove the formula shape, version/help smokes, and no-prompt behavior without configuration or EventKit. | `DIST-P10` performs the clean supported-Mac installation from the public tap. |
+| `DIST-AC-04` | `DistributionHomebrewPackageTests` proves prebuilt-only installation plus architecture and macOS metadata. | The protected Homebrew lane performs current `fetch`, `audit`, and installation checks. |
+| `DIST-AC-05` | `DistributionProductionArtifactTests` proves the signing/notarization/stapler/Gatekeeper command contract with fake tools. | `DIST-P05` and `DIST-P10` require real Developer ID, notarization ticket, hardened-runtime, and Gatekeeper evidence. |
+| `DIST-AC-06` | `DistributionHomebrewPackageTests` proves both installation orders, coexistence, independent upgrade/reinstall, and independent ordinary uninstallation. | `DIST-P10`/`DIST-P11` repeat the lifecycle with public artifacts and real Homebrew. |
+| `DIST-AC-07` | `DistributionHomebrewPackageTests` proves package operations do not launch products, and `CalendarNoPromptContractTests` proves ordinary CLI/app surfaces never request access. | The protected Homebrew lane confirms the same boundary on installed products. |
+| `DIST-AC-08` | Homebrew state sentinels, `DistributionVersionTests`, and `CalendarLoginLaunchPolicyTests` prove configuration retention, stable app identity, and actionable login-launch recovery. | `DIST-P10`/`DIST-P11` verify the installed signed app and upgrade behavior. |
+| `DIST-AC-09` | `DistributionHomebrewPackageTests` proves selected-package cleanup, other-package retention, and preserved configuration/app-state sentinels on success and failure. | The protected Homebrew lane verifies ordinary public-package uninstallation. |
+| `DIST-AC-10` | `DistributionProductionArtifactTests`, release-note privacy tests, publisher authentication-helper cleanup, and workflow cleanup checks cover credential, configuration, calendar-name, event-title, and EventKit-ID sentinels without leaving rejected artifacts or work state. | The protected lane scans real release logs and artifacts without exposing production values. |
+| `DIST-AC-11` | `DistributionReleasePolicyTests` covers `fix`/`fix!`, `feat`/`feat!`, non-qualifying and breaking-only histories, explicit bootstrap, invalid histories, and forbidden automatic `2.0.0`. | None beyond continued execution in `make check`. |
+| `DIST-AC-12` | `DistributionReleaseWorkflowTests` proves non-cancelling workflow configuration and stale-source failure before source publication. | `DIST-P07-V2` and `DIST-P11` verify protected queue execution on GitHub. |
+| `DIST-AC-13` | `DistributionReleaseStateTests` resumes every persisted incomplete stage, while workflow tests prove matching retries, immutable mismatch rejection, ordered publication, and one-commit formula/cask publication. | The protected lane validates the same transitions against GitHub and the public tap. |
+| `DIST-AC-14` | `DistributionReleaseStateTests` permits only a higher patch correction and records that distribution recovery never authorizes calendar rollback. | A real corrective release is needed only when an actual defective public version exists. |
+| `DIST-AC-15` | `DistributionDocumentationTests` requires exactly the two fully qualified supported installation commands and rejects supported-form claims for explicit tap or short commands. | `DIST-P10` executes both documented commands from a clean untapped supported environment. |
+| `DIST-AC-16` | `DistributionVersionTests`, `CalendarAppBundleMetadataTests`, `ConfigurationFileSelectionTests`, and `CalendarNoPromptContractTests` prove unsandboxed stable app identity, canonical configuration selection, and explicit-only permission requests. | The protected signed app is rechecked during `DIST-P05` and `DIST-P10`. |
+| `DIST-AC-17` | `make check` and the fake-backed release suites produce deterministic evidence without EventKit access or real calendars. | The protected lane supplies only the external signing, notarization, Homebrew, and publication boundaries. |
+| `DIST-AC-18` | Workflow and policy tests prove the manual bootstrap and later automatic paths share the same repository gate. | `DIST-P10` performs `v1.0.0`; `DIST-P11` proves a later qualifying `master` push publishes automatically. |
+
+**Repository evidence (September 27, 2026):** The focused distribution matrix,
+the reused cross-capability suites, and the complete deterministic runner pass.
+Fault injection covers every retained release stage, Homebrew failure cleanup,
+artifact rejection cleanup, and publisher authentication-helper cleanup on
+success and failure. Production packaging now scans signed and stapled products
+before creating private staged archives, exposes final outputs only after complete
+validation, and removes an incomplete script-owned output set on failure. It also
+removes the release-run CLI and app build products from the SwiftPM cache
+on every exit. Real Developer ID, notarization, Gatekeeper, live Homebrew, and
+protected GitHub publication evidence remains assigned to the protected
+checkpoints above.
 
 ### DIST-P09 — Document installation, operation, and recovery
 
@@ -626,18 +668,29 @@ repository-owned publication logic.
   disablement, and runner or tap recovery.
 - Name commands and secret roles without recording secret values.
 
-- [ ] **DIST-P09:** Distribution documentation is complete.
-- [ ] **DIST-P09-AC1:** User documentation contains exactly the two supported
+- [x] **DIST-P09:** Distribution documentation is complete.
+- [x] **DIST-P09-AC1:** User documentation contains exactly the two supported
   fully qualified installation commands.
-- [ ] **DIST-P09-AC2:** Support, coexistence, upgrades, ordinary uninstallation,
+- [x] **DIST-P09-AC2:** Support, coexistence, upgrades, ordinary uninstallation,
   configuration retention, and permission setup are described accurately.
-- [ ] **DIST-P09-AC3:** Operator documentation covers bootstrap, automation,
+- [x] **DIST-P09-AC3:** Operator documentation covers bootstrap, automation,
   rotation, resumption, roll-forward, compromise response, and recovery.
-- [ ] **DIST-P09-AC4:** No unsupported short-installation or official-Homebrew
+- [x] **DIST-P09-AC4:** No unsupported short-installation or official-Homebrew
   claim appears.
-- [ ] **DIST-P09-V1:** Every documented repository path and command is verified.
-- [ ] **DIST-P09-V2:** `git --no-pager diff HEAD --check`, `make format-check`,
+- [x] **DIST-P09-V1:** Every documented repository path and command is verified.
+- [x] **DIST-P09-V2:** `git --no-pager diff HEAD --check`, `make format-check`,
   `make check`, and `make app` pass.
+
+**Repository evidence (September 27, 2026):** `docs/distribution.md` documents
+the unavailable-until-bootstrap status, exact formula and cask commands,
+Apple Silicon and macOS 26+ support, coexistence, upgrades, ordinary
+uninstallation, configuration retention, and intentional app permission setup.
+`docs/release-operations.md` covers protected bootstrap and automation, all
+credential roles, rotation, immutable-candidate resumption, higher-patch
+correction, compromised-artifact disablement, and runner/tap recovery.
+`DistributionDocumentationTests` enforces the supported command surface and
+navigation links. The repository handoff gate passed; `actionlint` remains an
+unavailable additional provider-aware check recorded under `DIST-P07-V1`.
 
 ### DIST-P10 — Provision infrastructure and bootstrap `v1.0.0`
 
@@ -766,10 +819,10 @@ and document whether it is included in `make check`.
 
 ## Readiness and next action
 
-Repository implementation through `DIST-P04` is complete. `DIST-P05` has its
-production entry point and deterministic fake-backed evidence; only its protected
-real signing, notarization, stapler, and Gatekeeper validation remains externally
-blocked. `DIST-P06` is the next repository slice and may begin with fixture
-artifacts while protected production validation is provisioned. `DIST-P10` and
-`DIST-P11` remain externally blocked until their listed infrastructure and
-credential prerequisites exist.
+Repository implementation through `DIST-P09` is complete. The remaining open
+items in `DIST-P05`, `DIST-P06`, and `DIST-P07` require the protected release
+environment rather than additional local behavior. `DIST-P10` is the next action:
+provision repository controls, credentials, the GitHub App, and compliant
+runners, then bootstrap and verify public `v1.0.0`. `DIST-P11` remains blocked
+until that bootstrap succeeds and a later qualifying `master` push can exercise
+the same protected gate automatically.

@@ -12,8 +12,8 @@ import Foundation
         "CalendarManualDryRunTests", "CalendarMutationExecutorTests", "CalendarNoPromptContractTests",
         "CalendarReviewedActionTests", "CalendarStandingAuthorizationTests", "CalRelayCLISmokeTests",
         "CalRelayContractTests", "ConfigCheckCommandHandlerTests", "EventKitExactEventOccurrenceResolverTests",
-        "DistributionHomebrewPackageTests", "DistributionProductionArtifactTests", "DistributionReleasePolicyTests",
-        "DistributionReleaseStateTests", "DistributionReleaseWorkflowTests",
+        "DistributionDocumentationTests", "DistributionHomebrewPackageTests", "DistributionProductionArtifactTests",
+        "DistributionReleasePolicyTests", "DistributionReleaseStateTests", "DistributionReleaseWorkflowTests",
         "DistributionVersionTests", "FileCalendarRelaySettingsProviderTests",
         "OrdinaryReconciliationCalendarCaptureTests", "OrdinaryReconciliationWindowTests",
         "ReconcileCommandHandlerTests", "ReconciliationConvergenceTests", "ReconciliationSpecificationTests",
@@ -163,6 +163,9 @@ import Foundation
     }
 
     private static func runDistributionSuites(filters: Set<String>) throws {
+        if filters.isEmpty || filters.contains("DistributionDocumentationTests") {
+            try DistributionDocumentationTests.runAll()
+        }
         if filters.isEmpty || filters.contains("DistributionHomebrewPackageTests") {
             try DistributionHomebrewPackageTests.runAll()
         }

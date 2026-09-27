@@ -190,6 +190,7 @@ and release orchestration fixtures run with:
 
 ```sh
 swift run CalRelayKitTests \
+  DistributionDocumentationTests \
   DistributionHomebrewPackageTests \
   DistributionReleaseStateTests \
   DistributionReleaseWorkflowTests \
@@ -212,54 +213,11 @@ developer or CI environment; it is not currently a repository-managed dependency
 
 ## Protected release workflow setup and operation
 
-Before the first bootstrap, configure all of the following:
-
-1. Enable GitHub immutable releases for `ondrej-winter/calrelay`, protect
-   `master`, and disallow force-push replacement of release history.
-2. Keep `ondrej-winter/homebrew-tap` public with protected `master`, no
-   force-push publication, and the expected `Formula/` and `Casks/` paths.
-3. Create the protected `public-beta-release` environment with required review or
-   deployment controls.
-4. Provide an ephemeral self-hosted runner labeled `macOS`, `ARM64`, and
-   `calrelay-release`, with macOS 27+, Xcode 27, Swift 6.4, Homebrew, `gh`, and
-   the pinned Node runtime available.
-5. Install the dedicated release GitHub App only on `ondrej-winter/calrelay` and
-   `ondrej-winter/homebrew-tap`. Grant only repository contents/release access
-   needed for source refs, release assets, and the tap commit.
-6. Configure protected secret `CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY`; configure
-   variable `CALRELAY_RELEASE_GITHUB_APP_ID`; and set
-   `CALRELAY_TAP_REPOSITORY` exactly to `ondrej-winter/homebrew-tap`.
-7. Configure the signing/notarization secrets and identity variables listed above.
-
-The workflow has one non-cancelling concurrency group. Non-qualifying pushes stop
-after the unprivileged analysis job and cannot access signing or publication
-credentials. Bootstrap `v1.0.0` manually with:
-
-```sh
-gh workflow run release.yml -f bootstrap=true
-```
-
-The workflow retains the exact source-bound candidate as the
-`release-candidate` Actions artifact for 30 days. To resume an interrupted run,
-use the original workflow run ID and do not set `bootstrap`:
-
-```sh
-gh workflow run release.yml -f resume_run_id=123456789
-```
-
-Resumption never rebuilds the same version. It downloads the retained candidate,
-verifies that its source revision and artifact came from the named completed
-release workflow run on `ondrej-winter/calrelay` `master`, checks out that captured
-revision, and restores the prepared release commit and tag from `source.bundle`.
-It then reruns source quality gates and verifies the manifest, artifact digests,
-checksums, generated packages, source bundle, and remote state before continuing.
-This also permits recovery when interruption happened before the release commit
-was published to GitHub. After source publication, a later descendant of `master`
-is accepted only when the immutable release tag still identifies the retained
-release commit. Mismatched workflow provenance, tags, assets, tap content, or
-candidate bytes fail closed. If the Actions artifact has expired or is missing,
-do not rebuild the same version; investigate and use the accepted higher-patch
-corrective path where applicable.
+Use [Release operations](release-operations.md) as the canonical operator
+runbook for protected environment setup, `v1.0.0` bootstrap, automatic releases,
+credential rotation, incomplete-release resumption, higher-patch correction,
+compromise response, and runner or tap recovery. The public channel remains
+unavailable until the runbook's protected bootstrap checkpoints complete.
 
 Real Developer ID, notarization, stapler, and Gatekeeper evidence requires the
 protected release environment. The default deterministic suite uses fake tools and

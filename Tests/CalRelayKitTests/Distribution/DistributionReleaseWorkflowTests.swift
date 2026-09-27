@@ -15,6 +15,7 @@ enum DistributionReleaseWorkflowTests {
         try testTamperedRetainedSourceBundleFailsBeforeSourcePublication()
         try testReformattedProductionManifestFailsSameVersionRetry()
         try testInvalidProductionManifestLeavesNoRetainedCandidate()
+        try testPublicationAuthenticationHelperCleansUpAfterSuccessAndFailure()
     }
 
     private static func testWorkflowUsesSerializedLeastPrivilegeProtectedPublication() throws {
@@ -264,6 +265,30 @@ enum DistributionReleaseWorkflowTests {
         try expect(!fixture.candidateExists(), "Invalid production metadata must not leave immutable release state")
     }
 
+    private static func testPublicationAuthenticationHelperCleansUpAfterSuccessAndFailure() throws {
+        let token = "AUTHENTICATION-HELPER-TOKEN-SENTINEL"
+        let success = try ReleaseWorkflowFixture()
+        defer { success.remove() }
+        try success.stageCandidate()
+
+        let successResult = try success.publish("assets", gitToken: token)
+
+        try expect(successResult.status == 0, "Authenticated publication fixture must succeed: \(successResult.output)")
+        try expect(try success.authenticationHelperPaths().isEmpty, "Successful publication must remove its askpass helper")
+        try expect(!successResult.output.contains(token), "Successful publication must not disclose the Git token")
+
+        let failure = try ReleaseWorkflowFixture()
+        defer { failure.remove() }
+        try failure.stageCandidate()
+        try failure.advanceRemoteBranchTip()
+
+        let failureResult = try failure.publish("assets", gitToken: token)
+
+        try expect(failureResult.status != 0, "Stale source must fail after authentication helper setup")
+        try expect(try failure.authenticationHelperPaths().isEmpty, "Failed publication must remove its askpass helper")
+        try expect(!failureResult.output.contains(token), "Failed publication must not disclose the Git token")
+    }
+
     static func repositoryRoot() throws -> URL {
         var candidate = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         while candidate.path != "/" {
@@ -441,10 +466,11 @@ private final class ReleaseWorkflowFixture {
             ], at: source, environment: environment)
     }
 
-    func publish(_ stage: String) throws -> ReleaseWorkflowProcessResult {
+    func publish(_ stage: String, gitToken: String? = nil) throws -> ReleaseWorkflowProcessResult {
         var environment = ProcessInfo.processInfo.environment
         environment["CALRELAY_RELEASE_OPERATION_LOG"] = publisherLog.path
         environment["CALRELAY_FAKE_RELEASE_DIRECTORY"] = fakeRelease.path
+        environment["CALRELAY_GIT_TOKEN"] = gitToken
         return try command(
             "/usr/bin/env",
             [
@@ -454,6 +480,10 @@ private final class ReleaseWorkflowFixture {
                 "--tap-remote", tapRemote.path, "--work-directory", root.appendingPathComponent("publish-work").path,
                 "--gh", fakeGH.path,
             ], at: source, environment: environment)
+    }
+
+    func authenticationHelperPaths() throws -> [String] {
+        try FileManager.default.contentsOfDirectory(atPath: root.path).filter { $0.hasPrefix("publish-work.askpass-") }
     }
 
     func restoreReleaseCommitFromCandidate() throws -> String {

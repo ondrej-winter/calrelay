@@ -87,11 +87,22 @@ if ! /usr/bin/grep -Fq "// swift-tools-version: 6.4" "${ROOT_DIR}/Package.swift"
 fi
 
 KEYCHAIN_CREATED=0
+FINAL_OUTPUTS_OWNED=0
+FINAL_OUTPUTS_COMPLETE=0
+CLI_BUILD_PRODUCT="${ROOT_DIR}/.build/release/calrelay"
+APP_BUILD_PRODUCT="${ROOT_DIR}/.build/release/CalRelayApp"
+BUILD_PRODUCTS_OWNED=0
 cleanup() {
     local exit_code=$?
     if (( KEYCHAIN_CREATED )); then
         "${SECURITY}" delete-keychain "${KEYCHAIN_PATH}" >/dev/null 2>&1 || true
         KEYCHAIN_CREATED=0
+    fi
+    if (( FINAL_OUTPUTS_OWNED && ! FINAL_OUTPUTS_COMPLETE )); then
+        /bin/rm -f "${CLI_ARCHIVE}" "${APP_ARCHIVE}" "${MANIFEST}"
+    fi
+    if (( BUILD_PRODUCTS_OWNED )); then
+        /bin/rm -f "${CLI_BUILD_PRODUCT}" "${APP_BUILD_PRODUCT}"
     fi
     /bin/rm -rf "${WORK_DIR}"
     return "${exit_code}"
@@ -112,10 +123,12 @@ KEYCHAIN_CREATED=1
 "${SECURITY}" set-key-partition-list -S apple-tool:,apple: -s -k "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}" >/dev/null
 
 cd "${ROOT_DIR}"
+/bin/rm -f "${CLI_BUILD_PRODUCT}" "${APP_BUILD_PRODUCT}"
+BUILD_PRODUCTS_OWNED=1
 MACOSX_DEPLOYMENT_TARGET=26.0 "${SWIFT}" build -c release --arch arm64 --product calrelay
 MACOSX_DEPLOYMENT_TARGET=26.0 "${SWIFT}" build -c release --arch arm64 --product CalRelayApp
-/bin/cp "${ROOT_DIR}/.build/release/calrelay" "${CLI_DIR}/calrelay"
-/bin/cp "${ROOT_DIR}/.build/release/CalRelayApp" "${APP_BUNDLE}/Contents/MacOS/CalRelayApp"
+/bin/cp "${CLI_BUILD_PRODUCT}" "${CLI_DIR}/calrelay"
+/bin/cp "${APP_BUILD_PRODUCT}" "${APP_BUNDLE}/Contents/MacOS/CalRelayApp"
 /bin/cp "${ROOT_DIR}/Resources/CalRelayApp/Info.plist" "${APP_BUNDLE}/Contents/Info.plist"
 /usr/bin/plutil -replace CFBundleShortVersionString -string "${RELEASE_VERSION}" "${APP_BUNDLE}/Contents/Info.plist"
 /usr/bin/plutil -replace CFBundleVersion -string "${RELEASE_VERSION}" "${APP_BUNDLE}/Contents/Info.plist"
@@ -195,16 +208,6 @@ if [[ -e "${CLI_ARCHIVE}" || -e "${APP_ARCHIVE}" || -e "${MANIFEST}" ]]; then
     print -u2 -- "error: refusing to replace existing immutable release artifacts."
     exit 1
 fi
-COPYFILE_DISABLE=1 /usr/bin/tar -czf "${CLI_ARCHIVE}" -C "${CLI_DIR}" calrelay
-COPYFILE_DISABLE=1 /usr/bin/ditto -c -k --keepParent "${APP_BUNDLE}" "${APP_ARCHIVE}"
-if [[ "$(/usr/bin/tar -tzf "${CLI_ARCHIVE}")" != calrelay ]]; then
-    print -u2 -- "error: CLI archive must contain exactly one executable named calrelay."
-    exit 1
-fi
-if /usr/bin/zipinfo -1 "${APP_ARCHIVE}" | /usr/bin/grep -Ev "^CalRelay\.app(/|$)" >/dev/null; then
-    print -u2 -- "error: app archive contains content outside CalRelay.app."
-    exit 1
-fi
 
 scan_value() {
     local value="$1"
@@ -219,7 +222,25 @@ scan_value "${CALRELAY_NOTARY_API_KEY_P8}"
 if [[ -n "${CALRELAY_RELEASE_PROHIBITED_SENTINELS:-}" ]]; then
     while IFS= read -r sentinel; do scan_value "${sentinel}"; done <<< "${CALRELAY_RELEASE_PROHIBITED_SENTINELS}"
 fi
-CLI_SHA="$(/usr/bin/shasum -a 256 "${CLI_ARCHIVE}" | /usr/bin/cut -d " " -f 1)"
-APP_SHA="$(/usr/bin/shasum -a 256 "${APP_ARCHIVE}" | /usr/bin/cut -d " " -f 1)"
-/usr/bin/printf "{\n  \"schemaVersion\": 1,\n  \"version\": \"%s\",\n  \"architecture\": \"arm64\",\n  \"minimumMacOS\": \"26.0\",\n  \"sdk\": \"%s\",\n  \"cli\": { \"name\": \"%s\", \"sha256\": \"%s\" },\n  \"app\": { \"name\": \"%s\", \"sha256\": \"%s\" }\n}\n" "${RELEASE_VERSION}" "${SDK_VERSION}" "${CLI_ARCHIVE:t}" "${CLI_SHA}" "${APP_ARCHIVE:t}" "${APP_SHA}" > "${MANIFEST}"
+STAGED_CLI_ARCHIVE="${WORK_DIR}/${CLI_ARCHIVE:t}"
+STAGED_APP_ARCHIVE="${WORK_DIR}/${APP_ARCHIVE:t}"
+STAGED_MANIFEST="${WORK_DIR}/candidate-manifest.json"
+COPYFILE_DISABLE=1 /usr/bin/tar -czf "${STAGED_CLI_ARCHIVE}" -C "${CLI_DIR}" calrelay
+COPYFILE_DISABLE=1 /usr/bin/ditto -c -k --keepParent "${APP_BUNDLE}" "${STAGED_APP_ARCHIVE}"
+if [[ "$(/usr/bin/tar -tzf "${STAGED_CLI_ARCHIVE}")" != calrelay ]]; then
+    print -u2 -- "error: CLI archive must contain exactly one executable named calrelay."
+    exit 1
+fi
+if /usr/bin/zipinfo -1 "${STAGED_APP_ARCHIVE}" | /usr/bin/grep -Ev "^CalRelay\.app(/|$)" >/dev/null; then
+    print -u2 -- "error: app archive contains content outside CalRelay.app."
+    exit 1
+fi
+CLI_SHA="$(/usr/bin/shasum -a 256 "${STAGED_CLI_ARCHIVE}" | /usr/bin/cut -d " " -f 1)"
+APP_SHA="$(/usr/bin/shasum -a 256 "${STAGED_APP_ARCHIVE}" | /usr/bin/cut -d " " -f 1)"
+/usr/bin/printf "{\n  \"schemaVersion\": 1,\n  \"version\": \"%s\",\n  \"architecture\": \"arm64\",\n  \"minimumMacOS\": \"26.0\",\n  \"sdk\": \"%s\",\n  \"cli\": { \"name\": \"%s\", \"sha256\": \"%s\" },\n  \"app\": { \"name\": \"%s\", \"sha256\": \"%s\" }\n}\n" "${RELEASE_VERSION}" "${SDK_VERSION}" "${CLI_ARCHIVE:t}" "${CLI_SHA}" "${APP_ARCHIVE:t}" "${APP_SHA}" > "${STAGED_MANIFEST}"
+FINAL_OUTPUTS_OWNED=1
+/bin/mv "${STAGED_CLI_ARCHIVE}" "${CLI_ARCHIVE}"
+/bin/mv "${STAGED_APP_ARCHIVE}" "${APP_ARCHIVE}"
+/bin/mv "${STAGED_MANIFEST}" "${MANIFEST}"
+FINAL_OUTPUTS_COMPLETE=1
 print -r -- "Built verified production artifacts for ${RELEASE_VERSION}."
