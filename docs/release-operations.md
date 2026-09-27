@@ -7,8 +7,9 @@ workflow. It complements the accepted
 their product or security contracts.
 
 > **Availability:** As of September 27, 2026, the public channel is not live. The
-> protected environment, credentials, repository controls, production signing
-> evidence, and initial `v1.0.0` publication remain pending.
+> GitHub App installation and access, the preview hosted-runner release lane,
+> production signing/notarization evidence, and initial `v1.0.0` publication
+> remain to be validated.
 
 ## Invariants
 
@@ -41,15 +42,20 @@ recording their values in repository files:
 | `CALRELAY_RELEASE_GITHUB_APP_ID` | Protected environment variable identifying that GitHub App. |
 | `CALRELAY_TAP_REPOSITORY` | Protected environment variable set exactly to `ondrej-winter/homebrew-tap`. |
 
-The self-hosted release runner must be ephemeral, Apple Silicon, macOS 27 or
-later, and labeled `macOS`, `ARM64`, and `calrelay-release`. It must provide Xcode
-27, Swift 6.4, the macOS 27 SDK, Homebrew, `gh`, and the pinned Node runtime.
+The release job uses GitHub's standard hosted Apple Silicon `xcode-27` image. As
+of September 27, 2026, that image is in public preview and provides an ephemeral
+macOS 27 VM with Xcode 27, Swift 6.4, the macOS 27 SDK, Homebrew, and `gh`; the
+workflow installs the pinned Node runtime explicitly. Preview image contents and
+capacity may change. Before bootstrap and after an image rollout, verify the
+image inventory and let the production packaging preflight fail closed if the
+OS, architecture, Xcode, Swift, or SDK contract no longer matches.
 
 ## Bootstrap `v1.0.0`
 
 Before bootstrap, verify immutable GitHub releases, protected `master` branches,
 the `public-beta-release` environment, required reviewers or deployment controls,
-GitHub App installations, runner labels, and every protected role above.
+GitHub App installations, `xcode-27` availability and toolchain compatibility,
+and every protected role above.
 
 Dispatch the first release manually:
 
@@ -161,12 +167,17 @@ artifact as installable merely for downgrade convenience.
 
 ## Runner recovery
 
-If a runner fails or may retain protected material, stop assigning release work
-to it and destroy or reprovision it. Confirm the ephemeral keychain, signing
-files, retained candidate workspace, GitHub authentication helper, Homebrew
-validation directories, and downloaded artifacts are gone. Resume from the
-retained workflow candidate on a newly compliant runner; do not copy an
-unverified workspace or rebuild the same version.
+Each `xcode-27` job receives a fresh GitHub-hosted VM that GitHub disposes after
+the job. If a runner fails, do not copy or reuse its workspace. Confirm cleanup
+steps ran where logs are available, rotate any credential that may have been
+exposed, and resume from the retained workflow candidate on a fresh GitHub-hosted
+VM; do not rebuild the same version.
+
+Because `xcode-27` is a public preview image, treat image drift, unavailability,
+or sustained queueing as a provider dependency failure. Recheck the official
+runner-image announcement and inventory, and update the workflow and toolchain
+contract only through a reviewed change. Do not bypass production preflight or
+switch runner labels ad hoc during an immutable release.
 
 If failure occurred before a candidate was retained, no immutable release exists
 and a fresh protected run may prepare the selected version only after remote

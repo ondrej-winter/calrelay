@@ -37,7 +37,8 @@ boundaries:
   commit. The pinned semantic-release 25.0.9 prepare pipeline then re-reads Git
   HEAD and tags that commit, as defined by its versioned
   [`prepare` pipeline](https://github.com/semantic-release/semantic-release/blob/v25.0.9/lib/definitions/plugins.js).
-- A dedicated Apple Silicon release environment with Xcode 27, Swift 6.4, and the
+- The protected release job uses GitHub's standard hosted Apple Silicon
+  `xcode-27` image. Its ephemeral environment with Xcode 27, Swift 6.4, and the
   macOS 27 SDK builds the exact macOS 26-compatible candidate artifacts.
 - Production CLI and app packaging use separate release entry points from the
   local ad-hoc `make app` workflow. Local packaging never imports production
@@ -77,9 +78,15 @@ roles only and do not contain credential values.
 
 ### Runners
 
-- An ephemeral Apple Silicon release runner providing macOS 27, Xcode 27, Swift
-  6.4, the macOS 27 SDK, Homebrew, the pinned Node runtime, secure secret
-  injection, and ephemeral keychain support.
+- GitHub's standard hosted Apple Silicon `xcode-27` image, which is in public
+  preview as of September 27, 2026. Each job receives an ephemeral VM providing
+  macOS 27, Xcode 27, Swift 6.4, the macOS 27 SDK, Homebrew, secure secret
+  injection, and ephemeral keychain support; the workflow installs the pinned
+  Node runtime explicitly.
+- The workflow and production packaging preflight fail closed if the hosted
+  image no longer satisfies the required OS, architecture, Xcode, Swift, or SDK
+  contract. Preview image drift, capacity, and availability remain external
+  release risks that require validation before bootstrap and after image updates.
 - A clean Apple Silicon package-test environment for formula/cask install,
   coexistence, upgrade, and ordinary uninstall checks. It may use the release
   runner only when isolation and cleanup are demonstrably equivalent.
@@ -118,10 +125,12 @@ signing, notarization, or publication credentials.
 
 ### Negative
 
-- Public releases depend on provisioned Apple Silicon CI capacity, Apple signing
-  and notarization services, the public tap, and the dedicated GitHub App.
-- Credential rotation, runner recovery, incomplete-release resumption, and
-  compromised-artifact response require maintained operator procedures.
+- Public releases depend on GitHub's hosted `xcode-27` preview capacity and image
+  compatibility, Apple signing and notarization services, the public tap, and the
+  dedicated GitHub App.
+- Credential rotation, hosted-runner failure recovery, incomplete-release
+  resumption, and compromised-artifact response require maintained operator
+  procedures.
 - Release automation is intentionally more complex than the local build because it
   must preserve immutable bytes and cross-repository state.
 
@@ -140,6 +149,7 @@ signing, notarization, or publication credentials.
 | --- | --- |
 | Build from source during Homebrew installation | Conflicts with the accepted prebuilt artifact and no-SwiftPM installation contract. |
 | Reuse local ad-hoc app packaging for releases | Does not provide Developer ID identity, notarization, secure timestamps, or protected credential handling. |
+| Require a dedicated self-hosted Apple Silicon runner | Adds long-lived runner provisioning, isolation, patching, and cleanup responsibilities when the standard hosted `xcode-27` image satisfies the release contract with a fresh VM per job. |
 | Publish the formula and cask independently | Can expose a partial release and violate the shared-version contract. |
 | Use a personal access token for publication | Provides the wrong custody and least-privilege model for automated cross-repository writes. |
 | Rebuild artifacts when retrying a release | Risks different signed bytes under one immutable version. |

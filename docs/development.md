@@ -210,6 +210,8 @@ actionlint .github/workflows/release.yml
 
 `actionlint` is an additional provider-aware check and must run in a configured
 developer or CI environment; it is not currently a repository-managed dependency.
+`.github/actionlint.yaml` narrowly suppresses its outdated unknown-label warning
+for GitHub's public-preview `xcode-27` runner while retaining all other checks.
 
 ## Protected release workflow setup and operation
 

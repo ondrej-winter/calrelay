@@ -27,7 +27,7 @@ enum DistributionReleaseWorkflowTests {
         for required in [
             "workflow_dispatch:", "bootstrap:", "resume_run_id:", "push:", "branches: [master]",
             "group: calrelay-public-beta-release", "cancel-in-progress: false", "permissions:", "actions: read",
-            "contents: read", "environment: public-beta-release", "self-hosted", "ARM64", "calrelay-release",
+            "contents: read", "environment: public-beta-release", "runs-on: xcode-27",
             "persist-credentials: false", "node-version: 24.21.0", "package-manager-cache: false",
             "permission-contents: write", "CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY",
             "CALRELAY_RELEASE_GITHUB_APP_ID", "ondrej-winter/homebrew-tap", "if: always()",
@@ -50,6 +50,9 @@ enum DistributionReleaseWorkflowTests {
         try expect(
             !workflow.contains("pull_request_target") && !workflow.contains("permissions: write-all"),
             "Release workflow must not expose privileged execution to untrusted triggers")
+        try expect(
+            !workflow.contains("runs-on: [self-hosted"),
+            "Release workflow must use the ephemeral GitHub-hosted Apple Silicon runner")
         try expect(
             !workflow.contains("archive: false"),
             "The retained multi-file candidate must use upload-artifact's archive container")

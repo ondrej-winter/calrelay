@@ -50,6 +50,7 @@ enum DistributionDocumentationTests {
             "CALRELAY_NOTARY_KEY_ID", "CALRELAY_NOTARY_ISSUER_ID", "CALRELAY_DEVELOPER_TEAM_ID",
             "CALRELAY_SIGNING_IDENTITY", "CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY",
             "CALRELAY_RELEASE_GITHUB_APP_ID", "CALRELAY_TAP_REPOSITORY",
+            "`xcode-27`", "public preview", "fresh GitHub-hosted VM",
             "gh workflow run release.yml -f resume_run_id=123456789", "Do not rebuild the same version",
             "Do not move or replace same-version tags or assets", "higher patch version", "compromised artifact",
             "disable", "## Runner recovery", "## Tap recovery", "scripts/release/release-state.mjs",

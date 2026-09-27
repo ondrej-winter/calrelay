@@ -67,7 +67,7 @@ jobs:
   release:
     needs: analyze
     if: needs.analyze.outputs.release == 'true'
-    runs-on: [self-hosted, macOS, ARM64, calrelay-release]
+    runs-on: xcode-27
     environment: public-beta-release
     permissions:
       actions: read
