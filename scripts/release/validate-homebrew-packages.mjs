@@ -58,7 +58,6 @@ function main(arguments_) {
     initializeTap(tapSource, previousPackagesDirectory ?? packagesDirectory);
     assertCleanHomebrewState(brew);
 
-    run(brew, ["style", ...packageFiles.map((path) => join(packagesDirectory, path))]);
     run(brew, ["tap", "--custom-remote", tap, pathToFileURL(tapSource).href]);
     tapped = true;
     const tapCheckout = run(brew, ["--repo", tap]).trim();
@@ -67,6 +66,8 @@ function main(arguments_) {
     }
 
     stagePackages(tapCheckout, packagesDirectory);
+    run(brew, ["style", "--formula", token]);
+    run(brew, ["style", "--cask", token]);
     run(brew, ["audit", "--strict", "--formula", token]);
     run(brew, ["audit", "--strict", "--cask", token]);
     run(brew, ["fetch", "--retry", "--formula", token]);

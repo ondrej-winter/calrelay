@@ -101,7 +101,8 @@ enum DistributionHomebrewPackageTests {
         try expect(result.status == 0, "Fake-backed Homebrew lifecycle validation must succeed: \(result.output)")
         let log = try String(contentsOf: fixture.log, encoding: .utf8)
         for required in [
-            "style ", "audit --strict --formula ondrej-winter/tap/calrelay",
+            "style --formula ondrej-winter/tap/calrelay", "style --cask ondrej-winter/tap/calrelay",
+            "audit --strict --formula ondrej-winter/tap/calrelay",
             "audit --strict --cask ondrej-winter/tap/calrelay", "fetch --retry --formula ondrej-winter/tap/calrelay",
             "fetch --retry --cask ondrej-winter/tap/calrelay", "test ondrej-winter/tap/calrelay",
             "upgrade --formula ondrej-winter/tap/calrelay", "upgrade --cask ondrej-winter/tap/calrelay",
