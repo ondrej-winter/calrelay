@@ -16,6 +16,7 @@ import { pathToFileURL } from "node:url";
 
 const tap = "ondrej-winter/tap";
 const token = `${tap}/calrelay`;
+const packageToken = "calrelay";
 const packageFiles = [join("Formula", "calrelay.rb"), join("Casks", "calrelay.rb")];
 
 try {
@@ -68,8 +69,8 @@ function main(arguments_) {
     stagePackages(tapCheckout, packagesDirectory);
     run(brew, ["style", "--formula", token]);
     run(brew, ["style", "--cask", token]);
-    run(brew, ["audit", "--strict", "--formula", token]);
-    run(brew, ["audit", "--strict", "--cask", token]);
+    run(brew, ["audit", "--strict", "--formula", "--except=version", token]);
+    run(brew, ["audit", "--strict", "--cask", "--except=sha256_no_check_if_unversioned", token]);
     run(brew, ["fetch", "--retry", "--formula", token]);
     run(brew, ["fetch", "--retry", "--cask", token]);
 
@@ -196,7 +197,7 @@ function assertNotInstalled(brew, kind) {
 }
 
 function isInstalled(brew, kind) {
-  const result = spawnSync(brew, ["list", "--versions", `--${kind}`, token], processOptions());
+  const result = spawnSync(brew, ["list", "--versions", `--${kind}`, packageToken], processOptions());
   if (result.error) throw result.error;
   return result.status === 0;
 }

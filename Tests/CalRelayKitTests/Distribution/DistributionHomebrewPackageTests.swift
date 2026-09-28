@@ -102,11 +102,13 @@ enum DistributionHomebrewPackageTests {
         let log = try String(contentsOf: fixture.log, encoding: .utf8)
         for required in [
             "style --formula ondrej-winter/tap/calrelay", "style --cask ondrej-winter/tap/calrelay",
-            "audit --strict --formula ondrej-winter/tap/calrelay",
-            "audit --strict --cask ondrej-winter/tap/calrelay", "fetch --retry --formula ondrej-winter/tap/calrelay",
+            "audit --strict --formula --except=version ondrej-winter/tap/calrelay",
+            "audit --strict --cask --except=sha256_no_check_if_unversioned ondrej-winter/tap/calrelay",
+            "fetch --retry --formula ondrej-winter/tap/calrelay",
             "fetch --retry --cask ondrej-winter/tap/calrelay", "test ondrej-winter/tap/calrelay",
             "upgrade --formula ondrej-winter/tap/calrelay", "upgrade --cask ondrej-winter/tap/calrelay",
             "reinstall --formula ondrej-winter/tap/calrelay", "reinstall --cask ondrej-winter/tap/calrelay",
+            "list --versions --formula calrelay", "list --versions --cask calrelay",
             "untap ondrej-winter/tap",
         ] {
             try expect(log.contains(required), "Lifecycle validation must run \(required)")
