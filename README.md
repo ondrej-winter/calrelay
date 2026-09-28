@@ -32,6 +32,8 @@ Use the app's explicit setup/recovery action when full Calendar access is unavai
 
 ## Documentation
 
+Start with the [documentation index](docs/README.md) to choose the canonical guide for a task.
+
 - [Development workflow](docs/development.md): local requirements, build/test commands, formatting, linting, and package notes.
 - [Repository layout](docs/repository-layout.md): source targets, test organization, and the `CalRelayKit` integration boundary.
 - [Configuration](docs/configuration.md): YAML file location, schema, selector semantics, CLI reconciliation commands, and safety notes.
