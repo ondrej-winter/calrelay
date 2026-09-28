@@ -53,7 +53,7 @@ enum DistributionReleaseWorkflowTests {
             "persist-credentials: false", "node-version: 24.21.0", "package-manager-cache: false",
             "CALRELAY_SIGNING_CERTIFICATE_SHA1", "secrets.CALRELAY_SIGNING_CERTIFICATE_SHA1",
             "permission-contents: write", "CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY",
-            "client-id: ${{ vars.CALRELAY_RELEASE_GITHUB_APP_CLIENT_ID }}", "ondrej-winter/homebrew-tap", "if: always()",
+            "client-id: ${{ secrets.CALRELAY_RELEASE_GITHUB_APP_CLIENT_ID }}", "ondrej-winter/homebrew-tap", "if: always()",
             "compression-level: 0", "if-no-files-found: error", "retention-days: 30",
             "resume_run_id must be a positive workflow run ID", "bootstrap and resume_run_id are mutually exclusive",
             "Manual release dispatches must target master", "scripts/release/verify-resume-workflow.mjs",
