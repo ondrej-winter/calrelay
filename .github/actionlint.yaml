@@ -1,5 +1,6 @@
 paths:
   .github/workflows/ci-cd.yaml:
     ignore:
-      # actionlint v1.7.12 predates GitHub's public-preview xcode-27 label.
+      # actionlint v1.7.12 predates these GitHub-hosted runner labels.
+      - 'label "ubuntu-26.04" is unknown'
       - 'label "xcode-27" is unknown'

@@ -11,7 +11,7 @@ on:
         type: boolean
         default: false
       resume_run_id:
-        description: Workflow run containing the immutable release-candidate artifact to resume
+        description: Workflow run ID containing the immutable release-candidate artifact to resume
         required: false
         type: string
 
@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   portable-ci:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       release: ${{ steps.selection.outputs.release }}
       source_revision: ${{ steps.context.outputs.source_revision }}
@@ -37,29 +37,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Set up pinned Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: 24.21.0
-          package-manager-cache: false
-      - name: Validate portable release tooling
+        uses: ./.github/actions/setup-release-node
+      - name: Validate release JavaScript syntax
         run: |
           set -euo pipefail
           find scripts/release -type f -name '*.mjs' -print0 | sort -z | xargs -0 -n 1 node --check
-      - name: Run pinned actionlint
-        run: |
-          set -euo pipefail
-          version=1.7.12
-          archive="${RUNNER_TEMP}/actionlint.tar.gz"
-          install_directory="${RUNNER_TEMP}/actionlint"
-          rm -rf "$archive" "$install_directory"
-          mkdir -p "$install_directory"
-          curl --fail --location --proto '=https' --tlsv1.2 --retry 3 \
-            --output "$archive" \
-            "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_linux_amd64.tar.gz"
-          printf '%s  %s\n' '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8' "$archive" \
-            | sha256sum -c -
-          tar -xzf "$archive" -C "$install_directory" actionlint
-          "$install_directory/actionlint" -config-file .github/actionlint.yaml .github/workflows/ci-cd.yaml
       - name: Select release or resumption
         id: selection
         env:
@@ -90,15 +72,13 @@ jobs:
           selection="$(node scripts/release/release-policy.mjs "${arguments[@]}")"
           release="$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.nextVersion ? "true" : "false")' "$selection")"
           printf 'release=%s\nresume=false\n' "$release" >> "$GITHUB_OUTPUT"
-      - name: Download retained candidate context
+      - name: Download retained candidate for provenance validation
         if: steps.selection.outputs.resume == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: ./.github/actions/download-release-candidate
         with:
-          name: release-candidate
-          path: ${{ runner.temp }}/calrelay-release-candidate
-          github-token: ${{ github.token }}
           run-id: ${{ inputs.resume_run_id }}
-      - name: Verify retained workflow context
+          github-token: ${{ github.token }}
+      - name: Verify retained candidate provenance
         if: steps.selection.outputs.resume == 'true'
         id: resume-context
         env:
@@ -145,17 +125,13 @@ jobs:
     outputs:
       validated_revision: ${{ steps.validation.outputs.validated_revision }}
     steps:
-      - name: Check out validation source
+      - name: Check out current workflow automation
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ needs.portable-ci.outputs.source_revision }}
       - name: Set up pinned Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: 24.21.0
-          package-manager-cache: false
+        uses: ./.github/actions/setup-release-node
       - name: Stage reviewed source restoration helper
         if: needs.portable-ci.outputs.resume == 'true'
         run: |
@@ -166,13 +142,17 @@ jobs:
           [[ -s "$helper" ]] || { echo 'Reviewed source restoration helper is empty.' >&2; exit 1; }
       - name: Download retained candidate for validation
         if: needs.portable-ci.outputs.resume == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: ./.github/actions/download-release-candidate
         with:
-          name: release-candidate
-          path: ${{ runner.temp }}/calrelay-release-candidate
-          github-token: ${{ github.token }}
           run-id: ${{ inputs.resume_run_id }}
-      - name: Restore retained validation source
+          github-token: ${{ github.token }}
+      - name: Check out validation source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ needs.portable-ci.outputs.source_revision }}
+      - name: Restore retained validation revision
         if: needs.portable-ci.outputs.resume == 'true'
         env:
           RELEASE_COMMIT: ${{ needs.portable-ci.outputs.release_commit }}
@@ -216,7 +196,7 @@ jobs:
           [[ "$observed_version" == "$swiftlint_version" ]] \
             || { echo "Pinned SwiftLint reported ${observed_version}, expected ${swiftlint_version}." >&2; exit 1; }
           printf 'SWIFTLINT=%s\n' "$swiftlint_binary" >> "$GITHUB_ENV"
-      - name: Validate Apple release shell
+      - name: Validate release shell syntax
         run: zsh -n scripts/release/*.sh
       - name: Run source quality gates
         run: |
@@ -246,25 +226,19 @@ jobs:
       actions: read
       contents: read
     steps:
-      - name: Set up pinned Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: 24.21.0
-          package-manager-cache: false
-      - name: Download resumable candidate
-        if: needs.portable-ci.outputs.resume == 'true'
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
-        with:
-          name: release-candidate
-          path: ${{ runner.temp }}/calrelay-release-candidate
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.resume_run_id }}
-      - name: Check out release source
+      - name: Check out current workflow automation
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ needs.portable-ci.outputs.source_revision }}
+      - name: Set up pinned Node
+        uses: ./.github/actions/setup-release-node
+      - name: Download retained candidate for resumption
+        if: needs.portable-ci.outputs.resume == 'true'
+        uses: ./.github/actions/download-release-candidate
+        with:
+          run-id: ${{ inputs.resume_run_id }}
+          github-token: ${{ github.token }}
       - name: Stage reviewed resumption helpers
         if: needs.portable-ci.outputs.resume == 'true'
         run: |
@@ -276,7 +250,13 @@ jobs:
           git show "${GITHUB_SHA}:scripts/release/restore-retained-source.sh" > "$restoration"
           [[ -s "$validator" ]] || { echo 'Reviewed Homebrew validator is empty.' >&2; exit 1; }
           [[ -s "$restoration" ]] || { echo 'Reviewed source restoration helper is empty.' >&2; exit 1; }
-      - name: Restore resumable candidate after checkout
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ needs.portable-ci.outputs.source_revision }}
+      - name: Move retained candidate into release workspace
         if: needs.portable-ci.outputs.resume == 'true'
         run: |
           mkdir -p .build
@@ -308,7 +288,7 @@ jobs:
           arguments=(notes)
           [[ "${BOOTSTRAP:-false}" == true ]] && arguments+=(--bootstrap)
           node scripts/release/release-policy.mjs "${arguments[@]}" > .build/release-metadata/release-notes.md
-      - name: Prepare local source publication remote
+      - name: Create isolated source publication remote
         if: needs.portable-ci.outputs.resume != 'true'
         env:
           SOURCE_REVISION: ${{ needs.portable-ci.outputs.source_revision }}
@@ -317,7 +297,7 @@ jobs:
           git switch -C master "$SOURCE_REVISION"
           rm -rf "${RUNNER_TEMP}/calrelay-source-publication.git"
           git clone --bare . "${RUNNER_TEMP}/calrelay-source-publication.git"
-      - name: Prepare release commit and tag through semantic-release
+      - name: Prepare release commit and tag with semantic-release
         if: needs.portable-ci.outputs.resume != 'true'
         env:
           CALRELAY_RELEASE_SOURCE_REVISION: ${{ needs.portable-ci.outputs.source_revision }}

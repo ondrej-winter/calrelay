@@ -219,8 +219,14 @@ actionlint -config-file .github/actionlint.yaml .github/workflows/ci-cd.yaml
 
 `actionlint` is an additional provider-aware check and must run in a configured
 developer or CI environment; it is not currently a repository-managed dependency.
-`.github/actionlint.yaml` narrowly suppresses its outdated unknown-label warning
-for GitHub's public-preview `xcode-27` runner while retaining all other checks.
+`.github/actionlint.yaml` narrowly suppresses its outdated unknown-label warnings
+for GitHub's hosted `ubuntu-26.04` and `xcode-27` runners while retaining all
+other checks.
+Repository-local composite actions under `.github/actions/` centralize the pinned
+Node setup and retained-candidate download. The Apple and protected jobs check out
+the current workflow automation before using those actions, then check out the
+exact selected source revision. This keeps older retained candidates resumable
+without weakening exact-revision validation.
 
 `.github/workflows/ci-cd.yaml` is the single automation entry point for pushes,
 pull requests, and manual runs. `portable-ci` performs portable tooling and release

@@ -31,6 +31,14 @@ enum DistributionReleaseWorkflowTests {
         ).filter { ["yaml", "yml"].contains($0.pathExtension) }
         let candidateStager = try String(
             contentsOf: root.appendingPathComponent("scripts/release/stage-release-candidate.mjs"), encoding: .utf8)
+        let localActionPaths = [
+            ".github/actions/setup-release-node/action.yml",
+            ".github/actions/download-release-candidate/action.yml",
+        ]
+        let localActions = try localActionPaths.map { path in
+            try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+        }
+        let releaseAutomation = ([workflow] + localActions).joined(separator: "\n")
 
         try expect(
             workflowFiles.map(\.lastPathComponent) == ["ci-cd.yaml"],
@@ -53,7 +61,7 @@ enum DistributionReleaseWorkflowTests {
             "The previous tap must contain both CalRelay packages or neither", "release-publication.askpass-*",
             "--previous-packages-directory .build/previous-packages", ".build/previous-packages/Formula",
         ] {
-            try expect(workflow.contains(required), "Release workflow must contain \(required)")
+            try expect(releaseAutomation.contains(required), "Release automation must contain \(required)")
         }
         try expect(
             workflow.contains("needs.apple-ci.outputs.validated_revision == needs.portable-ci.outputs.validation_revision"),
@@ -85,12 +93,14 @@ enum DistributionReleaseWorkflowTests {
         try expect(
             candidateStager.contains("Candidate staging requires a clean tracked release worktree"),
             "Candidate staging must reject tracked worktree drift before retaining release provenance")
-        let actionReferences = workflow.matches(of: /uses:\s+[^\s@]+@([^\s#]+)/).map { String($0.1) }
-        try expect(!actionReferences.isEmpty, "Release workflow must declare its external actions")
-        try expect(
-            actionReferences.allSatisfy { $0.range(of: "^[0-9a-f]{40}$", options: .regularExpression) != nil },
-            "Every external action must be pinned to an immutable commit")
+        try assertLocalActionsAreCentralized(
+            workflow: workflow,
+            localActions: localActions,
+            releaseAutomation: releaseAutomation)
+        try assertPortableJobHasNoProtectedAccess(workflow)
+    }
 
+    private static func assertPortableJobHasNoProtectedAccess(_ workflow: String) throws {
         let portableCI = try job(named: "portable-ci", in: workflow)
         for protectedName in [
             "CALRELAY_DEVELOPER_ID_P12", "CALRELAY_NOTARY_API_KEY_P8",
@@ -101,16 +111,51 @@ enum DistributionReleaseWorkflowTests {
         }
     }
 
+    private static func assertLocalActionsAreCentralized(
+        workflow: String,
+        localActions: [String],
+        releaseAutomation: String
+    ) throws {
+        for actionPath in [
+            "./.github/actions/setup-release-node",
+            "./.github/actions/download-release-candidate",
+        ] {
+            let callCount = workflow.components(separatedBy: "uses: \(actionPath)").count - 1
+            try expect(callCount == 3, "Each CI/CD job must use local action \(actionPath)")
+        }
+        try expect(
+            !workflow.contains("uses: actions/setup-node@") && !workflow.contains("uses: actions/download-artifact@"),
+            "Repeated provider setup must remain centralized in local actions")
+        try expect(
+            localActions.allSatisfy { $0.contains("using: composite") },
+            "Release workflow helpers must be composite actions")
+
+        let actionReferences = releaseAutomation.matches(of: /uses:\s+[^\s@]+@([^\s#]+)/).map { String($0.1) }
+        try expect(!actionReferences.isEmpty, "Release automation must declare its external actions")
+        try expect(
+            actionReferences.allSatisfy { $0.range(of: "^[0-9a-f]{40}$", options: .regularExpression) != nil },
+            "Every external action must be pinned to an immutable commit")
+    }
+
     private static func testWorkflowRunsSourceGatesBeforeProtectedRelease() throws {
         let root = try repositoryRoot()
         let workflow = try String(contentsOf: root.appendingPathComponent(".github/workflows/ci-cd.yaml"), encoding: .utf8)
         let toolchainData = try Data(contentsOf: root.appendingPathComponent("scripts/release/toolchain.json"))
+        let nodeSetupAction = try String(
+            contentsOf: root.appendingPathComponent(".github/actions/setup-release-node/action.yml"), encoding: .utf8)
         guard
             let toolchain = try JSONSerialization.jsonObject(with: toolchainData) as? [String: Any],
+            let nodeVersion = toolchain["node"] as? String,
             let swiftLint = toolchain["swiftLint"] as? [String: String]
         else {
-            throw TestFailure("Release toolchain must declare pinned SwiftLint metadata")
+            throw TestFailure("Release toolchain must declare pinned Node and SwiftLint metadata")
         }
+
+        try expect(nodeVersion == "24.21.0", "Release Node must use the reviewed toolchain version")
+        try expect(
+            nodeSetupAction.contains("node-version: \(nodeVersion)")
+                && nodeSetupAction.contains("package-manager-cache: false"),
+            "The local Node setup action must use the reviewed version without package-manager caching")
 
         try expect(
             swiftLint == [
@@ -134,12 +179,21 @@ enum DistributionReleaseWorkflowTests {
             !appleCI.contains("if: github.event_name") && !appleCI.contains("outputs.release == 'true'"),
             "Apple CI must run source gates for every push, pull request, and manual workflow run")
         guard
-            let checkout = appleCI.range(of: "- name: Check out validation source"),
-            let setup = appleCI.range(of: "- name: Set up pinned SwiftLint"),
+            let automationCheckout = appleCI.range(of: "- name: Check out current workflow automation"),
+            let nodeSetup = appleCI.range(of: "uses: ./.github/actions/setup-release-node"),
+            let validationCheckout = appleCI.range(of: "- name: Check out validation source"),
+            let swiftLintSetup = appleCI.range(of: "- name: Set up pinned SwiftLint"),
             let qualityGates = appleCI.range(of: "- name: Run source quality gates")
-        else { throw TestFailure("Apple CI must declare checkout, SwiftLint setup, and source quality gates") }
-        try expect(checkout.lowerBound < setup.lowerBound, "SwiftLint setup must read metadata from the checked-out release source")
-        try expect(setup.lowerBound < qualityGates.lowerBound, "SwiftLint must be available before source quality gates run")
+        else { throw TestFailure("Apple CI must declare automation setup, exact source checkout, and source quality gates") }
+        try expect(
+            automationCheckout.lowerBound < nodeSetup.lowerBound && nodeSetup.lowerBound < validationCheckout.lowerBound,
+            "Apple CI must load current local actions before checking out the exact selected source")
+        try expect(
+            validationCheckout.lowerBound < swiftLintSetup.lowerBound,
+            "SwiftLint setup must read metadata from the checked-out release source")
+        try expect(
+            swiftLintSetup.lowerBound < qualityGates.lowerBound,
+            "SwiftLint must be available before source quality gates run")
         try expect(!protectedRelease.contains("make format-check"), "Protected release must trust the exact-revision source gate")
         try expect(!protectedRelease.contains("make check"), "Protected release must not repeat the full source gate")
         try expect(
@@ -206,16 +260,23 @@ enum DistributionReleaseWorkflowTests {
         ] {
             try expect(workflow.contains(required), "Resumption workflow must contain \(required)")
         }
+        let protectedRelease = try job(named: "protected-release", in: workflow)
         guard
-            let checkout = workflow.range(of: "- name: Check out release source"),
-            let validator = workflow.range(of: "- name: Stage reviewed resumption helpers"),
-            let restore = workflow.range(of: "- name: Restore retained release commit from source bundle"),
-            let homebrew = workflow.range(of: "- name: Validate Homebrew lifecycle without Calendar access")
+            let automationCheckout = protectedRelease.range(of: "- name: Check out current workflow automation"),
+            let candidateDownload = protectedRelease.range(of: "uses: ./.github/actions/download-release-candidate"),
+            let validator = protectedRelease.range(of: "- name: Stage reviewed resumption helpers"),
+            let sourceCheckout = protectedRelease.range(of: "- name: Check out release source"),
+            let restore = protectedRelease.range(of: "- name: Restore retained release commit from source bundle"),
+            let homebrew = protectedRelease.range(of: "- name: Validate Homebrew lifecycle without Calendar access")
         else {
             throw TestFailure("Release workflow must stage and use the reviewed Homebrew validator during resumption")
         }
-        try expect(checkout.lowerBound < validator.lowerBound, "Validator staging requires the current workflow checkout")
-        try expect(validator.lowerBound < restore.lowerBound, "Validator staging must precede immutable release checkout")
+        try expect(
+            automationCheckout.lowerBound < candidateDownload.lowerBound && candidateDownload.lowerBound < validator.lowerBound,
+            "Resumption must load current local actions and helpers from the reviewed workflow revision")
+        try expect(
+            validator.lowerBound < sourceCheckout.lowerBound && sourceCheckout.lowerBound < restore.lowerBound,
+            "Reviewed helpers must be staged before checking out and restoring the retained release source")
         try expect(restore.lowerBound < homebrew.lowerBound, "Homebrew validation must run after release source restoration")
     }
 

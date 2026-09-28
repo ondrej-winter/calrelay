@@ -1,0 +1,21 @@
+name: Download retained release candidate
+description: Download the immutable release-candidate artifact from a previous workflow run.
+
+inputs:
+  run-id:
+    description: Workflow run ID containing the retained release candidate.
+    required: true
+  github-token:
+    description: Token with actions:read access to the current repository.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Download release-candidate artifact
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+      with:
+        name: release-candidate
+        path: ${{ runner.temp }}/calrelay-release-candidate
+        github-token: ${{ inputs.github-token }}
+        run-id: ${{ inputs.run-id }}

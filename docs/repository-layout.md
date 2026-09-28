@@ -17,6 +17,12 @@ This page describes the main source, test, and documentation areas in the reposi
 - `CalRelayUITests.xcodeproj/`: minimal UI-test-only Xcode project and shared scheme. `Package.swift` remains authoritative for application products, library targets, and dependencies.
 - `Resources/CalRelayUITestHost/` and `scripts/build-calrelay-ui-test-app.sh`: separately identified, ad-hoc-signed fake host packaging used only by XCUITest. Generated host bundles live outside the workspace and `.build/CalRelayUITestHost.app` is a symlink.
 
+## Automation
+
+- `.github/workflows/ci-cd.yaml`: the single push, pull-request, manual CI, and protected-release workflow entry point.
+- `.github/actions/`: repository-local composite actions for repeated GitHub Actions mechanics such as pinned Node setup and retained-candidate download.
+- `scripts/release/`: deterministic release policy, candidate, publication, recovery, and validation tooling.
+
 ## Documentation
 
 - `docs/README.md`: documentation index organized by reader task and document authority.
