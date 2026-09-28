@@ -4,6 +4,7 @@ enum DistributionReleaseWorkflowTests {
     static func runAll() throws {
         try testWorkflowUsesSerializedLeastPrivilegeProtectedPublication()
         try testWorkflowInstallsPinnedSwiftLintBeforeSourceGates()
+        try testHomebrewBootstrapValidationSupportsNoPreviousPackagesWithNounset()
         try testSourceFreshnessPluginFailsBeforePreparation()
         try testRetainedBundleRestoresReleaseCommitBeforeSourcePublication()
         try testDisposablePublicationOrdersAndResumesImmutableStages()
@@ -122,6 +123,47 @@ enum DistributionReleaseWorkflowTests {
         }
         try expect(checkout.lowerBound < setup.lowerBound, "SwiftLint setup must read metadata from the checked-out release source")
         try expect(setup.lowerBound < qualityGates.lowerBound, "SwiftLint must be available before source quality gates run")
+    }
+
+    private static func testHomebrewBootstrapValidationSupportsNoPreviousPackagesWithNounset() throws {
+        let root = try repositoryRoot()
+        let workflow = try String(
+            contentsOf: root.appendingPathComponent(".github/workflows/release.yml"), encoding: .utf8)
+        guard
+            let step = workflow.range(of: "      - name: Validate Homebrew lifecycle without Calendar access\n"),
+            let nextStep = workflow.range(
+                of: "      - name: Publish formula and cask atomically\n",
+                range: step.upperBound..<workflow.endIndex),
+            let run = workflow.range(of: "        run: |\n", range: step.upperBound..<nextStep.lowerBound)
+        else {
+            throw TestFailure("Release workflow must define the Homebrew lifecycle validation step")
+        }
+        let script = workflow[run.upperBound..<nextStep.lowerBound]
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { line in line.hasPrefix("          ") ? String(line.dropFirst(10)) : String(line) }
+            .joined(separator: "\n")
+
+        let fixture = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "calrelay-homebrew-workflow-\(UUID().uuidString)")
+        let tools = fixture.appendingPathComponent("tools")
+        defer { try? FileManager.default.removeItem(at: fixture) }
+        try FileManager.default.createDirectory(at: tools, withIntermediateDirectories: true)
+        for tool in ["brew", "node"] {
+            let executable = tools.appendingPathComponent(tool)
+            try Data("#!/bin/sh\nprintf '%s\\n' \"$@\"\n".utf8).write(to: executable)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+        }
+        var environment = ProcessInfo.processInfo.environment
+        environment["PATH"] = "\(tools.path):\(environment["PATH"] ?? "")"
+
+        let result = try command("/bin/bash", ["-c", script], at: fixture, environment: environment)
+
+        try expect(
+            result.status == 0,
+            "Bootstrap Homebrew validation must support no previous packages under nounset: \(result.output)")
+        try expect(
+            !result.output.contains("--previous-packages-directory"),
+            "Bootstrap Homebrew validation must omit previous-package arguments")
     }
 
     private static func testSourceFreshnessPluginFailsBeforePreparation() throws {
@@ -348,6 +390,23 @@ enum DistributionReleaseWorkflowTests {
             candidate = candidate.deletingLastPathComponent()
         }
         throw TestFailure("Unable to resolve repository root")
+    }
+
+    private static func command(
+        _ executable: String, _ arguments: [String], at directory: URL, environment: [String: String]? = nil
+    ) throws -> ReleaseWorkflowProcessResult {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.currentDirectoryURL = directory
+        process.environment = environment
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        try process.run()
+        process.waitUntilExit()
+        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        return ReleaseWorkflowProcessResult(status: process.terminationStatus, output: output)
     }
 
     private static func expect(_ condition: @autoclosure () throws -> Bool, _ message: String) throws {

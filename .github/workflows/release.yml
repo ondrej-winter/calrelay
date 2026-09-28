@@ -311,7 +311,12 @@ jobs:
           mkdir -p .build/homebrew-state
           printf '%s\n' configuration-sentinel > .build/homebrew-state/config.yaml
           printf '%s\n' app-state-sentinel > .build/homebrew-state/app-state
-          previous=()
+          arguments=(
+            --packages-directory .build/release-candidate/packages
+            --work-directory .build/homebrew-validation
+            --state-directory .build/homebrew-state
+            --brew "$(command -v brew)"
+          )
           formula_exists=false
           cask_exists=false
           [[ -f .build/previous-tap/Formula/calrelay.rb ]] && formula_exists=true
@@ -321,14 +326,9 @@ jobs:
             mkdir -p .build/previous-packages/Formula .build/previous-packages/Casks
             cp .build/previous-tap/Formula/calrelay.rb .build/previous-packages/Formula/calrelay.rb
             cp .build/previous-tap/Casks/calrelay.rb .build/previous-packages/Casks/calrelay.rb
-            previous=(--previous-packages-directory .build/previous-packages)
+            arguments+=(--previous-packages-directory .build/previous-packages)
           fi
-          node scripts/release/validate-homebrew-packages.mjs \
-            --packages-directory .build/release-candidate/packages \
-            "${previous[@]}" \
-            --work-directory .build/homebrew-validation \
-            --state-directory .build/homebrew-state \
-            --brew "$(command -v brew)"
+          node scripts/release/validate-homebrew-packages.mjs "${arguments[@]}"
       - name: Publish formula and cask atomically
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
