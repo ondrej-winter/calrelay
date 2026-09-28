@@ -5,6 +5,7 @@ enum DistributionReleaseWorkflowTests {
         try testWorkflowUsesSerializedLeastPrivilegeProtectedPublication()
         try testWorkflowInstallsPinnedSwiftLintBeforeSourceGates()
         try testHomebrewBootstrapValidationSupportsNoPreviousPackagesWithNounset()
+        try testResumptionUsesReviewedCurrentHomebrewValidator()
         try testSourceFreshnessPluginFailsBeforePreparation()
         try testRetainedBundleRestoresReleaseCommitBeforeSourcePublication()
         try testDisposablePublicationOrdersAndResumesImmutableStages()
@@ -146,8 +147,11 @@ enum DistributionReleaseWorkflowTests {
         let fixture = FileManager.default.temporaryDirectory.appendingPathComponent(
             "calrelay-homebrew-workflow-\(UUID().uuidString)")
         let tools = fixture.appendingPathComponent("tools")
+        let validator = fixture.appendingPathComponent("scripts/release/validate-homebrew-packages.mjs")
         defer { try? FileManager.default.removeItem(at: fixture) }
         try FileManager.default.createDirectory(at: tools, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: validator.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("// fake validator\n".utf8).write(to: validator)
         for tool in ["brew", "node"] {
             let executable = tools.appendingPathComponent(tool)
             try Data("#!/bin/sh\nprintf '%s\\n' \"$@\"\n".utf8).write(to: executable)
@@ -164,6 +168,32 @@ enum DistributionReleaseWorkflowTests {
         try expect(
             !result.output.contains("--previous-packages-directory"),
             "Bootstrap Homebrew validation must omit previous-package arguments")
+    }
+
+    private static func testResumptionUsesReviewedCurrentHomebrewValidator() throws {
+        let root = try repositoryRoot()
+        let workflow = try String(
+            contentsOf: root.appendingPathComponent(".github/workflows/release.yml"), encoding: .utf8)
+        for required in [
+            "Stage reviewed Homebrew validator for resumption",
+            "git show \"${GITHUB_SHA}:scripts/release/validate-homebrew-packages.mjs\"",
+            "${RUNNER_TEMP}/calrelay-validate-homebrew-packages.mjs",
+            "RESUME: ${{ needs.analyze.outputs.resume }}",
+            "node \"$validator\" \"${arguments[@]}\"",
+        ] {
+            try expect(workflow.contains(required), "Resumption workflow must contain \(required)")
+        }
+        guard
+            let checkout = workflow.range(of: "- name: Check out release source"),
+            let validator = workflow.range(of: "- name: Stage reviewed Homebrew validator for resumption"),
+            let restore = workflow.range(of: "- name: Restore retained release commit from source bundle"),
+            let homebrew = workflow.range(of: "- name: Validate Homebrew lifecycle without Calendar access")
+        else {
+            throw TestFailure("Release workflow must stage and use the reviewed Homebrew validator during resumption")
+        }
+        try expect(checkout.lowerBound < validator.lowerBound, "Validator staging requires the current workflow checkout")
+        try expect(validator.lowerBound < restore.lowerBound, "Validator staging must precede immutable release checkout")
+        try expect(restore.lowerBound < homebrew.lowerBound, "Homebrew validation must run after release source restoration")
     }
 
     private static func testSourceFreshnessPluginFailsBeforePreparation() throws {

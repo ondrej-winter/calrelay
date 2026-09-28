@@ -135,6 +135,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ steps.checkout.outputs.revision }}
+      - name: Stage reviewed Homebrew validator for resumption
+        if: needs.analyze.outputs.resume == 'true'
+        run: |
+          set -euo pipefail
+          validator="${RUNNER_TEMP}/calrelay-validate-homebrew-packages.mjs"
+          rm -f "$validator"
+          git show "${GITHUB_SHA}:scripts/release/validate-homebrew-packages.mjs" > "$validator"
+          [[ -s "$validator" ]] || { echo 'Reviewed Homebrew validator is empty.' >&2; exit 1; }
       - name: Restore resumable candidate after checkout
         if: needs.analyze.outputs.resume == 'true'
         run: |
@@ -306,6 +314,8 @@ jobs:
           path: .build/previous-tap
           persist-credentials: false
       - name: Validate Homebrew lifecycle without Calendar access
+        env:
+          RESUME: ${{ needs.analyze.outputs.resume }}
         run: |
           set -euo pipefail
           mkdir -p .build/homebrew-state
@@ -328,7 +338,10 @@ jobs:
             cp .build/previous-tap/Casks/calrelay.rb .build/previous-packages/Casks/calrelay.rb
             arguments+=(--previous-packages-directory .build/previous-packages)
           fi
-          node scripts/release/validate-homebrew-packages.mjs "${arguments[@]}"
+          validator=scripts/release/validate-homebrew-packages.mjs
+          [[ "${RESUME:-false}" != true ]] || validator="${RUNNER_TEMP}/calrelay-validate-homebrew-packages.mjs"
+          [[ -s "$validator" ]] || { echo 'Homebrew validator is missing or empty.' >&2; exit 1; }
+          node "$validator" "${arguments[@]}"
       - name: Publish formula and cask atomically
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -350,5 +363,5 @@ jobs:
             .build/homebrew-validation .build/homebrew-state \
             "${RUNNER_TEMP}/calrelay-release-candidate" "${RUNNER_TEMP}/calrelay-source-publication.git" \
             "${RUNNER_TEMP}/calrelay-resume-run.json" "${RUNNER_TEMP}/calrelay-swiftlint" \
-            "${RUNNER_TEMP}/portable_swiftlint.zip"
+            "${RUNNER_TEMP}/portable_swiftlint.zip" "${RUNNER_TEMP}/calrelay-validate-homebrew-packages.mjs"
           rm -f .build/release-publication.askpass-*
