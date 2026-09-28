@@ -3,14 +3,14 @@
 ## Plan record
 
 - **Status:** Repository implementation is complete through `DIST-P09` as of
-  September 27, 2026. Protected release evidence and public rollout remain
+  September 28, 2026. Protected release evidence and public rollout remain
   blocked until repository policy, runners, credentials, signing identity,
   environment controls, and the configured GitHub App access are exercised.
 - **Prepared:** September 26, 2026.
-- **Updated:** September 27, 2026.
+- **Updated:** September 28, 2026.
 - **Canonical requirements:**
-  [`../specs/distribution-spec.md`](../specs/distribution-spec.md), revision 3,
-  accepted September 26, 2026.
+  [`../specs/distribution-spec.md`](../specs/distribution-spec.md), revision 4,
+  accepted September 28, 2026.
 - **Related accepted contracts:**
   [`../specs/cli-spec.md`](../specs/cli-spec.md),
   [`../specs/macos-app-spec.md`](../specs/macos-app-spec.md),
@@ -45,8 +45,9 @@ Implement the accepted public-beta distribution contract so CalRelay can:
   together from the production candidate manifest. The deterministic lifecycle
   suite covers package metadata, both installation orders, upgrade/reinstall,
   independent ordinary uninstallation, and retained-state sentinels.
-- `.github/workflows/release.yml` provides serialized manual bootstrap,
-  same-candidate resumption, and qualifying `master` push orchestration. Its
+- `.github/workflows/ci-cd.yaml` provides ordinary push and pull-request CI,
+  serialized manual bootstrap, same-candidate resumption, and qualifying
+  `master` push orchestration. Its
   repository-owned publisher verifies the retained manifest, artifact bytes,
   checksums, source bundle, release commit, published assets, and atomic tap
   commit at every retry boundary.
@@ -512,7 +513,7 @@ open until that lane runs on the clean Apple Silicon package-test environment;
 
 **Likely files:**
 
-- `.github/workflows/release.yml`
+- `.github/workflows/ci-cd.yaml`
 - supporting tools under `scripts/release/`
 
 **Work:**
@@ -545,23 +546,23 @@ open until that lane runs on the clean Apple Silicon package-test environment;
   with least privilege.
 - [x] **DIST-P07-AC6:** The complete release gate requires no real Calendar data
   or Calendar mutation.
-- [ ] **DIST-P07-V1:** Workflow syntax, permissions, and pinned-action policy
+- [x] **DIST-P07-V1:** Workflow syntax, permissions, and pinned-action policy
   checks pass.
 - [ ] **DIST-P07-V2:** A controlled dry run or disposable-repository exercise
   proves trigger, concurrency, token, source-check, and publication ordering.
 
-**Repository evidence (September 27, 2026):**
-`DistributionReleaseWorkflowTests`, `DistributionReleaseStateTests`, and
-`DistributionReleasePolicyTests` pass. They prove stale-source rejection before
+**Repository evidence (September 28, 2026):**
+`DistributionReleaseWorkflowTests`, `DistributionWorkflowContextTests`,
+`DistributionReleaseStateTests`, and `DistributionReleasePolicyTests` pass. They
+prove workflow provenance, exact-revision validation, stale-source rejection before
 preparation, exact release-commit and source-bundle retention, byte-for-byte
 same-version retries, candidate tamper rejection before source mutation, atomic
 source/tag publication, published-asset re-download verification, later-`master`
 resumption, and one-commit formula/cask publication. YAML parsing, JavaScript
-syntax checks, pinned-action policy checks, and least-privilege workflow checks
-also pass. `DIST-P07-V1` remains open because `actionlint` was not installed in
-the local environment and GitHub has not executed the workflow. `DIST-P07-V2`
-remains open until a protected disposable or production exercise proves the
-GitHub trigger, queue, App token, and environment controls rather than only the
+syntax checks, pinned-action policy checks, least-privilege workflow checks, and
+checksum-verified `actionlint` 1.7.12 validation also pass. `DIST-P07-V2` remains
+open until a protected disposable or production exercise proves the GitHub
+trigger, queue, App token, and environment controls rather than only the
 repository-owned publication logic.
 
 ### DIST-P08 — Close acceptance, recovery, and security evidence

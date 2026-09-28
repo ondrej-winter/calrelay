@@ -3,8 +3,8 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 3 — accepted on September 26, 2026; retains the automated, prebuilt, signed and notarized public-beta architecture from revision 2 while moving the first public release to `1.0.0` and limiting automatic releases to patch and minor transitions within `1.x`.
-- **Acceptance basis:** The project owner completed and approved the public-beta distribution interview on September 26, 2026, including release automation, versioning, packaging, credential, recovery, and Homebrew channel decisions, then explicitly approved the `1.0.0` bootstrap and `1.x` automation boundary on September 26, 2026.
+- **Revision:** 4 — accepted on September 28, 2026; retains revision 3's `1.0.0` bootstrap and `1.x` release policy while defining one CI/CD entry point, exact-revision Apple validation, and protected promotion of that validated revision.
+- **Acceptance basis:** The project owner approved the public-beta distribution and `1.x` automation decisions on September 26, 2026, then explicitly requested the single-workflow CI/CD architecture and preservation of release-security and resumption guarantees on September 28, 2026.
 - **Canonical artifact:** `docs/specs/distribution-spec.md`.
 - **Scope:** Public-beta releases, release identity, upstream binary artifacts, Homebrew formula and cask installation, distribution signing and notarization, package coexistence, upgrades, uninstallation, release automation and security, and recovery from incomplete or defective releases.
 
@@ -94,6 +94,8 @@ brew install --cask ondrej-winter/tap/calrelay
 
 - The manually initiated `v1.0.0` bootstrap passes the same build, signing, notarization, verification, and publication gates as later automated releases.
 - After bootstrap, every qualifying push to `master` starts the release workflow. Non-qualifying pushes complete without publishing a release.
+- Use one CI/CD workflow as the automation entry point for pushes, pull requests, bootstrap, and resumption. Its unprivileged portable checks and Apple source-quality gate run independently of the protected publication environment.
+- Run the Apple source-quality gate against the exact selected revision. For an ordinary run this is the captured source revision; for resumption this is the retained release commit restored from the verified source bundle. Protected publication proceeds only when the Apple job reports that exact revision and must not rerun the source-quality gate after receiving that evidence.
 - Configure semantic-release only through a root `.releaserc.json`. Do not add a `package.json`, JavaScript lockfile, or `CHANGELOG.md` solely for release automation.
 - Pin the Node runtime, semantic-release, every semantic-release plugin, and every GitHub Action to explicit reviewed versions or immutable commit identifiers in the workflow.
 - While the current version is `1.x`, `fix` and `fix!` commits select a patch release, while `feat` and `feat!` commits select a minor release. A breaking marker contributes a release warning or note but never changes the selected `1.x` bump by itself. Other commit types do not select a release unless a later accepted revision says otherwise.
@@ -121,6 +123,7 @@ brew install --cask ondrej-winter/tap/calrelay
 ### DIST-09 — Incomplete release and defective-release recovery
 
 - Treat release progress as resumable state. A retry inspects the source commit, `VERSION`, tag, GitHub release assets, checksums, and tap state and continues the same `X.Y.Z` instead of selecting a new version when publication is incomplete.
+- Bind retained candidates to an allowlisted protected workflow identity, repository, completed run, `master` source revision, release commit, and release tag before using them. Workflow renames may preserve resumption only through an explicit historical identity allowlist.
 - Every publication stage is idempotent or fails closed when an existing object does not match the expected immutable content.
 - Retain an identifiable previously known-good public-beta version until the new version has passed the complete CI release gate and the atomic tap update succeeds.
 - If a release is found defective before the tap is updated, keep the tap on the previous known-good version and resume or repair the incomplete release only when its immutable identity can be preserved safely.

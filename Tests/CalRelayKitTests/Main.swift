@@ -14,6 +14,7 @@ import Foundation
         "CalRelayContractTests", "ConfigCheckCommandHandlerTests", "EventKitExactEventOccurrenceResolverTests",
         "DistributionDocumentationTests", "DistributionHomebrewPackageTests", "DistributionProductionArtifactTests",
         "DistributionReleasePolicyTests", "DistributionReleaseStateTests", "DistributionReleaseWorkflowTests",
+        "DistributionWorkflowContextTests",
         "DistributionVersionTests", "FileCalendarRelaySettingsProviderTests",
         "OrdinaryReconciliationCalendarCaptureTests", "OrdinaryReconciliationWindowTests",
         "ReconcileCommandHandlerTests", "ReconciliationConvergenceTests", "ReconciliationSpecificationTests",
@@ -180,6 +181,9 @@ import Foundation
         }
         if filters.isEmpty || filters.contains("DistributionReleaseWorkflowTests") {
             try DistributionReleaseWorkflowTests.runAll()
+        }
+        if filters.isEmpty || filters.contains("DistributionWorkflowContextTests") {
+            try DistributionWorkflowContextTests.runAll()
         }
         if filters.isEmpty || filters.contains("DistributionVersionTests") { try DistributionVersionTests.runAll() }
     }

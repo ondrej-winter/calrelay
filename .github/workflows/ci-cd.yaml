@@ -1,8 +1,8 @@
-name: Public-beta release
+name: CI/CD
 
 on:
   push:
-    branches: [master]
+  pull_request:
   workflow_dispatch:
     inputs:
       bootstrap:
@@ -19,16 +19,15 @@ permissions:
   actions: read
   contents: read
 
-concurrency:
-  group: calrelay-public-beta-release
-  cancel-in-progress: false
-
 jobs:
-  analyze:
+  portable-ci:
     runs-on: ubuntu-latest
     outputs:
       release: ${{ steps.selection.outputs.release }}
-      source_revision: ${{ steps.selection.outputs.source_revision }}
+      source_revision: ${{ steps.context.outputs.source_revision }}
+      validation_revision: ${{ steps.context.outputs.validation_revision }}
+      release_commit: ${{ steps.resume-context.outputs.release_commit }}
+      release_tag: ${{ steps.resume-context.outputs.tag }}
       previous_version: ${{ steps.selection.outputs.previous_version }}
       resume: ${{ steps.selection.outputs.resume }}
     steps:
@@ -42,16 +41,44 @@ jobs:
         with:
           node-version: 24.21.0
           package-manager-cache: false
+      - name: Validate portable release tooling
+        run: |
+          set -euo pipefail
+          find scripts/release -type f -name '*.mjs' -print0 | sort -z | xargs -0 -n 1 node --check
+      - name: Run pinned actionlint
+        run: |
+          set -euo pipefail
+          version=1.7.12
+          archive="${RUNNER_TEMP}/actionlint.tar.gz"
+          install_directory="${RUNNER_TEMP}/actionlint"
+          rm -rf "$archive" "$install_directory"
+          mkdir -p "$install_directory"
+          curl --fail --location --proto '=https' --tlsv1.2 --retry 3 \
+            --output "$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${version}/actionlint_${version}_linux_amd64.tar.gz"
+          printf '%s  %s\n' '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8' "$archive" \
+            | sha256sum -c -
+          tar -xzf "$archive" -C "$install_directory" actionlint
+          "$install_directory/actionlint" -config-file .github/actionlint.yaml .github/workflows/ci-cd.yaml
       - name: Select release or resumption
         id: selection
         env:
           BOOTSTRAP: ${{ inputs.bootstrap }}
+          EVENT_NAME: ${{ github.event_name }}
           RESUME_RUN_ID: ${{ inputs.resume_run_id }}
         run: |
           set -euo pipefail
           printf 'source_revision=%s\n' "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
           previous="$(git tag --list 'v*' --sort=-version:refname | head -n 1)"
           printf 'previous_version=%s\n' "${previous#v}" >> "$GITHUB_OUTPUT"
+          if [[ "$EVENT_NAME" == workflow_dispatch && "$GITHUB_REF" != refs/heads/master ]]; then
+            echo 'Manual release dispatches must target master.' >&2
+            exit 1
+          fi
+          if [[ "$EVENT_NAME" == pull_request || "$GITHUB_REF" != refs/heads/master ]]; then
+            printf 'release=false\nresume=false\n' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [[ -n "${RESUME_RUN_ID:-}" ]]; then
             [[ "$RESUME_RUN_ID" =~ ^[1-9][0-9]*$ ]] || { echo 'resume_run_id must be a positive workflow run ID.' >&2; exit 1; }
             [[ "${BOOTSTRAP:-false}" != true ]] || { echo 'bootstrap and resume_run_id are mutually exclusive.' >&2; exit 1; }
@@ -63,115 +90,96 @@ jobs:
           selection="$(node scripts/release/release-policy.mjs "${arguments[@]}")"
           release="$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.nextVersion ? "true" : "false")' "$selection")"
           printf 'release=%s\nresume=false\n' "$release" >> "$GITHUB_OUTPUT"
-
-  release:
-    needs: analyze
-    if: needs.analyze.outputs.release == 'true'
-    runs-on: xcode-27
-    environment: public-beta-release
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - name: Set up pinned Node
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: 24.21.0
-          package-manager-cache: false
-      - name: Download resumable candidate
-        if: needs.analyze.outputs.resume == 'true'
+      - name: Download retained candidate context
+        if: steps.selection.outputs.resume == 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: release-candidate
           path: ${{ runner.temp }}/calrelay-release-candidate
           github-token: ${{ github.token }}
           run-id: ${{ inputs.resume_run_id }}
-      - name: Resolve checkout revision
-        id: checkout
+      - name: Verify retained workflow context
+        if: steps.selection.outputs.resume == 'true'
+        id: resume-context
         env:
           GH_TOKEN: ${{ github.token }}
-          RESUME: ${{ needs.analyze.outputs.resume }}
           RESUME_RUN_ID: ${{ inputs.resume_run_id }}
-          SOURCE_REVISION: ${{ needs.analyze.outputs.source_revision }}
         run: |
           set -euo pipefail
-          revision="$SOURCE_REVISION"
+          metadata="${RUNNER_TEMP}/calrelay-resume-run.json"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RESUME_RUN_ID}" > "$metadata"
+          node scripts/release/verify-resume-workflow.mjs \
+            --state "${RUNNER_TEMP}/calrelay-release-candidate/release-state.json" \
+            --run "$metadata" \
+            --repository "$GITHUB_REPOSITORY" \
+            --run-id "$RESUME_RUN_ID" \
+            --output "$GITHUB_OUTPUT"
+      - name: Select exact source and validation revisions
+        id: context
+        env:
+          CURRENT_SOURCE_REVISION: ${{ steps.selection.outputs.source_revision }}
+          RESUME: ${{ steps.selection.outputs.resume }}
+          RETAINED_SOURCE_REVISION: ${{ steps.resume-context.outputs.source_revision }}
+          RETAINED_VALIDATION_REVISION: ${{ steps.resume-context.outputs.validation_revision }}
+        run: |
+          set -euo pipefail
+          source_revision="$CURRENT_SOURCE_REVISION"
+          validation_revision="$CURRENT_SOURCE_REVISION"
           if [[ "$RESUME" == true ]]; then
-            command -v gh >/dev/null
-            metadata="${RUNNER_TEMP}/calrelay-resume-run.json"
-            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${RESUME_RUN_ID}" > "$metadata"
-            node --input-type=module --eval '
-              import { appendFileSync, readFileSync } from "node:fs";
-              const [statePath, metadataPath, repository, runID, outputPath] = process.argv.slice(1);
-              const state = JSON.parse(readFileSync(statePath, "utf8"));
-              const run = JSON.parse(readFileSync(metadataPath, "utf8"));
-              const revision = /^[0-9a-f]{40}$/;
-              if (state.schemaVersion !== 3 || !revision.test(state.sourceRevision ?? "") || !revision.test(state.releaseCommit ?? "")) {
-                throw new Error("retained release source metadata is invalid");
-              }
-              if (state.tag !== `v${state.version}`) throw new Error("retained release tag is invalid");
-              if (
-                String(run.id) !== runID
-                || run.name !== "Public-beta release"
-                || run.path !== ".github/workflows/release.yml"
-                || !["push", "workflow_dispatch"].includes(run.event)
-                || run.status !== "completed"
-                || run.head_branch !== "master"
-                || run.repository?.full_name !== repository
-                || run.head_repository?.full_name !== repository
-                || run.head_sha !== state.sourceRevision
-              ) {
-                throw new Error("resume candidate does not match its protected release workflow run");
-              }
-              appendFileSync(outputPath, `revision=${state.sourceRevision}\nrelease_commit=${state.releaseCommit}\ntag=${state.tag}\n`);
-            ' "${RUNNER_TEMP}/calrelay-release-candidate/release-state.json" "$metadata" "$GITHUB_REPOSITORY" "$RESUME_RUN_ID" "$GITHUB_OUTPUT"
-            exit 0
+            source_revision="$RETAINED_SOURCE_REVISION"
+            validation_revision="$RETAINED_VALIDATION_REVISION"
           fi
-          [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo 'Checkout revision must be a full lowercase Git revision.' >&2; exit 1; }
-          printf 'revision=%s\n' "$revision" >> "$GITHUB_OUTPUT"
-      - name: Check out release source
+          [[ "$source_revision" =~ ^[0-9a-f]{40}$ ]] \
+            || { echo 'Source revision must be a full lowercase Git revision.' >&2; exit 1; }
+          [[ "$validation_revision" =~ ^[0-9a-f]{40}$ ]] \
+            || { echo 'Validation revision must be a full lowercase Git revision.' >&2; exit 1; }
+          printf 'source_revision=%s\n' "$source_revision" >> "$GITHUB_OUTPUT"
+          printf 'validation_revision=%s\n' "$validation_revision" >> "$GITHUB_OUTPUT"
+      - name: Clean portable release context
+        if: always()
+        run: rm -rf "${RUNNER_TEMP}/calrelay-release-candidate" "${RUNNER_TEMP}/calrelay-resume-run.json"
+
+  apple-ci:
+    needs: portable-ci
+    runs-on: xcode-27
+    outputs:
+      validated_revision: ${{ steps.validation.outputs.validated_revision }}
+    steps:
+      - name: Check out validation source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ steps.checkout.outputs.revision }}
-      - name: Stage reviewed Homebrew validator for resumption
-        if: needs.analyze.outputs.resume == 'true'
+          ref: ${{ needs.portable-ci.outputs.source_revision }}
+      - name: Set up pinned Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.21.0
+          package-manager-cache: false
+      - name: Stage reviewed source restoration helper
+        if: needs.portable-ci.outputs.resume == 'true'
         run: |
           set -euo pipefail
-          validator="${RUNNER_TEMP}/calrelay-validate-homebrew-packages.mjs"
-          rm -f "$validator"
-          git show "${GITHUB_SHA}:scripts/release/validate-homebrew-packages.mjs" > "$validator"
-          [[ -s "$validator" ]] || { echo 'Reviewed Homebrew validator is empty.' >&2; exit 1; }
-      - name: Restore resumable candidate after checkout
-        if: needs.analyze.outputs.resume == 'true'
-        run: |
-          mkdir -p .build
-          mv "${RUNNER_TEMP}/calrelay-release-candidate" .build/release-candidate
-      - name: Restore retained release commit from source bundle
-        if: needs.analyze.outputs.resume == 'true'
+          helper="${RUNNER_TEMP}/calrelay-restore-retained-source.sh"
+          rm -f "$helper"
+          git show "${GITHUB_SHA}:scripts/release/restore-retained-source.sh" > "$helper"
+          [[ -s "$helper" ]] || { echo 'Reviewed source restoration helper is empty.' >&2; exit 1; }
+      - name: Download retained candidate for validation
+        if: needs.portable-ci.outputs.resume == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-candidate
+          path: ${{ runner.temp }}/calrelay-release-candidate
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
+      - name: Restore retained validation source
+        if: needs.portable-ci.outputs.resume == 'true'
         env:
-          RELEASE_COMMIT: ${{ steps.checkout.outputs.release_commit }}
-          RELEASE_TAG: ${{ steps.checkout.outputs.tag }}
+          RELEASE_COMMIT: ${{ needs.portable-ci.outputs.release_commit }}
+          RELEASE_TAG: ${{ needs.portable-ci.outputs.release_tag }}
         run: |
-          set -euo pipefail
-          bundle=.build/release-candidate/source.bundle
-          node --input-type=module --eval '
-            import { createHash } from "node:crypto";
-            import { readFileSync } from "node:fs";
-            const [statePath, bundlePath] = process.argv.slice(1);
-            const state = JSON.parse(readFileSync(statePath, "utf8"));
-            const observed = createHash("sha256").update(readFileSync(bundlePath)).digest("hex");
-            if (state.sourceBundle?.name !== "source.bundle" || state.sourceBundle.sha256 !== observed) {
-              throw new Error("retained source bundle digest conflicts with release state");
-            }
-          ' .build/release-candidate/release-state.json "$bundle"
-          git bundle verify "$bundle"
-          git fetch --no-tags "$bundle" refs/heads/master:refs/remotes/calrelay-candidate/master
-          git fetch --no-tags "$bundle" "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
-          [[ "$(git rev-parse refs/remotes/calrelay-candidate/master)" == "$RELEASE_COMMIT" ]]
-          [[ "$(git rev-parse "refs/tags/${RELEASE_TAG}")" == "$RELEASE_COMMIT" ]]
-          git checkout --detach "$RELEASE_COMMIT"
+          zsh "${RUNNER_TEMP}/calrelay-restore-retained-source.sh" \
+            "${RUNNER_TEMP}/calrelay-release-candidate" "$RELEASE_COMMIT" "$RELEASE_TAG"
       - name: Set up pinned SwiftLint
         run: |
           set -euo pipefail
@@ -205,12 +213,82 @@ jobs:
           swiftlint_binary="${install_directory}/swiftlint"
           [[ -x "$swiftlint_binary" ]] || { echo 'Pinned SwiftLint archive did not contain an executable swiftlint.' >&2; exit 1; }
           observed_version="$("$swiftlint_binary" version)"
-          [[ "$observed_version" == "$swiftlint_version" ]] || { echo "Pinned SwiftLint reported ${observed_version}, expected ${swiftlint_version}." >&2; exit 1; }
+          [[ "$observed_version" == "$swiftlint_version" ]] \
+            || { echo "Pinned SwiftLint reported ${observed_version}, expected ${swiftlint_version}." >&2; exit 1; }
           printf 'SWIFTLINT=%s\n' "$swiftlint_binary" >> "$GITHUB_ENV"
+      - name: Validate Apple release shell
+        run: zsh -n scripts/release/*.sh
       - name: Run source quality gates
         run: |
           make format-check
           make check
+      - name: Record validated revision
+        id: validation
+        run: printf 'validated_revision=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Clean Apple validation material
+        if: always()
+        run: |
+          rm -rf "${RUNNER_TEMP}/calrelay-release-candidate" "${RUNNER_TEMP}/calrelay-swiftlint" \
+            "${RUNNER_TEMP}/portable_swiftlint.zip"
+          rm -f "${RUNNER_TEMP}/calrelay-restore-retained-source.sh"
+
+  protected-release:
+    needs: [portable-ci, apple-ci]
+    if: >-
+      needs.portable-ci.outputs.release == 'true'
+      && needs.apple-ci.outputs.validated_revision == needs.portable-ci.outputs.validation_revision
+    runs-on: xcode-27
+    environment: public-beta-release
+    concurrency:
+      group: calrelay-public-beta-release
+      cancel-in-progress: false
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Set up pinned Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24.21.0
+          package-manager-cache: false
+      - name: Download resumable candidate
+        if: needs.portable-ci.outputs.resume == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: release-candidate
+          path: ${{ runner.temp }}/calrelay-release-candidate
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ needs.portable-ci.outputs.source_revision }}
+      - name: Stage reviewed resumption helpers
+        if: needs.portable-ci.outputs.resume == 'true'
+        run: |
+          set -euo pipefail
+          validator="${RUNNER_TEMP}/calrelay-validate-homebrew-packages.mjs"
+          restoration="${RUNNER_TEMP}/calrelay-restore-retained-source.sh"
+          rm -f "$validator" "$restoration"
+          git show "${GITHUB_SHA}:scripts/release/validate-homebrew-packages.mjs" > "$validator"
+          git show "${GITHUB_SHA}:scripts/release/restore-retained-source.sh" > "$restoration"
+          [[ -s "$validator" ]] || { echo 'Reviewed Homebrew validator is empty.' >&2; exit 1; }
+          [[ -s "$restoration" ]] || { echo 'Reviewed source restoration helper is empty.' >&2; exit 1; }
+      - name: Restore resumable candidate after checkout
+        if: needs.portable-ci.outputs.resume == 'true'
+        run: |
+          mkdir -p .build
+          mv "${RUNNER_TEMP}/calrelay-release-candidate" .build/release-candidate
+      - name: Restore retained release commit from source bundle
+        if: needs.portable-ci.outputs.resume == 'true'
+        env:
+          RELEASE_COMMIT: ${{ needs.portable-ci.outputs.release_commit }}
+          RELEASE_TAG: ${{ needs.portable-ci.outputs.release_tag }}
+        run: |
+          zsh "${RUNNER_TEMP}/calrelay-restore-retained-source.sh" \
+            .build/release-candidate "$RELEASE_COMMIT" "$RELEASE_TAG"
       - name: Validate protected release configuration
         env:
           TAP_REPOSITORY: ${{ vars.CALRELAY_TAP_REPOSITORY }}
@@ -221,7 +299,7 @@ jobs:
           command -v gh >/dev/null
           command -v brew >/dev/null
       - name: Prepare release notes
-        if: needs.analyze.outputs.resume != 'true'
+        if: needs.portable-ci.outputs.resume != 'true'
         env:
           BOOTSTRAP: ${{ inputs.bootstrap }}
         run: |
@@ -231,18 +309,18 @@ jobs:
           [[ "${BOOTSTRAP:-false}" == true ]] && arguments+=(--bootstrap)
           node scripts/release/release-policy.mjs "${arguments[@]}" > .build/release-metadata/release-notes.md
       - name: Prepare local source publication remote
-        if: needs.analyze.outputs.resume != 'true'
+        if: needs.portable-ci.outputs.resume != 'true'
         env:
-          SOURCE_REVISION: ${{ needs.analyze.outputs.source_revision }}
+          SOURCE_REVISION: ${{ needs.portable-ci.outputs.source_revision }}
         run: |
           set -euo pipefail
           git switch -C master "$SOURCE_REVISION"
           rm -rf "${RUNNER_TEMP}/calrelay-source-publication.git"
           git clone --bare . "${RUNNER_TEMP}/calrelay-source-publication.git"
       - name: Prepare release commit and tag through semantic-release
-        if: needs.analyze.outputs.resume != 'true'
+        if: needs.portable-ci.outputs.resume != 'true'
         env:
-          CALRELAY_RELEASE_SOURCE_REVISION: ${{ needs.analyze.outputs.source_revision }}
+          CALRELAY_RELEASE_SOURCE_REVISION: ${{ needs.portable-ci.outputs.source_revision }}
           CALRELAY_RELEASE_SOURCE_REMOTE: https://github.com/${{ github.repository }}.git
         run: |
           set -euo pipefail
@@ -250,7 +328,7 @@ jobs:
           [[ "${{ inputs.bootstrap }}" == true ]] && arguments+=(--bootstrap)
           scripts/release/run-semantic-release.sh "${arguments[@]}"
       - name: Build signed and notarized candidate
-        if: needs.analyze.outputs.resume != 'true'
+        if: needs.portable-ci.outputs.resume != 'true'
         env:
           CALRELAY_DEVELOPER_ID_P12: ${{ secrets.CALRELAY_DEVELOPER_ID_P12 }}
           CALRELAY_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.CALRELAY_DEVELOPER_ID_P12_PASSWORD }}
@@ -261,10 +339,10 @@ jobs:
           CALRELAY_SIGNING_CERTIFICATE_SHA1: ${{ secrets.CALRELAY_SIGNING_CERTIFICATE_SHA1 }}
         run: make release-artifacts
       - name: Stage immutable release candidate
-        if: needs.analyze.outputs.resume != 'true'
+        if: needs.portable-ci.outputs.resume != 'true'
         env:
-          PREVIOUS_VERSION: ${{ needs.analyze.outputs.previous_version }}
-          SOURCE_REVISION: ${{ needs.analyze.outputs.source_revision }}
+          PREVIOUS_VERSION: ${{ needs.portable-ci.outputs.previous_version }}
+          SOURCE_REVISION: ${{ needs.portable-ci.outputs.source_revision }}
         run: |
           set -euo pipefail
           node scripts/release/stage-release-candidate.mjs \
@@ -276,7 +354,7 @@ jobs:
             --source-revision "$SOURCE_REVISION" \
             --notes-file .build/release-metadata/release-notes.md
       - name: Retain immutable candidate for resumption
-        if: needs.analyze.outputs.resume != 'true'
+        if: needs.portable-ci.outputs.resume != 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-candidate
@@ -315,7 +393,7 @@ jobs:
           persist-credentials: false
       - name: Validate Homebrew lifecycle without Calendar access
         env:
-          RESUME: ${{ needs.analyze.outputs.resume }}
+          RESUME: ${{ needs.portable-ci.outputs.resume }}
         run: |
           set -euo pipefail
           mkdir -p .build/homebrew-state
@@ -362,6 +440,6 @@ jobs:
             .build/release-publication .build/previous-tap .build/previous-packages \
             .build/homebrew-validation .build/homebrew-state \
             "${RUNNER_TEMP}/calrelay-release-candidate" "${RUNNER_TEMP}/calrelay-source-publication.git" \
-            "${RUNNER_TEMP}/calrelay-resume-run.json" "${RUNNER_TEMP}/calrelay-swiftlint" \
-            "${RUNNER_TEMP}/portable_swiftlint.zip" "${RUNNER_TEMP}/calrelay-validate-homebrew-packages.mjs"
+            "${RUNNER_TEMP}/calrelay-validate-homebrew-packages.mjs" \
+            "${RUNNER_TEMP}/calrelay-restore-retained-source.sh"
           rm -f .build/release-publication.askpass-*

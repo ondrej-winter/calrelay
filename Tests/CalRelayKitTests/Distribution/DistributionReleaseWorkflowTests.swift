@@ -2,12 +2,13 @@ import Foundation
 
 enum DistributionReleaseWorkflowTests {
     static func runAll() throws {
-        try testWorkflowUsesSerializedLeastPrivilegeProtectedPublication()
-        try testWorkflowInstallsPinnedSwiftLintBeforeSourceGates()
+        try testWorkflowUsesSingleEntryPointAndLeastPrivilegeJobGraph()
+        try testWorkflowRunsSourceGatesBeforeProtectedRelease()
         try testHomebrewBootstrapValidationSupportsNoPreviousPackagesWithNounset()
         try testResumptionUsesReviewedCurrentHomebrewValidator()
         try testSourceFreshnessPluginFailsBeforePreparation()
         try testRetainedBundleRestoresReleaseCommitBeforeSourcePublication()
+        try testRetainedBundleRestorationRejectsDigestMismatch()
         try testDisposablePublicationOrdersAndResumesImmutableStages()
         try testSourcePublishedRetryAcceptsLaterBranchDescendant()
         try testTapPublishedRetryAcceptsLaterUnrelatedTapCommit()
@@ -21,14 +22,22 @@ enum DistributionReleaseWorkflowTests {
         try testPublicationAuthenticationHelperCleansUpAfterSuccessAndFailure()
     }
 
-    private static func testWorkflowUsesSerializedLeastPrivilegeProtectedPublication() throws {
+    private static func testWorkflowUsesSingleEntryPointAndLeastPrivilegeJobGraph() throws {
         let root = try repositoryRoot()
-        let workflow = try String(contentsOf: root.appendingPathComponent(".github/workflows/release.yml"), encoding: .utf8)
+        let workflow = try String(contentsOf: root.appendingPathComponent(".github/workflows/ci-cd.yaml"), encoding: .utf8)
+        let workflowFiles = try FileManager.default.contentsOfDirectory(
+            at: root.appendingPathComponent(".github/workflows"),
+            includingPropertiesForKeys: nil
+        ).filter { ["yaml", "yml"].contains($0.pathExtension) }
         let candidateStager = try String(
             contentsOf: root.appendingPathComponent("scripts/release/stage-release-candidate.mjs"), encoding: .utf8)
 
+        try expect(
+            workflowFiles.map(\.lastPathComponent) == ["ci-cd.yaml"],
+            "CI/CD must use exactly one workflow entry point")
         for required in [
-            "workflow_dispatch:", "bootstrap:", "resume_run_id:", "push:", "branches: [master]",
+            "name: CI/CD", "workflow_dispatch:", "bootstrap:", "resume_run_id:", "push:", "pull_request:",
+            "portable-ci:", "apple-ci:", "protected-release:",
             "group: calrelay-public-beta-release", "cancel-in-progress: false", "permissions:", "actions: read",
             "contents: read", "environment: public-beta-release", "runs-on: xcode-27",
             "persist-credentials: false", "node-version: 24.21.0", "package-manager-cache: false",
@@ -37,10 +46,8 @@ enum DistributionReleaseWorkflowTests {
             "CALRELAY_RELEASE_GITHUB_APP_ID", "ondrej-winter/homebrew-tap", "if: always()",
             "compression-level: 0", "if-no-files-found: error", "retention-days: 30",
             "resume_run_id must be a positive workflow run ID", "bootstrap and resume_run_id are mutually exclusive",
-            "actions/runs/${RESUME_RUN_ID}", "resume candidate does not match its protected release workflow run",
-            "run.path !== \".github/workflows/release.yml\"", "run.head_branch !== \"master\"",
-            "run.head_sha !== state.sourceRevision", "refs/remotes/calrelay-candidate/master", "git checkout --detach",
-            "retained source bundle digest conflicts with release state",
+            "Manual release dispatches must target master", "scripts/release/verify-resume-workflow.mjs",
+            "scripts/release/restore-retained-source.sh", "validated_revision", "validation_revision",
             "Release workflow is restricted to ondrej-winter/calrelay",
             "CALRELAY_TAP_REPOSITORY must be ondrej-winter/homebrew-tap", "command -v gh", "command -v brew",
             "The previous tap must contain both CalRelay packages or neither", "release-publication.askpass-*",
@@ -49,11 +56,20 @@ enum DistributionReleaseWorkflowTests {
             try expect(workflow.contains(required), "Release workflow must contain \(required)")
         }
         try expect(
-            workflow.contains("if: needs.analyze.outputs.release == 'true'"),
-            "Protected release work must be skipped for non-qualifying pushes")
+            workflow.contains("needs.apple-ci.outputs.validated_revision == needs.portable-ci.outputs.validation_revision"),
+            "Protected release work must require validation of the exact selected revision")
         try expect(
             !workflow.contains("pull_request_target") && !workflow.contains("permissions: write-all"),
-            "Release workflow must not expose privileged execution to untrusted triggers")
+            "CI/CD workflow must not expose privileged execution to untrusted triggers")
+        let protectedRelease = try job(named: "protected-release", in: workflow)
+        try expect(
+            protectedRelease.contains("group: calrelay-public-beta-release")
+                && protectedRelease.contains("cancel-in-progress: false"),
+            "Protected release job must own the non-cancelling publication queue")
+        let workflowPreamble = workflow[..<protectedRelease.startIndex]
+        try expect(
+            !workflowPreamble.contains("group: calrelay-public-beta-release"),
+            "Ordinary CI must not be serialized by the protected release queue")
         try expect(
             !workflow.contains("CALRELAY_SIGNING_IDENTITY"),
             "Release workflow must not select the signing certificate by its display name")
@@ -75,22 +91,19 @@ enum DistributionReleaseWorkflowTests {
             actionReferences.allSatisfy { $0.range(of: "^[0-9a-f]{40}$", options: .regularExpression) != nil },
             "Every external action must be pinned to an immutable commit")
 
-        guard let analyzeRange = workflow.range(of: "  analyze:"), let releaseRange = workflow.range(of: "  release:") else {
-            throw TestFailure("Release workflow must define analyze and release jobs")
-        }
-        let analyzeJob = String(workflow[analyzeRange.lowerBound..<releaseRange.lowerBound])
+        let portableCI = try job(named: "portable-ci", in: workflow)
         for protectedName in [
             "CALRELAY_DEVELOPER_ID_P12", "CALRELAY_NOTARY_API_KEY_P8",
             "CALRELAY_SIGNING_CERTIFICATE_SHA1", "CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY",
             "create-github-app-token",
         ] {
-            try expect(!analyzeJob.contains(protectedName), "Analysis must not access protected value \(protectedName)")
+            try expect(!portableCI.contains(protectedName), "Portable CI must not access protected value \(protectedName)")
         }
     }
 
-    private static func testWorkflowInstallsPinnedSwiftLintBeforeSourceGates() throws {
+    private static func testWorkflowRunsSourceGatesBeforeProtectedRelease() throws {
         let root = try repositoryRoot()
-        let workflow = try String(contentsOf: root.appendingPathComponent(".github/workflows/release.yml"), encoding: .utf8)
+        let workflow = try String(contentsOf: root.appendingPathComponent(".github/workflows/ci-cd.yaml"), encoding: .utf8)
         let toolchainData = try Data(contentsOf: root.appendingPathComponent("scripts/release/toolchain.json"))
         guard
             let toolchain = try JSONSerialization.jsonObject(with: toolchainData) as? [String: Any],
@@ -115,21 +128,29 @@ enum DistributionReleaseWorkflowTests {
         }
         try expect(!workflow.contains("brew install swiftlint"), "Release workflow must not resolve SwiftLint through Homebrew")
 
+        let appleCI = try job(named: "apple-ci", in: workflow)
+        let protectedRelease = try job(named: "protected-release", in: workflow)
+        try expect(
+            !appleCI.contains("if: github.event_name") && !appleCI.contains("outputs.release == 'true'"),
+            "Apple CI must run source gates for every push, pull request, and manual workflow run")
         guard
-            let checkout = workflow.range(of: "- name: Check out release source"),
-            let setup = workflow.range(of: "- name: Set up pinned SwiftLint"),
-            let qualityGates = workflow.range(of: "- name: Run source quality gates")
-        else {
-            throw TestFailure("Release workflow must declare checkout, SwiftLint setup, and source quality gates")
-        }
+            let checkout = appleCI.range(of: "- name: Check out validation source"),
+            let setup = appleCI.range(of: "- name: Set up pinned SwiftLint"),
+            let qualityGates = appleCI.range(of: "- name: Run source quality gates")
+        else { throw TestFailure("Apple CI must declare checkout, SwiftLint setup, and source quality gates") }
         try expect(checkout.lowerBound < setup.lowerBound, "SwiftLint setup must read metadata from the checked-out release source")
         try expect(setup.lowerBound < qualityGates.lowerBound, "SwiftLint must be available before source quality gates run")
+        try expect(!protectedRelease.contains("make format-check"), "Protected release must trust the exact-revision source gate")
+        try expect(!protectedRelease.contains("make check"), "Protected release must not repeat the full source gate")
+        try expect(
+            !protectedRelease.contains("Set up pinned SwiftLint"),
+            "Protected release must not repeat Apple CI toolchain setup")
     }
 
     private static func testHomebrewBootstrapValidationSupportsNoPreviousPackagesWithNounset() throws {
         let root = try repositoryRoot()
         let workflow = try String(
-            contentsOf: root.appendingPathComponent(".github/workflows/release.yml"), encoding: .utf8)
+            contentsOf: root.appendingPathComponent(".github/workflows/ci-cd.yaml"), encoding: .utf8)
         guard
             let step = workflow.range(of: "      - name: Validate Homebrew lifecycle without Calendar access\n"),
             let nextStep = workflow.range(
@@ -173,19 +194,21 @@ enum DistributionReleaseWorkflowTests {
     private static func testResumptionUsesReviewedCurrentHomebrewValidator() throws {
         let root = try repositoryRoot()
         let workflow = try String(
-            contentsOf: root.appendingPathComponent(".github/workflows/release.yml"), encoding: .utf8)
+            contentsOf: root.appendingPathComponent(".github/workflows/ci-cd.yaml"), encoding: .utf8)
         for required in [
-            "Stage reviewed Homebrew validator for resumption",
+            "Stage reviewed resumption helpers",
             "git show \"${GITHUB_SHA}:scripts/release/validate-homebrew-packages.mjs\"",
+            "git show \"${GITHUB_SHA}:scripts/release/restore-retained-source.sh\"",
             "${RUNNER_TEMP}/calrelay-validate-homebrew-packages.mjs",
-            "RESUME: ${{ needs.analyze.outputs.resume }}",
+            "${RUNNER_TEMP}/calrelay-restore-retained-source.sh",
+            "RESUME: ${{ needs.portable-ci.outputs.resume }}",
             "node \"$validator\" \"${arguments[@]}\"",
         ] {
             try expect(workflow.contains(required), "Resumption workflow must contain \(required)")
         }
         guard
             let checkout = workflow.range(of: "- name: Check out release source"),
-            let validator = workflow.range(of: "- name: Stage reviewed Homebrew validator for resumption"),
+            let validator = workflow.range(of: "- name: Stage reviewed resumption helpers"),
             let restore = workflow.range(of: "- name: Restore retained release commit from source bundle"),
             let homebrew = workflow.range(of: "- name: Validate Homebrew lifecycle without Calendar access")
         else {
@@ -258,6 +281,20 @@ enum DistributionReleaseWorkflowTests {
         try expect(
             try fixture.remoteSourceIsCapturedRevisionWithoutReleaseTag(),
             "Restoring the retained release commit must not require source publication")
+    }
+
+    private static func testRetainedBundleRestorationRejectsDigestMismatch() throws {
+        let fixture = try ReleaseWorkflowFixture()
+        defer { fixture.remove() }
+        try fixture.stageCandidate()
+        try fixture.corruptCandidateSourceBundle()
+
+        let result = try fixture.tryRestoreReleaseCommitFromCandidate()
+
+        try expect(result.status != 0, "A retained source bundle with changed bytes must fail restoration")
+        try expect(
+            result.output.contains("retained source bundle digest conflicts with release state"),
+            "Bundle restoration must explain the immutable digest mismatch")
     }
 
     private static func testTamperedRetainedCandidateFailsBeforeSourcePublication() throws {
@@ -420,6 +457,16 @@ enum DistributionReleaseWorkflowTests {
             candidate = candidate.deletingLastPathComponent()
         }
         throw TestFailure("Unable to resolve repository root")
+    }
+
+    private static func job(named name: String, in workflow: String) throws -> Substring {
+        guard let start = workflow.range(of: "  \(name):\n") else {
+            throw TestFailure("CI/CD workflow must define job \(name)")
+        }
+        let remainder = workflow[start.upperBound...]
+        let end = remainder.range(of: #"\n  [a-z][a-z0-9-]*:\n"#, options: .regularExpression)?.lowerBound
+            ?? workflow.endIndex
+        return workflow[start.lowerBound..<end]
     }
 
     private static func command(
@@ -636,6 +683,12 @@ private final class ReleaseWorkflowFixture {
     }
 
     func restoreReleaseCommitFromCandidate() throws -> String {
+        let result = try tryRestoreReleaseCommitFromCandidate()
+        try result.requireSuccess()
+        return result.output.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func tryRestoreReleaseCommitFromCandidate() throws -> ReleaseWorkflowProcessResult {
         let checkout = root.appendingPathComponent("resume-checkout")
         try command("/usr/bin/git", ["clone", sourceRemote.path, checkout.path], at: root).requireSuccess()
         let state = try JSONSerialization.jsonObject(
@@ -647,20 +700,12 @@ private final class ReleaseWorkflowFixture {
         else {
             throw TestFailure("Unable to decode retained release source metadata")
         }
-        let bundle = candidate.appendingPathComponent("source.bundle")
-        try git(checkout, ["bundle", "verify", bundle.path])
-        try git(checkout, [
-            "fetch", "--no-tags", bundle.path, "refs/heads/master:refs/remotes/calrelay-candidate/master",
-        ])
-        try git(checkout, ["fetch", "--no-tags", bundle.path, "refs/tags/\(tag):refs/tags/\(tag)"])
-        guard try gitOutput(checkout, ["rev-parse", "refs/remotes/calrelay-candidate/master"]) == releaseCommit else {
-            throw TestFailure("Restored candidate branch must identify the retained release commit")
-        }
-        guard try gitOutput(checkout, ["rev-parse", "refs/tags/\(tag)"]) == releaseCommit else {
-            throw TestFailure("Restored candidate tag must identify the retained release commit")
-        }
-        try git(checkout, ["checkout", "--detach", releaseCommit])
-        return try String(contentsOf: checkout.appendingPathComponent("VERSION"), encoding: .utf8)
+        return try command(
+            "/bin/zsh",
+            [
+                sourceRoot.appendingPathComponent("scripts/release/restore-retained-source.sh").path,
+                candidate.path, releaseCommit, tag,
+            ], at: checkout)
     }
 
     func stateStage() throws -> String {

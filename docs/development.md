@@ -205,24 +205,30 @@ swift run CalRelayKitTests \
   DistributionHomebrewPackageTests \
   DistributionReleaseStateTests \
   DistributionReleaseWorkflowTests \
-  DistributionReleasePolicyTests
+  DistributionReleasePolicyTests \
+  DistributionWorkflowContextTests
 ```
 
 When changing release JavaScript or the workflow, also run:
 
 ```sh
-node --check scripts/release/generate-homebrew-packages.mjs
-node --check scripts/release/validate-homebrew-packages.mjs
-node --check scripts/release/verify-release-source.mjs
-node --check scripts/release/stage-release-candidate.mjs
-node --check scripts/release/publish-release.mjs
-actionlint .github/workflows/release.yml
+find scripts/release -type f -name '*.mjs' -print0 | sort -z | xargs -0 -n 1 node --check
+zsh -n scripts/release/*.sh
+actionlint -config-file .github/actionlint.yaml .github/workflows/ci-cd.yaml
 ```
 
 `actionlint` is an additional provider-aware check and must run in a configured
 developer or CI environment; it is not currently a repository-managed dependency.
 `.github/actionlint.yaml` narrowly suppresses its outdated unknown-label warning
 for GitHub's public-preview `xcode-27` runner while retaining all other checks.
+
+`.github/workflows/ci-cd.yaml` is the single automation entry point for pushes,
+pull requests, and manual runs. `portable-ci` performs portable tooling and release
+context checks without protected credentials. `apple-ci` runs the complete source
+quality gate on the exact selected revision. `protected-release` runs only for a
+selected release after the Apple job reports that same revision, and it owns the
+protected environment and non-cancelling publication queue rather than repeating
+`make format-check` or `make check`.
 
 ## Protected release workflow setup and operation
 

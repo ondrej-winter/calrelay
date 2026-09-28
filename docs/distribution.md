@@ -1,6 +1,6 @@
 # CalRelay public-beta distribution
 
-> **Availability:** As of September 27, 2026, the public channel is not live. The
+> **Availability:** As of September 28, 2026, the public channel is not live. The
 > `v1.0.0` bootstrap and protected production validation remain pending. The
 > commands below are the accepted installation interface to use after that
 > bootstrap is published.

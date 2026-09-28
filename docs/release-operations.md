@@ -3,10 +3,11 @@
 This runbook is for maintainers operating the protected public-beta release
 workflow. It complements the accepted
 [distribution specification](specs/distribution-spec.md) and
-[ADR 0004](adr/0004-automate-signed-public-beta-releases.md); it does not replace
-their product or security contracts.
+[ADR 0004](adr/0004-automate-signed-public-beta-releases.md) with its workflow
+boundary in [ADR 0005](adr/0005-use-one-ci-cd-workflow-with-exact-revision-release-promotion.md);
+it does not replace their product or security contracts.
 
-> **Availability:** As of September 27, 2026, the public channel is not live. The
+> **Availability:** As of September 28, 2026, the public channel is not live. The
 > dedicated GitHub App is installed and its protected credential roles are
 > configured. Protected token minting for both `ondrej-winter/calrelay` and
 > `ondrej-winter/homebrew-tap` with effective `contents: write` access, the preview
@@ -15,7 +16,7 @@ their product or security contracts.
 
 ## Invariants
 
-- Release only from protected `master` through `.github/workflows/release.yml`.
+- Release only from protected `master` through `.github/workflows/ci-cd.yaml`.
 - Keep the source repository and `ondrej-winter/homebrew-tap` protected against
   force-push replacement.
 - Use the dedicated least-privilege GitHub App, never a personal access token.
@@ -49,11 +50,12 @@ Developer ID Application identity with the configured fingerprint before any
 release product is compiled. The fingerprint is a non-secret identity selector;
 the certificate export and its password remain protected secrets.
 
-The release job uses GitHub's standard hosted Apple Silicon `xcode-27` image. As
-of September 27, 2026, that image is in public preview and provides an ephemeral
-macOS 27 VM with Xcode 27, Swift 6.4, the macOS 27 SDK, Homebrew, and `gh`; the
-workflow installs the pinned Node runtime explicitly and downloads the exact
-official portable SwiftLint artifact recorded in `scripts/release/toolchain.json`.
+The Apple CI and protected release jobs use GitHub's standard hosted Apple Silicon
+`xcode-27` image. As of September 28, 2026, that image is in public preview and
+provides an ephemeral macOS 27 VM with Xcode 27, Swift 6.4, the macOS 27 SDK,
+Homebrew, and `gh`; the workflow installs the pinned Node runtime explicitly and
+downloads the exact official portable SwiftLint artifact recorded in
+`scripts/release/toolchain.json`.
 It verifies the artifact SHA-256 and reported SwiftLint version before running
 the source quality gate. Preview image contents and capacity may change. Before
 bootstrap and after an image rollout, verify the image inventory and let the
@@ -71,7 +73,7 @@ toolchain compatibility, and every protected role above.
 Dispatch the first release manually:
 
 ```sh
-gh workflow run release.yml -f bootstrap=true
+gh workflow run ci-cd.yaml -f bootstrap=true
 ```
 
 Do not combine `bootstrap` with `resume_run_id`. The workflow must select exactly
@@ -90,11 +92,14 @@ release queue. A `fix` or `fix!` selects a patch within `1.x`; a `feat` or `feat
 selects a minor within `1.x`. Other commits do not publish. Breaking markers add
 release context but never select `2.0.0`.
 
-The unprivileged analysis job decides whether a release is needed. Signing and
-publication credentials are available only in the protected release job. Remote
-source advancement, candidate mismatch, tag or asset mismatch, partial tap state,
-or failed evidence must stop publication rather than repair immutable state in
-place.
+The `portable-ci` job performs portable tooling checks and decides whether a
+release is needed without protected credentials. The `apple-ci` job runs
+`make format-check` and `make check` on every push, pull request, and manual run.
+For release runs, `protected-release` starts only after `apple-ci` reports the
+exact revision selected by `portable-ci`; signing and publication credentials are
+available only in that protected job. Remote source advancement, candidate
+mismatch, tag or asset mismatch, partial tap state, or failed evidence must stop
+publication rather than repair immutable state in place.
 
 ## Credential rotation
 
@@ -123,14 +128,19 @@ The workflow retains the exact source-bound `release-candidate` Actions artifact
 for 30 days. Use the original protected workflow run ID:
 
 ```sh
-gh workflow run release.yml -f resume_run_id=123456789
+gh workflow run ci-cd.yaml -f resume_run_id=123456789
 ```
 
 Do not rebuild the same version. Resumption downloads the retained candidate,
 verifies workflow provenance and exact artifact/source bytes, restores the
-release commit and tag from `source.bundle`, reruns source gates, and continues
-from the persisted stage. Matching published state is accepted; mismatched state
-fails closed.
+release commit and tag from `source.bundle`, validates that restored commit in
+`apple-ci`, and continues from the persisted stage only when `protected-release`
+receives the matching validated revision. The protected job does not rerun source
+gates. Matching published state is accepted; mismatched state fails closed.
+
+Unexpired retained candidates created by the historical `Public-beta release`
+workflow at `.github/workflows/release.yml` remain resumable through an explicit
+provenance allowlist. No other workflow name or path is accepted.
 
 If the retained Actions artifact is missing or expired, do not reconstruct or
 replace its tag or assets. Investigate the incomplete release. Resume only when

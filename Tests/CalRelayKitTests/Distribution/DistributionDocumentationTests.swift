@@ -45,7 +45,7 @@ enum DistributionDocumentationTests {
         let runbook = try contents(of: "docs/release-operations.md")
         let normalizedRunbook = normalizedWhitespace(runbook)
         for required in [
-            "public channel is not live", "gh workflow run release.yml -f bootstrap=true", "qualifying push to `master`",
+            "public channel is not live", "gh workflow run ci-cd.yaml -f bootstrap=true", "qualifying push to `master`",
             "CALRELAY_DEVELOPER_ID_P12", "CALRELAY_DEVELOPER_ID_P12_PASSWORD", "CALRELAY_NOTARY_API_KEY_P8",
             "CALRELAY_NOTARY_KEY_ID", "CALRELAY_NOTARY_ISSUER_ID", "CALRELAY_DEVELOPER_TEAM_ID",
             "CALRELAY_SIGNING_CERTIFICATE_SHA1", "Protected environment secret",
@@ -53,7 +53,9 @@ enum DistributionDocumentationTests {
             "CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY",
             "CALRELAY_RELEASE_GITHUB_APP_ID", "CALRELAY_TAP_REPOSITORY",
             "`xcode-27`", "public preview", "fresh GitHub-hosted VM",
-            "gh workflow run release.yml -f resume_run_id=123456789", "Do not rebuild the same version",
+            "gh workflow run ci-cd.yaml -f resume_run_id=123456789", "Do not rebuild the same version",
+            "`portable-ci`", "`apple-ci`", "`protected-release`", "exact revision", "does not rerun source gates",
+            "historical `Public-beta release`", ".github/workflows/release.yml",
             "Do not move or replace same-version tags or assets", "higher patch version", "compromised artifact",
             "disable", "## Runner recovery", "## Tap recovery", "scripts/release/release-state.mjs",
         ] {
