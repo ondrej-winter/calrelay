@@ -46,6 +46,9 @@ boundaries:
 - The CLI executable and app use Developer ID Application signing, hardened
   runtime, and secure timestamps. Both are notarized; the app is stapled and
   assessed by Gatekeeper before publication.
+- The app remains unsandboxed for canonical configuration-file access and is
+  signed with only the read/write Calendar resource-access entitlement required by
+  its explicit EventKit setup and recovery action.
 - Signing material is imported only into an ephemeral CI keychain and removed on
   every exit path. The Developer Team identifier is a stable, non-secret release
   invariant verified before publication.

@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="${0:A:h:h}"
 CONFIGURATION="${CONFIGURATION:-debug}"
 VERSION_FILE="${ROOT_DIR}/VERSION"
+ENTITLEMENTS_FILE="${ROOT_DIR}/Resources/CalRelayApp/CalRelayApp.entitlements"
 APP_NAME="CalRelay"
 EXECUTABLE_NAME="CalRelayApp"
 BUILD_DIR="${ROOT_DIR}/.build/${CONFIGURATION}"
@@ -56,13 +57,26 @@ for key in NSCalendarsFullAccessUsageDescription NSCalendarsUsageDescription; do
         exit 1
     fi
 done
+if [[ "$(/usr/bin/plutil -extract com\\.apple\\.security\\.personal-information\\.calendars raw -expect bool "${ENTITLEMENTS_FILE}" 2>/dev/null)" != true ]]; then
+    echo "error: ${ENTITLEMENTS_FILE} must grant read/write Calendar access." >&2
+    exit 1
+fi
+if /usr/bin/plutil -extract com\\.apple\\.security\\.app-sandbox raw "${ENTITLEMENTS_FILE}" >/dev/null 2>&1; then
+    echo "error: the local CalRelay app must remain unsandboxed." >&2
+    exit 1
+fi
 
 chmod 755 "${MACOS_DIR}/${EXECUTABLE_NAME}"
 
 /usr/bin/xattr -cr "${APP_BUNDLE}"
-/usr/bin/codesign --force --sign - "${APP_BUNDLE}"
+/usr/bin/codesign --force --sign - --entitlements "${ENTITLEMENTS_FILE}" "${APP_BUNDLE}"
 /usr/bin/xattr -cr "${APP_BUNDLE}"
 /usr/bin/codesign --verify --deep --strict "${APP_BUNDLE}"
+SIGNED_ENTITLEMENTS="$(/usr/bin/codesign -d --entitlements :- "${APP_BUNDLE}" 2>/dev/null)"
+if [[ "$(printf %s "${SIGNED_ENTITLEMENTS}" | /usr/bin/plutil -extract com\\.apple\\.security\\.personal-information\\.calendars raw -expect bool -o - - 2>/dev/null)" != true ]]; then
+    echo "error: the signed local CalRelay app is missing read/write Calendar access." >&2
+    exit 1
+fi
 
 echo "Built ${APP_BUNDLE}"
 rm -rf "${APP_LINK}"

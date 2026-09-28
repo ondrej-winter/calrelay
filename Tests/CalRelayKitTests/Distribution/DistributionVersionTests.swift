@@ -125,9 +125,12 @@ private struct AppBuildFixture {
         try fileManager.copyItem(
             at: repository.appendingPathComponent("Resources/CalRelayApp/Info.plist"),
             to: root.appendingPathComponent("Resources/CalRelayApp/Info.plist"))
+        try fileManager.copyItem(
+            at: repository.appendingPathComponent("Resources/CalRelayApp/CalRelayApp.entitlements"),
+            to: root.appendingPathComponent("Resources/CalRelayApp/CalRelayApp.entitlements"))
         try Data(version.utf8).write(to: root.appendingPathComponent("VERSION"))
-        try writeExecutable(
-            at: root.appendingPathComponent(".build/debug/CalRelayApp"), contents: "#!/bin/zsh\nexit 0\n")
+        let appExecutable = root.appendingPathComponent(".build/debug/CalRelayApp")
+        try fileManager.copyItem(at: URL(fileURLWithPath: "/usr/bin/true"), to: appExecutable)
         try writeExecutable(at: root.appendingPathComponent("bin/swift"), contents: "#!/bin/zsh\nexit 0\n")
     }
 

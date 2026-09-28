@@ -8,6 +8,7 @@ WORK_DIR="${OUTPUT_DIR}/.work"
 SECRETS_DIR="${WORK_DIR}/secrets"
 CLI_DIR="${WORK_DIR}/cli"
 APP_BUNDLE="${WORK_DIR}/CalRelay.app"
+APP_ENTITLEMENTS="${ROOT_DIR}/Resources/CalRelayApp/CalRelayApp.entitlements"
 KEYCHAIN_PATH="${WORK_DIR}/calrelay-release.keychain-db"
 KEYCHAIN_PASSWORD="calrelay-$(/usr/bin/uuidgen)"
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
@@ -150,7 +151,12 @@ MACOSX_DEPLOYMENT_TARGET=26.0 "${SWIFT}" build --sdk "${SDK_PATH}" -c release --
 
 sign_and_verify() {
     local target="$1"
-    "${CODESIGN}" --force --options runtime --timestamp --sign "${SIGNING_CERTIFICATE_SHA1}" --keychain "${KEYCHAIN_PATH}" "${target}"
+    local entitlements="${2:-}"
+    if [[ -n "${entitlements}" ]]; then
+        "${CODESIGN}" --force --options runtime --timestamp --sign "${SIGNING_CERTIFICATE_SHA1}" --keychain "${KEYCHAIN_PATH}" --entitlements "${entitlements}" "${target}"
+    else
+        "${CODESIGN}" --force --options runtime --timestamp --sign "${SIGNING_CERTIFICATE_SHA1}" --keychain "${KEYCHAIN_PATH}" "${target}"
+    fi
     "${CODESIGN}" --verify --strict --verbose=2 "${target}"
     local metadata="$("${CODESIGN}" -dv --verbose=4 "${target}" 2>&1)"
     if [[ "${metadata}" != *"TeamIdentifier=${CALRELAY_DEVELOPER_TEAM_ID}"* || "${metadata}" != *runtime* || "${metadata}" != *Timestamp=* ]]; then
@@ -171,7 +177,7 @@ verify_binary() {
     fi
 }
 sign_and_verify "${CLI_DIR}/calrelay"
-sign_and_verify "${APP_BUNDLE}"
+sign_and_verify "${APP_BUNDLE}" "${APP_ENTITLEMENTS}"
 verify_binary "${CLI_DIR}/calrelay"
 verify_binary "${APP_BUNDLE}/Contents/MacOS/CalRelayApp"
 
@@ -184,7 +190,12 @@ for expected in "CFBundleIdentifier:dev.owinter.CalRelay" "CFBundleExecutable:Ca
         exit 1
     fi
 done
-if "${CODESIGN}" -d --entitlements :- "${APP_BUNDLE}" 2>/dev/null | /usr/bin/grep -Fq "com.apple.security.app-sandbox"; then
+APP_EFFECTIVE_ENTITLEMENTS="$("${CODESIGN}" -d --entitlements :- "${APP_BUNDLE}" 2>/dev/null)"
+if [[ "$(print -rn -- "${APP_EFFECTIVE_ENTITLEMENTS}" | /usr/bin/plutil -extract com\\.apple\\.security\\.personal-information\\.calendars raw -expect bool -o - - 2>/dev/null)" != true ]]; then
+    print -u2 -- "error: the production app must include read/write Calendar access."
+    exit 1
+fi
+if print -rn -- "${APP_EFFECTIVE_ENTITLEMENTS}" | /usr/bin/grep -Fq "com.apple.security.app-sandbox"; then
     print -u2 -- "error: the production app must remain unsandboxed."
     exit 1
 fi

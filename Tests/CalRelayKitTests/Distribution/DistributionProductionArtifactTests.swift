@@ -80,6 +80,9 @@ enum DistributionProductionArtifactTests {
             log.contains("codesign --force --options runtime --timestamp"),
             "Signing must request hardened runtime and timestamp")
         try expect(
+            log.contains("--entitlements") && log.contains("CalRelayApp.entitlements"),
+            "App signing must apply the production Calendar entitlement file")
+        try expect(
             log.contains("security find-identity -v -p codesigning")
                 && log.contains("--sign \(fixture.signingCertificateSHA1)"),
             "Signing must verify and select the imported certificate by its SHA-1 fingerprint")
@@ -103,7 +106,8 @@ enum DistributionProductionArtifactTests {
 
     private static func testFakeReleaseBuildRejectsBoundaryFailuresAndCleansKeychain() throws {
         for failure in [
-            "toolchain", "identity", "architecture", "deployment", "team", "codesign", "notary", "stapler",
+            "toolchain", "identity", "architecture", "deployment", "team", "codesign", "entitlement", "notary",
+            "stapler"
         ] {
             let fixture = try ProductionArtifactFixture(version: "1.2.4", failure: failure)
             let result = try fixture.run()
@@ -271,6 +275,9 @@ private final class ProductionArtifactFixture {
         try FileManager.default.copyItem(
             at: source.appendingPathComponent("Resources/CalRelayApp/Info.plist"),
             to: root.appendingPathComponent("Resources/CalRelayApp/Info.plist"))
+        try FileManager.default.copyItem(
+            at: source.appendingPathComponent("Resources/CalRelayApp/CalRelayApp.entitlements"),
+            to: root.appendingPathComponent("Resources/CalRelayApp/CalRelayApp.entitlements"))
         try Data(version.utf8).write(to: root.appendingPathComponent("VERSION"))
         try Data("// swift-tools-version: 6.4\nplatforms: [.macOS(.v26)]\n".utf8).write(
             to: root.appendingPathComponent("Package.swift"))
@@ -339,7 +346,7 @@ private final class ProductionArtifactFixture {
         try writeTool(
             "codesign",
             common
-                + "[[ \"${CALRELAY_RELEASE_FAKE_FAILURE}\" == codesign && \"$1\" == --force ]] && exit 2\nif [[ \"$1\" == -dv ]]; then [[ \"${CALRELAY_RELEASE_FAKE_FAILURE}\" == team ]] && team=WRONGTEAM || team=TEAM123456; print -u2 \"TeamIdentifier=$team\"; print -u2 \"flags=0x10000(runtime)\"; print -u2 \"Timestamp=Sep 26, 2026\"; fi\nif [[ \"$1\" == -d && \"$2\" == --entitlements ]]; then print \"<?xml version=\\\"1.0\\\"?><plist><dict></dict></plist>\"; fi\nexit 0\n"
+                + "[[ \"${CALRELAY_RELEASE_FAKE_FAILURE}\" == codesign && \"$1\" == --force ]] && exit 2\nif [[ \"$1\" == -dv ]]; then [[ \"${CALRELAY_RELEASE_FAKE_FAILURE}\" == team ]] && team=WRONGTEAM || team=TEAM123456; print -u2 \"TeamIdentifier=$team\"; print -u2 \"flags=0x10000(runtime)\"; print -u2 \"Timestamp=Sep 26, 2026\"; fi\nif [[ \"$1\" == -d && \"$2\" == --entitlements ]]; then [[ \"${CALRELAY_RELEASE_FAKE_FAILURE}\" == entitlement ]] && calendar=\"\" || calendar=\"<key>com.apple.security.personal-information.calendars</key><true/>\"; print \"<?xml version=\\\"1.0\\\"?><plist><dict>${calendar}</dict></plist>\"; fi\nexit 0\n"
         )
         try writeTool(
             "lipo",

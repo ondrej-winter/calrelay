@@ -5,9 +5,12 @@ enum CalendarAppBundleMetadataTests {
     private static let calendarUsageDescriptionKeys = [
         "NSCalendarsFullAccessUsageDescription", "NSCalendarsUsageDescription"
     ]
+    private static let calendarEntitlementKey = "com.apple.security.personal-information.calendars"
 
     static func runAll() throws {
         try testProductionSourceInfoPlistContainsNonemptyCalendarUsageDescriptions()
+        try testProductionSourceEntitlementsAllowCalendarAccessWithoutSandbox()
+        try testLocalAppBuildSignsWithCalendarEntitlements()
         try testUITestHostSourceInfoPlistOmitsCalendarUsageDescriptions()
         try testAppBuildRejectsMissingCalendarUsageDescriptions()
         try testAppBuildRejectsEmptyCalendarUsageDescriptions()
@@ -18,6 +21,25 @@ enum CalendarAppBundleMetadataTests {
             at: try repositoryRoot().appendingPathComponent("Resources/CalRelayApp/Info.plist"))
 
         for key in calendarUsageDescriptionKeys { try expectNonemptyString(metadata[key], key: key) }
+    }
+
+    private static func testProductionSourceEntitlementsAllowCalendarAccessWithoutSandbox() throws {
+        let entitlements = try propertyList(
+            at: try repositoryRoot().appendingPathComponent("Resources/CalRelayApp/CalRelayApp.entitlements"))
+
+        try expect(
+            entitlements[calendarEntitlementKey] as? Bool == true,
+            "The production app must declare read/write Calendar access")
+        try expect(entitlements["com.apple.security.app-sandbox"] == nil, "The production app must remain unsandboxed")
+    }
+
+    private static func testLocalAppBuildSignsWithCalendarEntitlements() throws {
+        let script = try String(
+            contentsOf: try repositoryRoot().appendingPathComponent("scripts/build-calrelay-app.sh"), encoding: .utf8)
+
+        try expect(
+            script.contains("--entitlements \"${ENTITLEMENTS_FILE}\""),
+            "The local app build must sign with the production Calendar entitlement file")
     }
 
     private static func testUITestHostSourceInfoPlistOmitsCalendarUsageDescriptions() throws {
