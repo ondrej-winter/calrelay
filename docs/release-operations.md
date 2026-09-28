@@ -42,7 +42,7 @@ recording their values in repository files:
 | `CALRELAY_DEVELOPER_TEAM_ID` | Protected environment variable and stable, non-secret signing invariant. |
 | `CALRELAY_SIGNING_CERTIFICATE_SHA1` | Protected environment secret containing the expected Developer ID Application certificate's canonical 40-character SHA-1 certificate fingerprint. It selects the imported identity without depending on its locale-sensitive display name. |
 | `CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY` | Protected secret for the dedicated source/tap publication app. |
-| `CALRELAY_RELEASE_GITHUB_APP_ID` | Protected environment variable identifying that GitHub App. |
+| `CALRELAY_RELEASE_GITHUB_APP_CLIENT_ID` | Protected environment variable containing that GitHub App's non-secret Client ID. |
 | `CALRELAY_TAP_REPOSITORY` | Protected environment variable set exactly to `ondrej-winter/homebrew-tap`. |
 
 The release build verifies that the ephemeral keychain contains exactly one valid

@@ -51,7 +51,7 @@ enum DistributionDocumentationTests {
             "CALRELAY_SIGNING_CERTIFICATE_SHA1", "Protected environment secret",
             "40-character SHA-1 certificate fingerprint",
             "CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY",
-            "CALRELAY_RELEASE_GITHUB_APP_ID", "CALRELAY_TAP_REPOSITORY",
+            "CALRELAY_RELEASE_GITHUB_APP_CLIENT_ID", "CALRELAY_TAP_REPOSITORY",
             "`xcode-27`", "public preview", "fresh GitHub-hosted VM",
             "gh workflow run ci-cd.yaml -f resume_run_id=123456789", "Do not rebuild the same version",
             "`portable-ci`", "`apple-ci`", "`protected-release`", "exact revision", "does not rerun source gates",
@@ -61,6 +61,9 @@ enum DistributionDocumentationTests {
         ] {
             try expect(normalizedRunbook.contains(required), "Release operator documentation must contain \(required)")
         }
+        try expect(
+            !runbook.contains("CALRELAY_RELEASE_GITHUB_APP_ID"),
+            "Release operator documentation must not require the deprecated GitHub App ID variable")
     }
 
     private static func testDistributionDocumentationIsLinkedFromProjectNavigation() throws {

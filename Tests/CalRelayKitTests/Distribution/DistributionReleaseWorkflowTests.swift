@@ -51,7 +51,7 @@ enum DistributionReleaseWorkflowTests {
             "persist-credentials: false", "node-version: 24.21.0", "package-manager-cache: false",
             "CALRELAY_SIGNING_CERTIFICATE_SHA1", "secrets.CALRELAY_SIGNING_CERTIFICATE_SHA1",
             "permission-contents: write", "CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY",
-            "CALRELAY_RELEASE_GITHUB_APP_ID", "ondrej-winter/homebrew-tap", "if: always()",
+            "client-id: ${{ vars.CALRELAY_RELEASE_GITHUB_APP_CLIENT_ID }}", "ondrej-winter/homebrew-tap", "if: always()",
             "compression-level: 0", "if-no-files-found: error", "retention-days: 30",
             "resume_run_id must be a positive workflow run ID", "bootstrap and resume_run_id are mutually exclusive",
             "Manual release dispatches must target master", "scripts/release/verify-resume-workflow.mjs",
@@ -85,6 +85,9 @@ enum DistributionReleaseWorkflowTests {
             !workflow.contains("vars.CALRELAY_SIGNING_CERTIFICATE_SHA1"),
             "Release workflow must read the protected signing fingerprint from the secrets context")
         try expect(
+            !workflow.contains("app-id:") && !workflow.contains("CALRELAY_RELEASE_GITHUB_APP_ID"),
+            "Release workflow must use the GitHub App Client ID rather than the deprecated App ID input")
+        try expect(
             !workflow.contains("runs-on: [self-hosted"),
             "Release workflow must use the ephemeral GitHub-hosted Apple Silicon runner")
         try expect(
@@ -105,7 +108,7 @@ enum DistributionReleaseWorkflowTests {
         for protectedName in [
             "CALRELAY_DEVELOPER_ID_P12", "CALRELAY_NOTARY_API_KEY_P8",
             "CALRELAY_SIGNING_CERTIFICATE_SHA1", "CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY",
-            "create-github-app-token",
+            "CALRELAY_RELEASE_GITHUB_APP_CLIENT_ID", "create-github-app-token",
         ] {
             try expect(!portableCI.contains(protectedName), "Portable CI must not access protected value \(protectedName)")
         }
