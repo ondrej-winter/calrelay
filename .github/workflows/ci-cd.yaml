@@ -244,13 +244,16 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ needs.portable-ci.outputs.source_revision }}
+          path: release-source
       - name: Move retained candidate into release workspace
         if: needs.portable-ci.outputs.resume == 'true'
+        working-directory: release-source
         run: |
           mkdir -p .build
           mv "${RUNNER_TEMP}/calrelay-release-candidate" .build/release-candidate
       - name: Restore retained release commit from source bundle
         if: needs.portable-ci.outputs.resume == 'true'
+        working-directory: release-source
         env:
           RELEASE_COMMIT: ${{ needs.portable-ci.outputs.release_commit }}
           RELEASE_TAG: ${{ needs.portable-ci.outputs.release_tag }}
@@ -268,6 +271,7 @@ jobs:
           command -v brew >/dev/null
       - name: Prepare release notes
         if: needs.portable-ci.outputs.resume != 'true'
+        working-directory: release-source
         env:
           BOOTSTRAP: ${{ inputs.bootstrap }}
         run: |
@@ -278,6 +282,7 @@ jobs:
           node scripts/release/release-policy.mjs "${arguments[@]}" > .build/release-metadata/release-notes.md
       - name: Create isolated source publication remote
         if: needs.portable-ci.outputs.resume != 'true'
+        working-directory: release-source
         env:
           SOURCE_REVISION: ${{ needs.portable-ci.outputs.source_revision }}
         run: |
@@ -287,6 +292,7 @@ jobs:
           git clone --bare . "${RUNNER_TEMP}/calrelay-source-publication.git"
       - name: Prepare release commit and tag with semantic-release
         if: needs.portable-ci.outputs.resume != 'true'
+        working-directory: release-source
         env:
           CALRELAY_RELEASE_SOURCE_REVISION: ${{ needs.portable-ci.outputs.source_revision }}
           CALRELAY_RELEASE_SOURCE_REMOTE: https://github.com/${{ github.repository }}.git
@@ -297,6 +303,7 @@ jobs:
           scripts/release/run-semantic-release.sh "${arguments[@]}"
       - name: Build signed and notarized candidate
         if: needs.portable-ci.outputs.resume != 'true'
+        working-directory: release-source
         env:
           CALRELAY_DEVELOPER_ID_P12: ${{ secrets.CALRELAY_DEVELOPER_ID_P12 }}
           CALRELAY_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.CALRELAY_DEVELOPER_ID_P12_PASSWORD }}
@@ -308,6 +315,7 @@ jobs:
         run: make release-artifacts
       - name: Stage immutable release candidate
         if: needs.portable-ci.outputs.resume != 'true'
+        working-directory: release-source
         env:
           PREVIOUS_VERSION: ${{ needs.portable-ci.outputs.previous_version }}
           SOURCE_REVISION: ${{ needs.portable-ci.outputs.source_revision }}
@@ -326,7 +334,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: release-candidate
-          path: .build/release-candidate
+          path: release-source/.build/release-candidate
           compression-level: 0
           if-no-files-found: error
           retention-days: 30
@@ -340,6 +348,7 @@ jobs:
           repositories: calrelay,homebrew-tap
           permission-contents: write
       - name: Publish and verify immutable release assets
+        working-directory: release-source
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           CALRELAY_GIT_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -360,9 +369,10 @@ jobs:
         with:
           repository: ${{ vars.CALRELAY_TAP_REPOSITORY }}
           token: ${{ steps.app-token.outputs.token }}
-          path: .build/previous-tap
+          path: release-source/.build/previous-tap
           persist-credentials: false
       - name: Validate Homebrew lifecycle without Calendar access
+        working-directory: release-source
         env:
           RESUME: ${{ needs.portable-ci.outputs.resume }}
         run: |
@@ -392,6 +402,7 @@ jobs:
           [[ -s "$validator" ]] || { echo 'Homebrew validator is missing or empty.' >&2; exit 1; }
           node "$validator" "${arguments[@]}"
       - name: Publish formula and cask atomically
+        working-directory: release-source
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           CALRELAY_GIT_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -409,6 +420,7 @@ jobs:
             --gh "$(command -v gh)"
       - name: Clean protected release material
         if: always()
+        working-directory: release-source
         run: |
           rm -rf .build/release-artifacts .build/release-candidate .build/release-metadata \
             .build/release-publication .build/previous-tap .build/previous-packages \

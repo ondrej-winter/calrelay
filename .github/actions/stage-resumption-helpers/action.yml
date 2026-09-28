@@ -7,7 +7,7 @@ inputs:
     required: false
     default: "false"
   include-release-publisher:
-    description: Also stage the reviewed release publisher and state transition helper.
+    description: Also stage the reviewed release publisher and its runtime helpers.
     required: false
     default: "false"
 
@@ -41,5 +41,7 @@ runs:
         mkdir -p "$directory"
         git show "${GITHUB_SHA}:scripts/release/publish-release.mjs" > "$directory/publish-release.mjs"
         git show "${GITHUB_SHA}:scripts/release/release-state.mjs" > "$directory/release-state.mjs"
+        git show "${GITHUB_SHA}:scripts/release/generate-homebrew-packages.mjs" > "$directory/generate-homebrew-packages.mjs"
         [[ -s "$directory/publish-release.mjs" ]] || { echo 'Reviewed release publisher is empty.' >&2; exit 1; }
         [[ -s "$directory/release-state.mjs" ]] || { echo 'Reviewed release state helper is empty.' >&2; exit 1; }
+        [[ -s "$directory/generate-homebrew-packages.mjs" ]] || { echo 'Reviewed Homebrew package generator is empty.' >&2; exit 1; }

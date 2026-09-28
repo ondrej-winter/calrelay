@@ -343,11 +343,17 @@ enum DistributionReleaseWorkflowTests {
             "git show \"${GITHUB_SHA}:scripts/release/restore-retained-source.sh\"",
             "git show \"${GITHUB_SHA}:scripts/release/publish-release.mjs\"",
             "git show \"${GITHUB_SHA}:scripts/release/release-state.mjs\"",
+            "git show \"${GITHUB_SHA}:scripts/release/generate-homebrew-packages.mjs\"",
             "${RUNNER_TEMP}/calrelay-validate-homebrew-packages.mjs",
             "${RUNNER_TEMP}/calrelay-restore-retained-source.sh",
             "${RUNNER_TEMP}/calrelay-release-publisher/publish-release.mjs",
             "\"$directory/release-state.mjs\"",
+            "\"$directory/generate-homebrew-packages.mjs\"",
             "include-release-publisher: true",
+            "path: release-source",
+            "path: release-source/.build/release-candidate",
+            "path: release-source/.build/previous-tap",
+            "working-directory: release-source",
             "RESUME: ${{ needs.portable-ci.outputs.resume }}",
             "node \"$validator\" \"${arguments[@]}\"",
             "node \"$publisher\" assets",
@@ -372,6 +378,9 @@ enum DistributionReleaseWorkflowTests {
         try expect(
             validator.lowerBound < sourceCheckout.lowerBound && sourceCheckout.lowerBound < restore.lowerBound,
             "Reviewed helpers must be staged before checking out and restoring the retained release source")
+        try expect(
+            protectedRelease.components(separatedBy: "working-directory: release-source").count - 1 == 11,
+            "Protected release shell commands must run in the exact release-source checkout without replacing current local actions")
         try expect(restore.lowerBound < homebrew.lowerBound, "Homebrew validation must run after release source restoration")
     }
 
