@@ -33,7 +33,9 @@ enum DistributionReleaseWorkflowTests {
             contentsOf: root.appendingPathComponent("scripts/release/stage-release-candidate.mjs"), encoding: .utf8)
         let localActionPaths = [
             ".github/actions/setup-release-node/action.yml",
+            ".github/actions/setup-swiftlint/action.yml",
             ".github/actions/download-release-candidate/action.yml",
+            ".github/actions/stage-resumption-helpers/action.yml",
         ]
         let localActions = try localActionPaths.map { path in
             try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
@@ -119,12 +121,17 @@ enum DistributionReleaseWorkflowTests {
         localActions: [String],
         releaseAutomation: String
     ) throws {
-        for actionPath in [
-            "./.github/actions/setup-release-node",
-            "./.github/actions/download-release-candidate",
-        ] {
+        let expectedActionCallCounts = [
+            "./.github/actions/setup-release-node": 3,
+            "./.github/actions/setup-swiftlint": 1,
+            "./.github/actions/download-release-candidate": 3,
+            "./.github/actions/stage-resumption-helpers": 2,
+        ]
+        for (actionPath, expectedCallCount) in expectedActionCallCounts {
             let callCount = workflow.components(separatedBy: "uses: \(actionPath)").count - 1
-            try expect(callCount == 3, "Each CI/CD job must use local action \(actionPath)")
+            try expect(
+                callCount == expectedCallCount,
+                "CI/CD must use local action \(actionPath) exactly \(expectedCallCount) time(s)")
         }
         try expect(
             !workflow.contains("uses: actions/setup-node@") && !workflow.contains("uses: actions/download-artifact@"),
@@ -146,6 +153,10 @@ enum DistributionReleaseWorkflowTests {
         let toolchainData = try Data(contentsOf: root.appendingPathComponent("scripts/release/toolchain.json"))
         let nodeSetupAction = try String(
             contentsOf: root.appendingPathComponent(".github/actions/setup-release-node/action.yml"), encoding: .utf8)
+        let swiftLintSetupAction = try String(
+            contentsOf: root.appendingPathComponent(".github/actions/setup-swiftlint/action.yml"), encoding: .utf8)
+        let swiftLintSetupScript = try String(
+            contentsOf: root.appendingPathComponent(".github/actions/setup-swiftlint/setup.sh"), encoding: .utf8)
         guard
             let toolchain = try JSONSerialization.jsonObject(with: toolchainData) as? [String: Any],
             let nodeVersion = toolchain["node"] as? String,
@@ -167,14 +178,22 @@ enum DistributionReleaseWorkflowTests {
                 "sha256": "c1e429b0599cf1b516f369a2d9ec04eaf0e436f3c12b637df8851fa52ff694d0",
             ],
             "Release SwiftLint must use the reviewed official portable artifact and SHA-256")
+        try expect(
+            workflow.contains("uses: ./.github/actions/setup-swiftlint")
+                && swiftLintSetupAction.contains("source-directory")
+                && swiftLintSetupAction.contains("bash \"$GITHUB_ACTION_PATH/setup.sh\""),
+            "Apple CI must delegate pinned SwiftLint installation to the local setup action")
         for required in [
-            "Set up pinned SwiftLint", "toolchain.swiftLint", "swiftLint.asset !== \"portable_swiftlint.zip\"",
+            "toolchain.swiftLint", "swiftLint.asset !== \"portable_swiftlint.zip\"",
             "https://github.com/realm/SwiftLint/releases/download/${swiftlint_version}/${swiftlint_asset}",
             "shasum -a 256 -c -", "observed_version", "printf 'SWIFTLINT=%s\\n'",
+            "--silent", "--show-error",
         ] {
-            try expect(workflow.contains(required), "Release workflow must contain \(required)")
+            try expect(swiftLintSetupScript.contains(required), "SwiftLint setup action must contain \(required)")
         }
-        try expect(!workflow.contains("brew install swiftlint"), "Release workflow must not resolve SwiftLint through Homebrew")
+        try expect(
+            !workflow.contains("brew install swiftlint") && !swiftLintSetupScript.contains("brew install swiftlint"),
+            "Release automation must not resolve SwiftLint through Homebrew")
 
         let appleCI = try job(named: "apple-ci", in: workflow)
         let protectedRelease = try job(named: "protected-release", in: workflow)
@@ -185,7 +204,7 @@ enum DistributionReleaseWorkflowTests {
             let automationCheckout = appleCI.range(of: "- name: Check out current workflow automation"),
             let nodeSetup = appleCI.range(of: "uses: ./.github/actions/setup-release-node"),
             let validationCheckout = appleCI.range(of: "- name: Check out validation source"),
-            let swiftLintSetup = appleCI.range(of: "- name: Set up pinned SwiftLint"),
+            let swiftLintSetup = appleCI.range(of: "uses: ./.github/actions/setup-swiftlint"),
             let qualityGates = appleCI.range(of: "- name: Run source quality gates")
         else { throw TestFailure("Apple CI must declare automation setup, exact source checkout, and source quality gates") }
         try expect(
@@ -194,6 +213,10 @@ enum DistributionReleaseWorkflowTests {
         try expect(
             validationCheckout.lowerBound < swiftLintSetup.lowerBound,
             "SwiftLint setup must read metadata from the checked-out release source")
+        try expect(
+            appleCI.contains("path: validation-source")
+                && appleCI.components(separatedBy: "working-directory: validation-source").count - 1 == 4,
+            "Apple CI must run restoration and source gates in the exact validation-source checkout")
         try expect(
             swiftLintSetup.lowerBound < qualityGates.lowerBound,
             "SwiftLint must be available before source quality gates run")
@@ -252,6 +275,9 @@ enum DistributionReleaseWorkflowTests {
         let root = try repositoryRoot()
         let workflow = try String(
             contentsOf: root.appendingPathComponent(".github/workflows/ci-cd.yaml"), encoding: .utf8)
+        let helperAction = try String(
+            contentsOf: root.appendingPathComponent(".github/actions/stage-resumption-helpers/action.yml"), encoding: .utf8)
+        let releaseAutomation = workflow + "\n" + helperAction
         for required in [
             "Stage reviewed resumption helpers",
             "git show \"${GITHUB_SHA}:scripts/release/validate-homebrew-packages.mjs\"",
@@ -261,7 +287,7 @@ enum DistributionReleaseWorkflowTests {
             "RESUME: ${{ needs.portable-ci.outputs.resume }}",
             "node \"$validator\" \"${arguments[@]}\"",
         ] {
-            try expect(workflow.contains(required), "Resumption workflow must contain \(required)")
+            try expect(releaseAutomation.contains(required), "Resumption automation must contain \(required)")
         }
         let protectedRelease = try job(named: "protected-release", in: workflow)
         guard

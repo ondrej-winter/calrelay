@@ -20,7 +20,7 @@ This page describes the main source, test, and documentation areas in the reposi
 ## Automation
 
 - `.github/workflows/ci-cd.yaml`: the single push, pull-request, manual CI, and protected-release workflow entry point.
-- `.github/actions/`: repository-local composite actions for repeated GitHub Actions mechanics such as pinned Node setup and retained-candidate download.
+- `.github/actions/`: repository-local composite actions for repeated GitHub Actions mechanics such as pinned tool setup, retained-candidate download, and reviewed recovery-helper staging.
 - `scripts/release/`: deterministic release policy, candidate, publication, recovery, and validation tooling.
 
 ## Documentation

@@ -1,0 +1,16 @@
+name: Set up pinned SwiftLint
+description: Install and verify the SwiftLint artifact pinned by the selected source revision.
+
+inputs:
+  source-directory:
+    description: Repository directory containing scripts/release/toolchain.json.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install verified SwiftLint
+      shell: bash
+      env:
+        SOURCE_DIRECTORY: ${{ inputs.source-directory }}
+      run: bash "$GITHUB_ACTION_PATH/setup.sh"

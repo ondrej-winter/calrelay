@@ -1,0 +1,29 @@
+name: Stage reviewed resumption helpers
+description: Preserve reviewed recovery helpers before checking out a retained source revision.
+
+inputs:
+  include-homebrew-validator:
+    description: Also stage the reviewed Homebrew package validator.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Stage source restoration helper
+      shell: bash
+      run: |
+        set -euo pipefail
+        helper="${RUNNER_TEMP}/calrelay-restore-retained-source.sh"
+        rm -f "$helper"
+        git show "${GITHUB_SHA}:scripts/release/restore-retained-source.sh" > "$helper"
+        [[ -s "$helper" ]] || { echo 'Reviewed source restoration helper is empty.' >&2; exit 1; }
+    - name: Stage Homebrew validator
+      if: inputs.include-homebrew-validator == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        validator="${RUNNER_TEMP}/calrelay-validate-homebrew-packages.mjs"
+        rm -f "$validator"
+        git show "${GITHUB_SHA}:scripts/release/validate-homebrew-packages.mjs" > "$validator"
+        [[ -s "$validator" ]] || { echo 'Reviewed Homebrew validator is empty.' >&2; exit 1; }

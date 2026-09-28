@@ -132,14 +132,9 @@ jobs:
           persist-credentials: false
       - name: Set up pinned Node
         uses: ./.github/actions/setup-release-node
-      - name: Stage reviewed source restoration helper
+      - name: Stage reviewed resumption helpers
         if: needs.portable-ci.outputs.resume == 'true'
-        run: |
-          set -euo pipefail
-          helper="${RUNNER_TEMP}/calrelay-restore-retained-source.sh"
-          rm -f "$helper"
-          git show "${GITHUB_SHA}:scripts/release/restore-retained-source.sh" > "$helper"
-          [[ -s "$helper" ]] || { echo 'Reviewed source restoration helper is empty.' >&2; exit 1; }
+        uses: ./.github/actions/stage-resumption-helpers
       - name: Download retained candidate for validation
         if: needs.portable-ci.outputs.resume == 'true'
         uses: ./.github/actions/download-release-candidate
@@ -152,8 +147,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ needs.portable-ci.outputs.source_revision }}
+          path: validation-source
       - name: Restore retained validation revision
         if: needs.portable-ci.outputs.resume == 'true'
+        working-directory: validation-source
         env:
           RELEASE_COMMIT: ${{ needs.portable-ci.outputs.release_commit }}
           RELEASE_TAG: ${{ needs.portable-ci.outputs.release_tag }}
@@ -161,49 +158,20 @@ jobs:
           zsh "${RUNNER_TEMP}/calrelay-restore-retained-source.sh" \
             "${RUNNER_TEMP}/calrelay-release-candidate" "$RELEASE_COMMIT" "$RELEASE_TAG"
       - name: Set up pinned SwiftLint
-        run: |
-          set -euo pipefail
-          {
-            IFS= read -r swiftlint_version
-            IFS= read -r swiftlint_asset
-            IFS= read -r swiftlint_sha256
-          } < <(node --input-type=module --eval '
-            import { readFileSync } from "node:fs";
-            const toolchain = JSON.parse(readFileSync("scripts/release/toolchain.json", "utf8"));
-            const swiftLint = toolchain.swiftLint;
-            if (
-              !swiftLint
-              || !/^\d+\.\d+\.\d+$/.test(swiftLint.version ?? "")
-              || swiftLint.asset !== "portable_swiftlint.zip"
-              || !/^[0-9a-f]{64}$/.test(swiftLint.sha256 ?? "")
-            ) {
-              throw new Error("release SwiftLint toolchain metadata is invalid");
-            }
-            process.stdout.write(`${swiftLint.version}\n${swiftLint.asset}\n${swiftLint.sha256}\n`);
-          ')
-          install_directory="${RUNNER_TEMP}/calrelay-swiftlint"
-          archive="${RUNNER_TEMP}/${swiftlint_asset}"
-          rm -rf "$install_directory" "$archive"
-          mkdir -p "$install_directory"
-          curl --fail --location --proto '=https' --tlsv1.2 --retry 3 \
-            --output "$archive" \
-            "https://github.com/realm/SwiftLint/releases/download/${swiftlint_version}/${swiftlint_asset}"
-          printf '%s  %s\n' "$swiftlint_sha256" "$archive" | shasum -a 256 -c -
-          unzip -q "$archive" -d "$install_directory"
-          swiftlint_binary="${install_directory}/swiftlint"
-          [[ -x "$swiftlint_binary" ]] || { echo 'Pinned SwiftLint archive did not contain an executable swiftlint.' >&2; exit 1; }
-          observed_version="$("$swiftlint_binary" version)"
-          [[ "$observed_version" == "$swiftlint_version" ]] \
-            || { echo "Pinned SwiftLint reported ${observed_version}, expected ${swiftlint_version}." >&2; exit 1; }
-          printf 'SWIFTLINT=%s\n' "$swiftlint_binary" >> "$GITHUB_ENV"
+        uses: ./.github/actions/setup-swiftlint
+        with:
+          source-directory: ${{ github.workspace }}/validation-source
       - name: Validate release shell syntax
+        working-directory: validation-source
         run: zsh -n scripts/release/*.sh
       - name: Run source quality gates
+        working-directory: validation-source
         run: |
           make format-check
           make check
       - name: Record validated revision
         id: validation
+        working-directory: validation-source
         run: printf 'validated_revision=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Clean Apple validation material
         if: always()
@@ -241,15 +209,9 @@ jobs:
           github-token: ${{ github.token }}
       - name: Stage reviewed resumption helpers
         if: needs.portable-ci.outputs.resume == 'true'
-        run: |
-          set -euo pipefail
-          validator="${RUNNER_TEMP}/calrelay-validate-homebrew-packages.mjs"
-          restoration="${RUNNER_TEMP}/calrelay-restore-retained-source.sh"
-          rm -f "$validator" "$restoration"
-          git show "${GITHUB_SHA}:scripts/release/validate-homebrew-packages.mjs" > "$validator"
-          git show "${GITHUB_SHA}:scripts/release/restore-retained-source.sh" > "$restoration"
-          [[ -s "$validator" ]] || { echo 'Reviewed Homebrew validator is empty.' >&2; exit 1; }
-          [[ -s "$restoration" ]] || { echo 'Reviewed source restoration helper is empty.' >&2; exit 1; }
+        uses: ./.github/actions/stage-resumption-helpers
+        with:
+          include-homebrew-validator: true
       - name: Check out release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -346,7 +308,7 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          client-id: ${{ vars.CALRELAY_RELEASE_GITHUB_APP_CLIENT_ID }}
+          client-id: ${{ secrets.CALRELAY_RELEASE_GITHUB_APP_CLIENT_ID }}
           private-key: ${{ secrets.CALRELAY_RELEASE_GITHUB_APP_PRIVATE_KEY }}
           owner: ondrej-winter
           repositories: calrelay,homebrew-tap
