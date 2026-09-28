@@ -97,16 +97,16 @@ function main(arguments_) {
       assertInstalled(brew, "cask");
 
       uninstall(brew, "formula");
-      installedFormula = false;
       assertNotInstalled(brew, "formula");
+      installedFormula = false;
       assertInstalled(brew, "cask");
       uninstall(brew, "cask");
-      installedCask = false;
       assertNotInstalled(brew, "cask");
+      installedCask = false;
     }
   } finally {
     if (installedFormula) {
-      runForCleanup(brew, ["uninstall", "--formula", token]);
+      runForCleanup(brew, ["uninstall", "--force", "--formula", token]);
     }
     if (installedCask) {
       runForCleanup(brew, ["uninstall", "--cask", token]);
@@ -225,12 +225,13 @@ function git(repository, arguments_) {
 }
 
 function processOptions() {
+  const environment = { ...process.env };
+  delete environment.HOMEBREW_NO_INSTALL_CLEANUP;
   return {
     encoding: "utf8",
     env: {
-      ...process.env,
+      ...environment,
       HOMEBREW_NO_AUTO_UPDATE: "1",
-      HOMEBREW_NO_INSTALL_CLEANUP: "1",
       HOMEBREW_NO_ANALYTICS: "1",
       HOMEBREW_NO_ENV_HINTS: "1",
     },

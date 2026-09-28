@@ -130,7 +130,8 @@ enum DistributionHomebrewPackageTests {
     }
 
     private static func testLifecycleFailureCleansPackagesTapAndWorkDirectory() throws {
-        let fixture = try HomebrewLifecycleFixture(failureCommandPrefix: "upgrade --cask ondrej-winter/tap/calrelay")
+        let fixture = try HomebrewLifecycleFixture(
+            failureCommandPrefix: "upgrade --cask ondrej-winter/tap/calrelay", retainOldFormulaOnUpgrade: true)
         defer { fixture.remove() }
 
         let result = try fixture.run()
@@ -142,7 +143,7 @@ enum DistributionHomebrewPackageTests {
         try expect(installedPackages.isEmpty, "Failed package validation must uninstall temporary packages")
         try expect(!FileManager.default.fileExists(atPath: fixture.work.path), "Failed package validation must remove work")
         let log = try String(contentsOf: fixture.log, encoding: .utf8)
-        try expect(log.contains("uninstall --formula"), "Failure cleanup must remove the temporary formula")
+        try expect(log.contains("uninstall --force --formula"), "Failure cleanup must remove every temporary formula version")
         try expect(log.contains("uninstall --cask"), "Failure cleanup must remove the temporary cask")
         try expect(log.contains("untap ondrej-winter/tap"), "Failure cleanup must remove the temporary tap")
     }
@@ -253,9 +254,11 @@ private final class HomebrewLifecycleFixture {
     let sentinel = "CONFIGURATION-AND-APP-STATE-SENTINEL"
     private let brew: URL
     private let failureCommandPrefix: String?
+    private let retainOldFormulaOnUpgrade: Bool
 
-    init(failureCommandPrefix: String? = nil) throws {
+    init(failureCommandPrefix: String? = nil, retainOldFormulaOnUpgrade: Bool = false) throws {
         self.failureCommandPrefix = failureCommandPrefix
+        self.retainOldFormulaOnUpgrade = retainOldFormulaOnUpgrade
         sourceRoot = try Self.repositoryRoot()
         root = FileManager.default.temporaryDirectory.appendingPathComponent("calrelay-homebrew-lifecycle-\(UUID().uuidString)")
         currentPackages = root.appendingPathComponent("current")
@@ -287,6 +290,8 @@ private final class HomebrewLifecycleFixture {
         environment["CALRELAY_FAKE_BREW_STATE"] = root.appendingPathComponent("installed").path
         environment["CALRELAY_FAKE_TAP_CHECKOUT"] = root.appendingPathComponent("tap-checkout").path
         environment["CALRELAY_FAKE_BREW_FAILURE_COMMAND_PREFIX"] = failureCommandPrefix ?? ""
+        environment["CALRELAY_FAKE_BREW_RETAIN_OLD_FORMULA"] = retainOldFormulaOnUpgrade ? "1" : ""
+        environment["HOMEBREW_NO_INSTALL_CLEANUP"] = "1"
         return try Self.run(
             executable: "/usr/bin/env",
             arguments: [
@@ -337,14 +342,34 @@ private final class HomebrewLifecycleFixture {
           [ "$argument" = "--cask" ] && kind=cask
         done
         case "$command" in
-          install|reinstall|upgrade)
-            : > "$CALRELAY_FAKE_BREW_STATE/$kind"
+          install|reinstall)
+            : > "$CALRELAY_FAKE_BREW_STATE/$kind-current"
+            ;;
+          upgrade)
+            if [ "$kind" = formula ]; then
+              [ ! -f "$CALRELAY_FAKE_BREW_STATE/formula-current" ] || : > "$CALRELAY_FAKE_BREW_STATE/formula-old"
+              : > "$CALRELAY_FAKE_BREW_STATE/formula-current"
+              if [ -z "${HOMEBREW_NO_INSTALL_CLEANUP:-}" ] && [ -z "${CALRELAY_FAKE_BREW_RETAIN_OLD_FORMULA:-}" ]; then
+                rm -f "$CALRELAY_FAKE_BREW_STATE/formula-old"
+              fi
+            else
+              : > "$CALRELAY_FAKE_BREW_STATE/cask-current"
+            fi
             ;;
           uninstall)
-            rm -f "$CALRELAY_FAKE_BREW_STATE/$kind"
+            force=false
+            for argument in "$@"; do
+              [ "$argument" != "--force" ] || force=true
+            done
+            rm -f "$CALRELAY_FAKE_BREW_STATE/$kind-current"
+            [ "$kind" != formula ] || [ "$force" != true ] || rm -f "$CALRELAY_FAKE_BREW_STATE/formula-old"
             ;;
           list)
-            [ -f "$CALRELAY_FAKE_BREW_STATE/$kind" ] || exit 1
+            if [ "$kind" = formula ]; then
+              [ -f "$CALRELAY_FAKE_BREW_STATE/formula-current" ] || [ -f "$CALRELAY_FAKE_BREW_STATE/formula-old" ] || exit 1
+            else
+              [ -f "$CALRELAY_FAKE_BREW_STATE/cask-current" ] || exit 1
+            fi
             printf 'calrelay 1.2.3\\n'
             ;;
           style|audit|fetch|test|tap|untap)
