@@ -4,15 +4,18 @@ enum DistributionReleaseWorkflowTests {
     static func runAll() throws {
         try testWorkflowUsesSingleEntryPointAndLeastPrivilegeJobGraph()
         try testWorkflowRunsSourceGatesBeforeProtectedRelease()
+        try testReleaseChannelReadinessDetectsLagAndRejectsInvalidTapState()
         try testHomebrewBootstrapValidationSupportsNoPreviousPackagesWithNounset()
-        try testResumptionUsesReviewedCurrentHomebrewValidator()
+        try testResumptionUsesReviewedCurrentReleaseHelpers()
         try testSourceFreshnessPluginFailsBeforePreparation()
         try testRetainedBundleRestoresReleaseCommitBeforeSourcePublication()
         try testRetainedBundleRestorationRejectsDigestMismatch()
         try testDisposablePublicationOrdersAndResumesImmutableStages()
         try testSourcePublishedRetryAcceptsLaterBranchDescendant()
         try testTapPublishedRetryAcceptsLaterUnrelatedTapCommit()
-        try testOlderCandidateCannotResumeAfterNewerReleaseTag()
+        try testAlreadyPublishedOlderCandidateCanResumeAfterNewerReleaseTag()
+        try testFreshOlderCandidateCannotPublishAfterNewerReleaseTag()
+        try testOutOfOrderTapRecoveryFailsBeforePublication()
         try testTamperedRetainedCandidateFailsBeforeSourcePublication()
         try testReformattedRetainedManifestFailsBeforeSourcePublication()
         try testTamperedReleaseNotesFailBeforeSourcePublication()
@@ -103,6 +106,7 @@ enum DistributionReleaseWorkflowTests {
             localActions: localActions,
             releaseAutomation: releaseAutomation)
         try assertPortableJobHasNoProtectedAccess(workflow)
+        try assertReleaseChannelReadinessIsRequired(workflow)
     }
 
     private static func assertPortableJobHasNoProtectedAccess(_ workflow: String) throws {
@@ -114,6 +118,61 @@ enum DistributionReleaseWorkflowTests {
         ] {
             try expect(!portableCI.contains(protectedName), "Portable CI must not access protected value \(protectedName)")
         }
+    }
+
+    private static func assertReleaseChannelReadinessIsRequired(_ workflow: String) throws {
+        for required in [
+            "Check out public release channel", "scripts/release/check-release-channel.mjs", ".build/release-channel",
+            "The public tap is behind the latest source release; resume retained candidates before publishing another version.",
+        ] {
+            try expect(workflow.contains(required), "Release workflow must contain \(required)")
+        }
+    }
+
+    private static func testReleaseChannelReadinessDetectsLagAndRejectsInvalidTapState() throws {
+        let root = try repositoryRoot()
+        let fixture = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "calrelay-release-channel-\(UUID().uuidString)")
+        let environment = ProcessInfo.processInfo.environment
+        defer { try? FileManager.default.removeItem(at: fixture) }
+        try writeTapPackages(version: "1.0.0", at: fixture)
+
+        let lagging = try command(
+            "/usr/bin/env",
+            [
+                "node", root.appendingPathComponent("scripts/release/check-release-channel.mjs").path,
+                "--source-version", "1.1.0", "--tap-directory", fixture.path,
+            ], at: root, environment: environment)
+
+        try expect(lagging.status == 0, "A valid lagging tap must produce readiness output: \(lagging.output)")
+        let laggingState = try decodeJSON(lagging.output)
+        try expect(laggingState["caughtUp"] as? Bool == false, "A tap behind the source release must block a new release")
+        try expect(laggingState["tapVersion"] as? String == "1.0.0", "Readiness must report the observed tap version")
+
+        try writeTapPackages(version: "1.1.0", at: fixture)
+        let caughtUp = try command(
+            "/usr/bin/env",
+            [
+                "node", root.appendingPathComponent("scripts/release/check-release-channel.mjs").path,
+                "--source-version", "1.1.0", "--tap-directory", fixture.path,
+            ], at: root, environment: environment)
+
+        try expect(caughtUp.status == 0, "A matching tap must produce readiness output: \(caughtUp.output)")
+        try expect(
+            try decodeJSON(caughtUp.output)["caughtUp"] as? Bool == true,
+            "A tap matching the latest source release must permit ordinary release selection")
+
+        try Data("cask \"calrelay\" do\n  version \"1.0.0\"\nend\n".utf8).write(
+            to: fixture.appendingPathComponent("Casks/calrelay.rb"))
+        let divergent = try command(
+            "/usr/bin/env",
+            [
+                "node", root.appendingPathComponent("scripts/release/check-release-channel.mjs").path,
+                "--source-version", "1.1.0", "--tap-directory", fixture.path,
+            ], at: root, environment: environment)
+
+        try expect(divergent.status != 0, "Divergent formula and cask versions must fail closed")
+        try expect(divergent.output.contains("diverge"), "Invalid tap diagnostics must identify package divergence")
     }
 
     private static func assertLocalActionsAreCentralized(
@@ -271,7 +330,7 @@ enum DistributionReleaseWorkflowTests {
             "Bootstrap Homebrew validation must omit previous-package arguments")
     }
 
-    private static func testResumptionUsesReviewedCurrentHomebrewValidator() throws {
+    private static func testResumptionUsesReviewedCurrentReleaseHelpers() throws {
         let root = try repositoryRoot()
         let workflow = try String(
             contentsOf: root.appendingPathComponent(".github/workflows/ci-cd.yaml"), encoding: .utf8)
@@ -282,10 +341,17 @@ enum DistributionReleaseWorkflowTests {
             "Stage reviewed resumption helpers",
             "git show \"${GITHUB_SHA}:scripts/release/validate-homebrew-packages.mjs\"",
             "git show \"${GITHUB_SHA}:scripts/release/restore-retained-source.sh\"",
+            "git show \"${GITHUB_SHA}:scripts/release/publish-release.mjs\"",
+            "git show \"${GITHUB_SHA}:scripts/release/release-state.mjs\"",
             "${RUNNER_TEMP}/calrelay-validate-homebrew-packages.mjs",
             "${RUNNER_TEMP}/calrelay-restore-retained-source.sh",
+            "${RUNNER_TEMP}/calrelay-release-publisher/publish-release.mjs",
+            "\"$directory/release-state.mjs\"",
+            "include-release-publisher: true",
             "RESUME: ${{ needs.portable-ci.outputs.resume }}",
             "node \"$validator\" \"${arguments[@]}\"",
+            "node \"$publisher\" assets",
+            "node \"$publisher\" tap",
         ] {
             try expect(releaseAutomation.contains(required), "Resumption automation must contain \(required)")
         }
@@ -402,17 +468,52 @@ enum DistributionReleaseWorkflowTests {
             "Candidate verification must fail before source publication")
     }
 
-    private static func testOlderCandidateCannotResumeAfterNewerReleaseTag() throws {
+    private static func testAlreadyPublishedOlderCandidateCanResumeAfterNewerReleaseTag() throws {
         let fixture = try ReleaseWorkflowFixture()
         defer { fixture.remove() }
         try fixture.stageCandidate()
         try fixture.publish("assets").requireSuccess()
         try fixture.publishLaterReleaseTag()
 
+        let assetsRetry = try fixture.publish("assets")
+        let tapRetry = try fixture.publish("tap")
+
+        try expect(
+            assetsRetry.status == 0,
+            "An already-published retained candidate must re-observe immutable assets after a newer tag: \(assetsRetry.output)")
+        try expect(
+            tapRetry.status == 0,
+            "An already-published retained candidate must complete sequential tap recovery after a newer tag: \(tapRetry.output)")
+        try expect(try fixture.tapContainsBothPackages(), "Sequential recovery must publish both retained packages atomically")
+    }
+
+    private static func testFreshOlderCandidateCannotPublishAfterNewerReleaseTag() throws {
+        let fixture = try ReleaseWorkflowFixture()
+        defer { fixture.remove() }
+        try fixture.stageCandidate()
+        try fixture.publishLaterReleaseTag()
+
         let result = try fixture.publish("assets")
 
-        try expect(result.status != 0, "An older retained candidate must not resume after a newer release tag")
+        try expect(result.status != 0, "A fresh older retained candidate must not publish after a newer release tag")
         try expect(result.output.contains("newer release tag"), "Stale-candidate diagnostics must identify the newer release")
+    }
+
+    private static func testOutOfOrderTapRecoveryFailsBeforePublication() throws {
+        let fixture = try ReleaseWorkflowFixture()
+        defer { fixture.remove() }
+        try fixture.stageCandidate()
+        try fixture.publish("assets").requireSuccess()
+        try fixture.advanceTap(to: "1.0.2")
+        let tapCommitCount = try fixture.tapCommitCount()
+
+        let result = try fixture.publish("tap")
+
+        try expect(result.status != 0, "A retained candidate must not skip its recorded tap predecessor")
+        try expect(
+            result.output.contains("does not match previous known-good version 1.0.0"),
+            "Out-of-order diagnostics must identify the required predecessor")
+        try expect(try fixture.tapCommitCount() == tapCommitCount, "Out-of-order recovery must not mutate the tap")
     }
 
     private static func testTapPublishedRetryAcceptsLaterUnrelatedTapCommit() throws {
@@ -576,6 +677,22 @@ enum DistributionReleaseWorkflowTests {
         return ReleaseWorkflowProcessResult(status: process.terminationStatus, output: output)
     }
 
+    private static func writeTapPackages(version: String, at directory: URL) throws {
+        try FileManager.default.createDirectory(at: directory.appendingPathComponent("Formula"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: directory.appendingPathComponent("Casks"), withIntermediateDirectories: true)
+        try Data("class Calrelay < Formula\n  version \"\(version)\"\nend\n".utf8).write(
+            to: directory.appendingPathComponent("Formula/calrelay.rb"))
+        try Data("cask \"calrelay\" do\n  version \"\(version)\"\nend\n".utf8).write(
+            to: directory.appendingPathComponent("Casks/calrelay.rb"))
+    }
+
+    private static func decodeJSON(_ value: String) throws -> [String: Any] {
+        guard let result = try JSONSerialization.jsonObject(with: Data(value.utf8)) as? [String: Any] else {
+            throw TestFailure("Expected JSON object, received: \(value)")
+        }
+        return result
+    }
+
     private static func expect(_ condition: @autoclosure () throws -> Bool, _ message: String) throws {
         guard try condition() else { throw TestFailure(message) }
     }
@@ -707,6 +824,20 @@ private final class ReleaseWorkflowFixture {
         try Data("unrelated tap update\n".utf8).write(to: clone.appendingPathComponent("unrelated.txt"))
         try git(clone, ["add", "unrelated.txt"])
         try git(clone, ["commit", "-m", "docs: update tap metadata"])
+        try git(clone, ["push", "origin", "master"])
+    }
+
+    func advanceTap(to version: String) throws {
+        let clone = root.appendingPathComponent("advance-tap-version")
+        try command("/usr/bin/git", ["clone", tapRemote.path, clone.path], at: root).requireSuccess()
+        try git(clone, ["config", "user.name", "CalRelay Tests"])
+        try git(clone, ["config", "user.email", "tests@example.invalid"])
+        try Data("class Calrelay < Formula\n  version \"\(version)\"\nend\n".utf8).write(
+            to: clone.appendingPathComponent("Formula/calrelay.rb"))
+        try Data("cask \"calrelay\" do\n  version \"\(version)\"\nend\n".utf8).write(
+            to: clone.appendingPathComponent("Casks/calrelay.rb"))
+        try git(clone, ["add", "Formula/calrelay.rb", "Casks/calrelay.rb"])
+        try git(clone, ["commit", "-m", "chore: advance tap to \(version)"])
         try git(clone, ["push", "origin", "master"])
     }
 

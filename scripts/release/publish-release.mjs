@@ -108,8 +108,6 @@ function publishSource(state, candidateDirectory, remote, workDirectory) {
   ) {
     throw new Error("Release source bundle must contain exactly master and the matching release tag.");
   }
-  assertNoNewerReleaseTag(remote, state.version);
-
   const remoteMaster = lsRemote(remote, "refs/heads/master");
   const remoteTag = lsRemote(remote, `refs/tags/${state.tag}`);
   let alreadyPublished = remoteTag === releaseCommit
@@ -117,6 +115,7 @@ function publishSource(state, candidateDirectory, remote, workDirectory) {
     && remoteMasterContains(remote, remoteMaster, releaseCommit, workDirectory);
   const publicationMode = alreadyPublished ? "resume" : "fresh";
   if (!alreadyPublished) {
+    assertNoNewerReleaseTag(remote, state.version);
     if (remoteMaster !== state.sourceRevision || remoteTag !== "") {
       throw new Error("Remote master or release tag changed before source publication.");
     }

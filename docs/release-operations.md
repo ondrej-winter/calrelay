@@ -7,12 +7,10 @@ workflow. It complements the accepted
 boundary in [ADR 0005](adr/0005-use-one-ci-cd-workflow-with-exact-revision-release-promotion.md);
 it does not replace their product or security contracts.
 
-> **Availability:** As of September 28, 2026, the public channel is not live. The
-> dedicated GitHub App is installed and its protected credential roles are
-> configured. Protected token minting for both `ondrej-winter/calrelay` and
-> `ondrej-winter/homebrew-tap` with effective `contents: write` access, the preview
-> hosted-runner release lane, production signing/notarization evidence, and initial
-> `v1.0.0` publication remain to be exercised or validated.
+> **Availability:** As of September 28, 2026, the public tap serves `1.0.0`, while
+> immutable source releases and assets through `1.1.1` have been published and are
+> awaiting sequential tap promotion. Do not select another release until the
+> retained candidates have restored formula and cask parity through `1.1.1`.
 
 ## Invariants
 
@@ -92,6 +90,12 @@ release queue. A `fix` or `fix!` selects a patch within `1.x`; a `feat` or `feat
 selects a minor within `1.x`. Other commits do not publish. Breaking markers add
 release context but never select `2.0.0`.
 
+Before ordinary release selection, `portable-ci` checks that the public formula
+and cask both match the latest source release. If the tap is absent, partial,
+divergent, newer than source, or behind source, the workflow fails closed for
+invalid state or selects no new release for a valid lagging channel. Resume the
+retained candidates before another qualifying commit can publish a new version.
+
 The `portable-ci` job performs portable tooling checks and decides whether a
 release is needed without protected credentials. The `apple-ci` job runs
 `make format-check` and `make check` on every push, pull request, and manual run.
@@ -137,6 +141,33 @@ release commit and tag from `source.bundle`, validates that restored commit in
 `apple-ci`, and continues from the persisted stage only when `protected-release`
 receives the matching validated revision. The protected job does not rerun source
 gates. Matching published state is accepted; mismatched state fails closed.
+
+If later immutable source tags exist, an already-published retained candidate may
+still re-observe its exact tag and assets and continue to tap publication. This is
+not permission to publish a fresh stale source: an older candidate whose tag is
+not already published remains blocked when a newer tag exists.
+
+When more than one retained candidate is incomplete, resume them in ascending
+version order. Each candidate records the tap version it must observe as its
+previous known-good version; an out-of-order dispatch fails without changing the
+tap. Wait for each run to complete successfully and verify that formula and cask
+both advanced before dispatching the next run.
+
+For the September 28, 2026 catch-up from tap version `1.0.0`, use this exact order:
+
+```sh
+gh workflow run ci-cd.yaml -f resume_run_id=36393633391
+gh workflow run ci-cd.yaml -f resume_run_id=36394347865
+gh workflow run ci-cd.yaml -f resume_run_id=36396642210
+gh workflow run ci-cd.yaml -f resume_run_id=36455774614
+gh workflow run ci-cd.yaml -f resume_run_id=36456725592
+```
+
+These correspond to `1.0.1`, `1.0.2`, `1.0.3`, `1.1.0`, and `1.1.1`. Do not
+dispatch them concurrently or skip ahead. The reviewed current publisher and
+release-state helper are staged by the current workflow before it checks out each
+historical retained source, so the recovery fix applies without rebuilding or
+altering the candidate.
 
 Unexpired retained candidates created by the historical `Public-beta release`
 workflow at `.github/workflows/release.yml` remain resumable through an explicit
@@ -217,6 +248,10 @@ place. If unrelated commits advance protected tap `master`, resumption may proce
 only when the recorded package commit remains an ancestor and the formula/cask
 bytes match the retained candidate. Resolve compromised or defective content
 through the dedicated incident or higher-patch procedures above.
+
+If the tap is behind by multiple versions, do not edit it manually to the newest
+release. Resume every retained candidate in predecessor order so each atomic tap
+commit remains tied to its verified immutable artifacts and release state.
 
 ## Validation and evidence
 

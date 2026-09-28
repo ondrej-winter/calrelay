@@ -42,6 +42,17 @@ jobs:
         run: |
           set -euo pipefail
           find scripts/release -type f -name '*.mjs' -print0 | sort -z | xargs -0 -n 1 node --check
+      - name: Check out public release channel
+        if: >-
+          github.event_name != 'pull_request'
+          && github.ref == 'refs/heads/master'
+          && inputs.bootstrap != true
+          && inputs.resume_run_id == ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ondrej-winter/homebrew-tap
+          path: .build/release-channel
+          persist-credentials: false
       - name: Select release or resumption
         id: selection
         env:
@@ -66,6 +77,17 @@ jobs:
             [[ "${BOOTSTRAP:-false}" != true ]] || { echo 'bootstrap and resume_run_id are mutually exclusive.' >&2; exit 1; }
             printf 'release=true\nresume=true\n' >> "$GITHUB_OUTPUT"
             exit 0
+          fi
+          if [[ "${BOOTSTRAP:-false}" != true && -n "$previous" ]]; then
+            channel="$(node scripts/release/check-release-channel.mjs \
+              --source-version "${previous#v}" \
+              --tap-directory .build/release-channel)"
+            caught_up="$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.caughtUp ? "true" : "false")' "$channel")"
+            if [[ "$caught_up" != true ]]; then
+              echo '::notice::The public tap is behind the latest source release; resume retained candidates before publishing another version.'
+              printf 'release=false\nresume=false\n' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
           fi
           arguments=(select)
           [[ "${BOOTSTRAP:-false}" == true ]] && arguments+=(--bootstrap)
@@ -117,7 +139,10 @@ jobs:
           printf 'validation_revision=%s\n' "$validation_revision" >> "$GITHUB_OUTPUT"
       - name: Clean portable release context
         if: always()
-        run: rm -rf "${RUNNER_TEMP}/calrelay-release-candidate" "${RUNNER_TEMP}/calrelay-resume-run.json"
+        run: >-
+          rm -rf .build/release-channel
+          "${RUNNER_TEMP}/calrelay-release-candidate"
+          "${RUNNER_TEMP}/calrelay-resume-run.json"
 
   apple-ci:
     needs: portable-ci
@@ -212,6 +237,7 @@ jobs:
         uses: ./.github/actions/stage-resumption-helpers
         with:
           include-homebrew-validator: true
+          include-release-publisher: true
       - name: Check out release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -317,8 +343,11 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           CALRELAY_GIT_TOKEN: ${{ steps.app-token.outputs.token }}
+          RESUME: ${{ needs.portable-ci.outputs.resume }}
         run: |
-          node scripts/release/publish-release.mjs assets \
+          publisher=scripts/release/publish-release.mjs
+          [[ "${RESUME:-false}" != true ]] || publisher="${RUNNER_TEMP}/calrelay-release-publisher/publish-release.mjs"
+          node "$publisher" assets \
             --candidate-directory .build/release-candidate \
             --source-repository "$GITHUB_REPOSITORY" \
             --tap-repository "${{ vars.CALRELAY_TAP_REPOSITORY }}" \
@@ -366,8 +395,11 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           CALRELAY_GIT_TOKEN: ${{ steps.app-token.outputs.token }}
+          RESUME: ${{ needs.portable-ci.outputs.resume }}
         run: |
-          node scripts/release/publish-release.mjs tap \
+          publisher=scripts/release/publish-release.mjs
+          [[ "${RESUME:-false}" != true ]] || publisher="${RUNNER_TEMP}/calrelay-release-publisher/publish-release.mjs"
+          node "$publisher" tap \
             --candidate-directory .build/release-candidate \
             --source-repository "$GITHUB_REPOSITORY" \
             --tap-repository "${{ vars.CALRELAY_TAP_REPOSITORY }}" \
@@ -382,6 +414,7 @@ jobs:
             .build/release-publication .build/previous-tap .build/previous-packages \
             .build/homebrew-validation .build/homebrew-state \
             "${RUNNER_TEMP}/calrelay-release-candidate" "${RUNNER_TEMP}/calrelay-source-publication.git" \
+            "${RUNNER_TEMP}/calrelay-release-publisher" \
             "${RUNNER_TEMP}/calrelay-validate-homebrew-packages.mjs" \
             "${RUNNER_TEMP}/calrelay-restore-retained-source.sh"
           rm -f .build/release-publication.askpass-*

@@ -3,8 +3,8 @@
 ## Specification record
 
 - **Status:** Accepted.
-- **Revision:** 4 — accepted on September 28, 2026; retains revision 3's `1.0.0` bootstrap and `1.x` release policy while defining one CI/CD entry point, exact-revision Apple validation, and protected promotion of that validated revision.
-- **Acceptance basis:** The project owner approved the public-beta distribution and `1.x` automation decisions on September 26, 2026, then explicitly requested the single-workflow CI/CD architecture and preservation of release-security and resumption guarantees on September 28, 2026.
+- **Revision:** 5 — accepted on September 28, 2026; retains revision 4's single-workflow exact-revision promotion while preventing new release selection when the tap lags and defining sequential retained-candidate catch-up after later source tags exist.
+- **Acceptance basis:** The project owner approved the public-beta distribution and `1.x` automation decisions on September 26, 2026, requested the single-workflow CI/CD architecture on September 28, 2026, and approved the recovery plan after workflow run `36456725592` exposed multiple immutable source releases awaiting ordered tap promotion.
 - **Canonical artifact:** `docs/specs/distribution-spec.md`.
 - **Scope:** Public-beta releases, release identity, upstream binary artifacts, Homebrew formula and cask installation, distribution signing and notarization, package coexistence, upgrades, uninstallation, release automation and security, and recovery from incomplete or defective releases.
 
@@ -103,6 +103,7 @@ brew install --cask ondrej-winter/tap/calrelay
 - Releasing `2.0.0` requires an explicit product decision and a revised release rule; automation must not infer `2.0.0` from a breaking marker.
 - For a selected release, create one source commit with subject `chore(release): vX.Y.Z` that records the new root `VERSION`; tag that commit `vX.Y.Z`.
 - Serialize release executions without cancelling an in-progress release. A newer queued push must not supersede or interrupt the run currently publishing.
+- Before selecting another ordinary release, verify that the formula and cask both exist at the latest source release version. If the tap lags, continue ordinary CI but select no new release until retained candidates have restored the channel in order.
 - Capture the intended source revision and fail closed before source publication if remote `master` has advanced. Do not tag or publish a different source revision under the computed version.
 - The CI workflow is the complete required release gate: source checks, release builds, non-EventKit smoke checks, signing, notarization, checksums, Homebrew validation, coexistence checks, and publication checks must pass there. Real-Mac manual validation may supplement the gate but is not required for release acceptance.
 - Publish the immutable CLI `.tar.gz`, app `.zip`, checksums, and release notes before updating the tap.
@@ -125,6 +126,8 @@ brew install --cask ondrej-winter/tap/calrelay
 - Treat release progress as resumable state. A retry inspects the source commit, `VERSION`, tag, GitHub release assets, checksums, and tap state and continues the same `X.Y.Z` instead of selecting a new version when publication is incomplete.
 - Bind retained candidates to an allowlisted protected workflow identity, repository, completed run, `master` source revision, release commit, and release tag before using them. Workflow renames may preserve resumption only through an explicit historical identity allowlist.
 - Every publication stage is idempotent or fails closed when an existing object does not match the expected immutable content.
+- An exact retained candidate whose source tag and assets were already published may continue to tap recovery after later source tags exist. A fresh older candidate must still fail before source publication when a newer tag exists.
+- When multiple immutable releases await tap publication, resume them in ascending predecessor order. Each candidate must observe its recorded previous known-good version in both formula and cask before publishing; do not skip directly to a later retained version.
 - Retain an identifiable previously known-good public-beta version until the new version has passed the complete CI release gate and the atomic tap update succeeds.
 - If a release is found defective before the tap is updated, keep the tap on the previous known-good version and resume or repair the incomplete release only when its immutable identity can be preserved safely.
 - Do not replace an existing tag or release asset under the same version.
@@ -193,7 +196,7 @@ brew install --cask ondrej-winter/tap/calrelay
 - **DIST-AC-10:** Release logs, caches, and artifacts contain none of the prohibited credentials, configuration, calendar data, or EventKit identifiers.
 - **DIST-AC-11:** The release-policy test matrix proves `fix`/`fix!` produce a patch within `1.x`, `feat`/`feat!` produce a minor within `1.x`, breaking markers alone do not produce a major, non-qualifying commits publish nothing, histories outside `1.x` fail closed, and no ordinary history automatically selects `2.0.0`.
 - **DIST-AC-12:** Concurrent qualifying pushes are queued without cancelling the active release, and a release fails before source publication when remote `master` no longer matches its captured source revision.
-- **DIST-AC-13:** A simulated interruption after each publication stage resumes the same version, accepts matching immutable state, rejects mismatched state, and updates the formula and cask together only after both artifacts are verified.
+- **DIST-AC-13:** A simulated interruption after each publication stage resumes the same version, accepts matching immutable state, rejects mismatched state, permits an already-published older candidate to complete after later source tags exist, rejects fresh stale publication, and updates the formula and cask together only after both artifacts are verified.
 - **DIST-AC-14:** A simulated defective tap-published release is corrected only through a higher patch version and performs no automatic calendar rollback.
 - **DIST-AC-15:** Documentation installation commands work exactly as documented for users who have not previously configured the tap, and unsupported short installation forms are not presented as supported.
 - **DIST-AC-16:** The production app remains unsandboxed, reads the canonical configuration path after intentional launch, and requests Calendar permission only through the explicit setup or recovery action defined by the calendar-access and macOS-app specifications.
@@ -202,4 +205,4 @@ brew install --cask ondrej-winter/tap/calrelay
 
 ## Open decisions
 
-- None. Revision 3 fixes the first public-beta architecture, `1.0.0` bootstrap, `1.x` release policy, artifact formats, toolchain, platform, credential classes, automation boundary, and recovery behavior. Implementation details explicitly listed as freedoms do not block planning.
+- None. Revision 5 fixes the public-beta architecture, `1.0.0` bootstrap, `1.x` release policy, artifact formats, toolchain, platform, credential classes, single-workflow automation boundary, channel-readiness gate, and sequential retained-candidate recovery behavior. Implementation details explicitly listed as freedoms do not block planning.

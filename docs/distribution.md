@@ -1,9 +1,9 @@
 # CalRelay public-beta distribution
 
-> **Availability:** As of September 28, 2026, the public channel is not live. The
-> `v1.0.0` bootstrap and protected production validation remain pending. The
-> commands below are the accepted installation interface to use after that
-> bootstrap is published.
+> **Availability:** As of September 28, 2026, the public tap serves `1.0.0` while
+> release operators complete sequential promotion of later published versions.
+> The commands below are live; upgrades beyond `1.0.0` remain paused until formula
+> and cask catch up together.
 
 CalRelay's public beta supports Apple Silicon Macs running macOS 26 or later. The
 CLI and app are separate Homebrew packages with the same `calrelay` token. They

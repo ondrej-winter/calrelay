@@ -6,6 +6,10 @@ inputs:
     description: Also stage the reviewed Homebrew package validator.
     required: false
     default: "false"
+  include-release-publisher:
+    description: Also stage the reviewed release publisher and state transition helper.
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -27,3 +31,15 @@ runs:
         rm -f "$validator"
         git show "${GITHUB_SHA}:scripts/release/validate-homebrew-packages.mjs" > "$validator"
         [[ -s "$validator" ]] || { echo 'Reviewed Homebrew validator is empty.' >&2; exit 1; }
+    - name: Stage release publisher
+      if: inputs.include-release-publisher == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        directory="${RUNNER_TEMP}/calrelay-release-publisher"
+        rm -rf "$directory"
+        mkdir -p "$directory"
+        git show "${GITHUB_SHA}:scripts/release/publish-release.mjs" > "$directory/publish-release.mjs"
+        git show "${GITHUB_SHA}:scripts/release/release-state.mjs" > "$directory/release-state.mjs"
+        [[ -s "$directory/publish-release.mjs" ]] || { echo 'Reviewed release publisher is empty.' >&2; exit 1; }
+        [[ -s "$directory/release-state.mjs" ]] || { echo 'Reviewed release state helper is empty.' >&2; exit 1; }
