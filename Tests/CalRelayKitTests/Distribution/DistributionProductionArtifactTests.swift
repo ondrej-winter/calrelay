@@ -84,6 +84,10 @@ enum DistributionProductionArtifactTests {
                 && log.contains("--sign \(fixture.signingCertificateSHA1)"),
             "Signing must verify and select the imported certificate by its SHA-1 fingerprint")
         try expect(
+            log.contains("swift build --sdk \(fixture.sdkPath) -c release --arch arm64 --product calrelay")
+                && log.contains("swift build --sdk \(fixture.sdkPath) -c release --arch arm64 --product CalRelayApp"),
+            "Both products must explicitly build with the selected macOS 27 SDK")
+        try expect(
             log.contains("notarytool submit") && log.contains("stapler staple") && log.contains("spctl --assess"),
             "Protected verification stages must all run")
         try expect(log.contains("security delete-keychain"), "The ephemeral keychain must be removed after success")
@@ -92,10 +96,15 @@ enum DistributionProductionArtifactTests {
             !FileManager.default.fileExists(atPath: fixture.output.appendingPathComponent(".work").path),
             "Ephemeral signing work must be removed after success")
         try expect(!result.output.contains(fixture.secretSentinel), "Release output must not disclose protected values")
+        try expect(
+            !result.output.contains("swift-driver version"),
+            "Captured Swift version diagnostics must not run into later release output")
     }
 
     private static func testFakeReleaseBuildRejectsBoundaryFailuresAndCleansKeychain() throws {
-        for failure in ["toolchain", "identity", "architecture", "team", "codesign", "notary", "stapler"] {
+        for failure in [
+            "toolchain", "identity", "architecture", "deployment", "team", "codesign", "notary", "stapler",
+        ] {
             let fixture = try ProductionArtifactFixture(version: "1.2.4", failure: failure)
             let result = try fixture.run()
             let log = (try? String(contentsOf: fixture.toolLog, encoding: .utf8)) ?? ""
@@ -122,6 +131,10 @@ enum DistributionProductionArtifactTests {
                 try expect(
                     !log.contains("swift build"),
                     "A missing imported signing identity must fail before compiling release products")
+            } else if failure == "deployment" {
+                try expect(
+                    result.output.contains("macOS 26 as the minimum deployment target"),
+                    "Deployment mismatch diagnostics must explain the required minimum macOS version")
             }
         }
 
@@ -218,6 +231,7 @@ private final class ProductionArtifactFixture {
     let output: URL
     let toolLog: URL
     let signingCertificateSHA1: String
+    var sdkPath: String { tools.appendingPathComponent("MacOSX27.0.sdk").path }
     let secretSentinel = "PRIVATE-SENTINEL"
     let prohibitedSentinels = [
         "CONFIGURATION-CONTENT-SENTINEL", "CALENDAR-NAME-SENTINEL", "EVENT-TITLE-SENTINEL",
@@ -249,6 +263,8 @@ private final class ProductionArtifactFixture {
         try FileManager.default.createDirectory(
             at: root.appendingPathComponent("Sources/CalRelayCLI"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: tools, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: tools.appendingPathComponent("MacOSX27.0.sdk"), withIntermediateDirectories: true)
         try FileManager.default.copyItem(
             at: source.appendingPathComponent("scripts/release/build-production-artifacts.sh"),
             to: root.appendingPathComponent("scripts/release/build-production-artifacts.sh"))
@@ -314,7 +330,7 @@ private final class ProductionArtifactFixture {
         try writeTool(
             "swift",
             common
-                + "if [[ \"$1\" == --version ]]; then print \"Apple Swift version 6.4\"; print \"Target: arm64-apple-macosx27.0.0\"; exit 0; fi\nproduct=\"\"\nwhile (( $# )); do [[ \"$1\" == --product ]] && { shift; product=\"$1\"; }; shift || true; done\nmkdir -p .build/release\nif [[ \"$product\" == calrelay ]]; then printf \"%s\\n\" \"#!/bin/zsh\" \"[[ \\\"\\$1\\\" == --version ]] && print \(version)\" \"exit 0\" > .build/release/calrelay; [[ -n \"${CALRELAY_RELEASE_FAKE_PROHIBITED_SENTINEL}\" ]] && print -r -- \"# ${CALRELAY_RELEASE_FAKE_PROHIBITED_SENTINEL}\" >> .build/release/calrelay; chmod 755 .build/release/calrelay; else printf \"%s\\n\" \"#!/bin/zsh\" \"exit 0\" > .build/release/CalRelayApp; chmod 755 .build/release/CalRelayApp; fi\n"
+                + "if [[ \"$1\" == --version ]]; then print -nu2 \"swift-driver version: 1.168.6 \"; print \"Apple Swift version 6.4\"; print \"Target: arm64-apple-macosx27.0.0\"; exit 0; fi\nproduct=\"\"\nwhile (( $# )); do [[ \"$1\" == --product ]] && { shift; product=\"$1\"; }; shift || true; done\nmkdir -p .build/release\nif [[ \"$product\" == calrelay ]]; then printf \"%s\\n\" \"#!/bin/zsh\" \"[[ \\\"\\$1\\\" == --version ]] && print \(version)\" \"exit 0\" > .build/release/calrelay; [[ -n \"${CALRELAY_RELEASE_FAKE_PROHIBITED_SENTINEL}\" ]] && print -r -- \"# ${CALRELAY_RELEASE_FAKE_PROHIBITED_SENTINEL}\" >> .build/release/calrelay; chmod 755 .build/release/calrelay; else printf \"%s\\n\" \"#!/bin/zsh\" \"exit 0\" > .build/release/CalRelayApp; chmod 755 .build/release/CalRelayApp; fi\n"
         )
         try writeTool(
             "security",
@@ -328,7 +344,10 @@ private final class ProductionArtifactFixture {
         try writeTool(
             "lipo",
             common + "[[ \"${CALRELAY_RELEASE_FAKE_FAILURE}\" == architecture ]] && print x86_64 || print arm64\n")
-        try writeTool("vtool", common + "print \"minos 26.0\"\nprint \"sdk 27.0\"\n")
+        try writeTool(
+            "vtool",
+            common
+                + "print \"platform MACOS\"\n[[ \"${CALRELAY_RELEASE_FAKE_FAILURE}\" == deployment ]] && print \"minos 27.0\" || print \"minos 26.0\"\nprint \"sdk 26.0\"\n")
         try writeTool(
             "notarytool",
             common

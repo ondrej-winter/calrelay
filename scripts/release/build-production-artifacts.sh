@@ -46,6 +46,7 @@ if [[ "${CALRELAY_RELEASE_TESTING:-0}" == 1 ]]; then
     NOTARYTOOL="${TOOLS}/notarytool"
     STAPLER="${TOOLS}/stapler"
     SPCTL="${TOOLS}/spctl"
+    SDK_PATH="${TOOLS}/MacOSX27.0.sdk"
     SDK_VERSION="27.0"
 else
     XCODEBUILD=/usr/bin/xcodebuild
@@ -59,11 +60,12 @@ else
     NOTARYTOOL="$(/usr/bin/xcrun --find notarytool)"
     STAPLER="$(/usr/bin/xcrun --find stapler)"
     SPCTL=/usr/sbin/spctl
+    SDK_PATH="$(/usr/bin/xcrun --sdk macosx --show-sdk-path)"
     SDK_VERSION="$(/usr/bin/xcrun --sdk macosx --show-sdk-version)"
 fi
 
 XCODE_VERSION="$("${XCODEBUILD}" -version)"
-SWIFT_VERSION="$("${SWIFT}" --version)"
+SWIFT_VERSION="$("${SWIFT}" --version 2>&1)"
 RUNNER_ARCH="$("${UNAME}" -m)"
 RUNNER_MACOS="$("${SW_VERS}" -productVersion)"
 if [[ "${XCODE_VERSION}" != Xcode\ 27.* ]]; then
@@ -136,8 +138,8 @@ fi
 cd "${ROOT_DIR}"
 /bin/rm -f "${CLI_BUILD_PRODUCT}" "${APP_BUILD_PRODUCT}"
 BUILD_PRODUCTS_OWNED=1
-MACOSX_DEPLOYMENT_TARGET=26.0 "${SWIFT}" build -c release --arch arm64 --product calrelay
-MACOSX_DEPLOYMENT_TARGET=26.0 "${SWIFT}" build -c release --arch arm64 --product CalRelayApp
+MACOSX_DEPLOYMENT_TARGET=26.0 "${SWIFT}" build --sdk "${SDK_PATH}" -c release --arch arm64 --product calrelay
+MACOSX_DEPLOYMENT_TARGET=26.0 "${SWIFT}" build --sdk "${SDK_PATH}" -c release --arch arm64 --product CalRelayApp
 /bin/cp "${CLI_BUILD_PRODUCT}" "${CLI_DIR}/calrelay"
 /bin/cp "${APP_BUILD_PRODUCT}" "${APP_BUNDLE}/Contents/MacOS/CalRelayApp"
 /bin/cp "${ROOT_DIR}/Resources/CalRelayApp/Info.plist" "${APP_BUNDLE}/Contents/Info.plist"
@@ -163,8 +165,8 @@ verify_binary() {
         return 1
     fi
     local metadata="$("${VTOOL}" -show-build "${binary}")"
-    if [[ "${metadata}" != *"minos 26.0"* || "${metadata}" != *"sdk 27."* ]]; then
-        print -u2 -- "error: release products must target macOS 26 with the macOS 27 SDK."
+    if ! print -r -- "${metadata}" | /usr/bin/grep -Eq "^[[:space:]]*platform[[:space:]]+MACOS[[:space:]]*$" || ! print -r -- "${metadata}" | /usr/bin/grep -Eq "^[[:space:]]*minos[[:space:]]+26\.0[[:space:]]*$"; then
+        print -u2 -- "error: release products must be macOS binaries with macOS 26 as the minimum deployment target."
         return 1
     fi
 }
