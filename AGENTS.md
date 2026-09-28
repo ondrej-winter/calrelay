@@ -92,9 +92,12 @@ See `docs/repository-layout.md` and the cross-slice rules in
 
 ## Tests and Swift quality
 
-- Use the repository's custom SwiftPM executable test runner. `make test`
-  runs `swift run CalRelayKitTests`; do not substitute `swift test`, XCTest, or
-  Swift Testing without an explicit migration request.
+- Use the repository's custom SwiftPM executable test runner for deterministic
+  library, application, adapter, CLI-support, and contract tests. `make test`
+  runs `swift run CalRelayKitTests`; do not replace that lane with `swift test`,
+  XCTest, or Swift Testing without an explicit migration request.
+- XCUITest is reserved for the documented fake-backed macOS UI smoke lane. Run
+  it through `make ui-test` under the conditions in `docs/development.md`.
 - New suites provide a `runAll()` entry point and are registered in
   `Tests/CalRelayKitTests/Main.swift`; tests are not auto-discovered.
 - When focusing a suite, use an exact suite name registered in
@@ -102,7 +105,9 @@ See `docs/repository-layout.md` and the cross-slice rules in
 - Keep default tests fast, deterministic, isolated, offline, fake-backed, and
   independent of EventKit, real calendars, wall-clock time, and shared developer
   state.
-- Add or update tests for behavior changes and regression fixes when practical.
+- Add or update tests for behavior changes and regression fixes. If suitable
+  automated coverage is not practical, explain why and report the manual or
+  alternative evidence used.
 - Follow the repository `.swift-format` and `.swiftlint.yml` configuration. Do
   not weaken checks, concurrency safety, or warnings to make a change pass.
 
@@ -131,6 +136,12 @@ make check
 
 - Run `make app` when app sources, `Resources/CalRelayApp/`, or the app-bundle
   script changes.
+- The base gate does not include every target-specific check. Run the additional
+  validation prescribed by `docs/development.md` for each affected surface,
+  including the fake-backed UI lane for app UI, accessibility, fake composition,
+  or UI-test-harness changes and the documented Node and workflow checks for
+  release-tooling changes. Report unavailable prerequisites rather than silently
+  skipping a required check.
 - For documentation-only changes, verify referenced paths and commands, then
   run:
 
@@ -145,9 +156,19 @@ git --no-pager diff HEAD --check
 
 ## Command and Git safety
 
-- Do not run commands that modify Git's index, refs, or history, including
-  `git add`, `git restore --staged`, `git commit`, and `git reset`, unless the
-  user explicitly requests that exact operation.
+- Do not run Git commands or wrappers that stage, unstage, discard, shelve,
+  clean, switch, commit, rewrite history, create or delete refs, or update
+  remotes—including `git add`, `git restore`, `git clean`, `git stash`,
+  `git switch`, `git checkout`, `git commit`, `git reset`, `git merge`,
+  `git rebase`, `git tag`, `git push`, and `make commit`—unless the user
+  explicitly requests the applicable operation and scope.
+- A request to commit clearly scoped agent-created changes also authorizes
+  staging only those changes unless the user separately constrains staging. It
+  never authorizes staging pre-existing or unrelated changes.
+- A general implementation, validation, or completion request does not authorize
+  staging, committing, pushing, publishing, triggering remote workflows, or
+  destructive cleanup. Do not mutate remote services or run production release
+  operations unless the user explicitly requests that exact external operation.
 - Do not run `swift package resolve`, `make resolve`, or other network-backed
   dependency updates unless the task requires an intentional dependency change.
 - Do not pipe remote downloads directly into a shell or interpreter.
