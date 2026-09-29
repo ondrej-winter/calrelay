@@ -9,6 +9,7 @@ enum CalendarAppBundleMetadataTests {
 
     static func runAll() throws {
         try testProductionSourceInfoPlistContainsNonemptyCalendarUsageDescriptions()
+        try testProductionSourceDeclaresApplicationIcon()
         try testProductionSourceEntitlementsAllowCalendarAccessWithoutSandbox()
         try testLocalAppBuildSignsWithCalendarEntitlements()
         try testUITestHostSourceInfoPlistOmitsCalendarUsageDescriptions()
@@ -21,6 +22,17 @@ enum CalendarAppBundleMetadataTests {
             at: try repositoryRoot().appendingPathComponent("Resources/CalRelayApp/Info.plist"))
 
         for key in calendarUsageDescriptionKeys { try expectNonemptyString(metadata[key], key: key) }
+    }
+
+    private static func testProductionSourceDeclaresApplicationIcon() throws {
+        let root = try repositoryRoot()
+        let metadata = try propertyList(at: root.appendingPathComponent("Resources/CalRelayApp/Info.plist"))
+
+        try expect(
+            metadata["CFBundleIconFile"] as? String == "CalRelay.icns",
+            "The production app must declare CalRelay.icns as its application icon")
+        let iconData = try Data(contentsOf: root.appendingPathComponent("Resources/CalRelayApp/CalRelay.icns"))
+        try expect(iconData.starts(with: Data("icns".utf8)), "The production application icon must be a valid ICNS file")
     }
 
     private static func testProductionSourceEntitlementsAllowCalendarAccessWithoutSandbox() throws {
@@ -84,6 +96,9 @@ enum CalendarAppBundleMetadataTests {
         let script = fixtureRoot.appendingPathComponent("scripts/build-calrelay-app.sh")
         try fileManager.copyItem(at: root.appendingPathComponent("scripts/build-calrelay-app.sh"), to: script)
         try fileManager.copyItem(at: root.appendingPathComponent("VERSION"), to: fixtureRoot.appendingPathComponent("VERSION"))
+        try fileManager.copyItem(
+            at: root.appendingPathComponent("Resources/CalRelayApp/CalRelay.icns"),
+            to: fixtureRoot.appendingPathComponent("Resources/CalRelayApp/CalRelay.icns"))
 
         var metadata = try propertyList(at: root.appendingPathComponent("Resources/CalRelayApp/Info.plist"))
         if let replacement { metadata[key] = replacement } else { metadata.removeValue(forKey: key) }

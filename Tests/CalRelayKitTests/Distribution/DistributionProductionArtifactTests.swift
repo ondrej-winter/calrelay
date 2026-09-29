@@ -75,6 +75,14 @@ enum DistributionProductionArtifactTests {
         try expect(
             appEntries.output.split(separator: "\n").allSatisfy { $0.hasPrefix("CalRelay.app/") },
             "App archive must contain only CalRelay.app")
+        let extractedApp = fixture.root.appendingPathComponent("extracted-app")
+        let extraction = try fixture.command("/usr/bin/ditto", ["-x", "-k", app.path, extractedApp.path])
+        try expect(extraction.status == 0, "The production app archive must be extractable: \(extraction.output)")
+        let sourceIcon = try Data(
+            contentsOf: repositoryRoot().appendingPathComponent("Resources/CalRelayApp/CalRelay.icns"))
+        let archivedIcon = try Data(
+            contentsOf: extractedApp.appendingPathComponent("CalRelay.app/Contents/Resources/CalRelay.icns"))
+        try expect(archivedIcon == sourceIcon, "The production app archive must contain the source application icon")
         let log = try String(contentsOf: fixture.toolLog, encoding: .utf8)
         try expect(
             log.contains("codesign --force --options runtime --timestamp"),
@@ -278,6 +286,9 @@ private final class ProductionArtifactFixture {
         try FileManager.default.copyItem(
             at: source.appendingPathComponent("Resources/CalRelayApp/CalRelayApp.entitlements"),
             to: root.appendingPathComponent("Resources/CalRelayApp/CalRelayApp.entitlements"))
+        try FileManager.default.copyItem(
+            at: source.appendingPathComponent("Resources/CalRelayApp/CalRelay.icns"),
+            to: root.appendingPathComponent("Resources/CalRelayApp/CalRelay.icns"))
         try Data(version.utf8).write(to: root.appendingPathComponent("VERSION"))
         try Data("// swift-tools-version: 6.4\nplatforms: [.macOS(.v26)]\n".utf8).write(
             to: root.appendingPathComponent("Package.swift"))

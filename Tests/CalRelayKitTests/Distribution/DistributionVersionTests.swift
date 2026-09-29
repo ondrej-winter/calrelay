@@ -8,6 +8,7 @@ enum DistributionVersionTests {
         try testAppBuildDerivesBothVersionsFromRootVersion()
         try testAppBuildRejectsMalformedVersions()
         try testAppBuildPreservesProductionIdentity()
+        try testAppBuildCopiesApplicationIcon()
     }
 
     private static func testRootVersionIsCanonical() throws {
@@ -73,6 +74,14 @@ enum DistributionVersionTests {
         try expect(metadata["LSMinimumSystemVersion"] as? String == "26.0", "App minimum system version must remain 26.0")
     }
 
+    private static func testAppBuildCopiesApplicationIcon() throws {
+        let root = try repositoryRoot()
+        let sourceIcon = try Data(contentsOf: root.appendingPathComponent("Resources/CalRelayApp/CalRelay.icns"))
+        let bundledIcon = try AppBuildFixture(version: "3.4.5").buildApplicationIcon()
+
+        try expect(bundledIcon == sourceIcon, "The local app bundle must contain the source CalRelay.icns application icon")
+    }
+
     private static func compareVersion(_ first: String, isLessThan second: String) -> Bool {
         let firstParts = first.split(separator: ".").compactMap { Int($0) }
         let secondParts = second.split(separator: ".").compactMap { Int($0) }
@@ -128,6 +137,9 @@ private struct AppBuildFixture {
         try fileManager.copyItem(
             at: repository.appendingPathComponent("Resources/CalRelayApp/CalRelayApp.entitlements"),
             to: root.appendingPathComponent("Resources/CalRelayApp/CalRelayApp.entitlements"))
+        try fileManager.copyItem(
+            at: repository.appendingPathComponent("Resources/CalRelayApp/CalRelay.icns"),
+            to: root.appendingPathComponent("Resources/CalRelayApp/CalRelay.icns"))
         try Data(version.utf8).write(to: root.appendingPathComponent("VERSION"))
         let appExecutable = root.appendingPathComponent(".build/debug/CalRelayApp")
         try fileManager.copyItem(at: URL(fileURLWithPath: "/usr/bin/true"), to: appExecutable)
@@ -139,19 +151,20 @@ private struct AppBuildFixture {
         let result = try runBuild()
         try expect(result.status == 0, "Fixture app build must succeed: \(result.output)")
 
-        let builds = root.appendingPathComponent("home/Library/Caches/dev.owinter.CalRelay/builds")
-        let workspaceDirectories = try FileManager.default.contentsOfDirectory(
-            at: builds, includingPropertiesForKeys: nil)
-        guard let workspace = workspaceDirectories.first else {
-            throw TestFailure("Fixture app build did not create a workspace directory")
-        }
-        let infoPlist = workspace.appendingPathComponent("CalRelay.app/Contents/Info.plist")
+        let infoPlist = try appBundle().appendingPathComponent("Contents/Info.plist")
         let data = try Data(contentsOf: infoPlist)
         let propertyList = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
         guard let metadata = propertyList as? [String: Any] else {
             throw TestFailure("Expected a dictionary property list at \(infoPlist.path)")
         }
         return metadata
+    }
+
+    func buildApplicationIcon() throws -> Data {
+        defer { try? FileManager.default.removeItem(at: root) }
+        let result = try runBuild()
+        try expect(result.status == 0, "Fixture app build must succeed: \(result.output)")
+        return try Data(contentsOf: try appBundle().appendingPathComponent("Contents/Resources/CalRelay.icns"))
     }
 
     func build() throws -> AppBuildResult {
@@ -176,6 +189,16 @@ private struct AppBuildFixture {
         process.waitUntilExit()
         let output = String(data: outputPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
         return AppBuildResult(status: process.terminationStatus, output: output)
+    }
+
+    private func appBundle() throws -> URL {
+        let builds = root.appendingPathComponent("home/Library/Caches/dev.owinter.CalRelay/builds")
+        let workspaceDirectories = try FileManager.default.contentsOfDirectory(
+            at: builds, includingPropertiesForKeys: nil)
+        guard let workspace = workspaceDirectories.first else {
+            throw TestFailure("Fixture app build did not create a workspace directory")
+        }
+        return workspace.appendingPathComponent("CalRelay.app")
     }
 
     private static func repositoryRoot() throws -> URL {

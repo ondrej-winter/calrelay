@@ -144,6 +144,7 @@ MACOSX_DEPLOYMENT_TARGET=26.0 "${SWIFT}" build --sdk "${SDK_PATH}" -c release --
 /bin/cp "${CLI_BUILD_PRODUCT}" "${CLI_DIR}/calrelay"
 /bin/cp "${APP_BUILD_PRODUCT}" "${APP_BUNDLE}/Contents/MacOS/CalRelayApp"
 /bin/cp "${ROOT_DIR}/Resources/CalRelayApp/Info.plist" "${APP_BUNDLE}/Contents/Info.plist"
+/bin/cp "${ROOT_DIR}/Resources/CalRelayApp/CalRelay.icns" "${APP_BUNDLE}/Contents/Resources/CalRelay.icns"
 /usr/bin/plutil -replace CFBundleShortVersionString -string "${RELEASE_VERSION}" "${APP_BUNDLE}/Contents/Info.plist"
 /usr/bin/plutil -replace CFBundleVersion -string "${RELEASE_VERSION}" "${APP_BUNDLE}/Contents/Info.plist"
 /bin/chmod 755 "${CLI_DIR}/calrelay" "${APP_BUNDLE}/Contents/MacOS/CalRelayApp"

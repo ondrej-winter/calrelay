@@ -46,6 +46,7 @@ mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}"
 
 cp "${BUILD_DIR}/${EXECUTABLE_NAME}" "${MACOS_DIR}/${EXECUTABLE_NAME}"
 cp "${ROOT_DIR}/Resources/CalRelayApp/Info.plist" "${CONTENTS_DIR}/Info.plist"
+cp "${ROOT_DIR}/Resources/CalRelayApp/CalRelay.icns" "${RESOURCES_DIR}/CalRelay.icns"
 
 INFO_PLIST="${CONTENTS_DIR}/Info.plist"
 /usr/bin/plutil -lint "${INFO_PLIST}" >/dev/null

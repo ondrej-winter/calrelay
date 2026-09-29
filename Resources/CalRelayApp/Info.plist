@@ -8,6 +8,8 @@
     <string>CalRelayApp</string>
     <key>CFBundleIdentifier</key>
     <string>dev.owinter.CalRelay</string>
+    <key>CFBundleIconFile</key>
+    <string>CalRelay.icns</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
