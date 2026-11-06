@@ -520,9 +520,23 @@ lint/build/custom-runner/smoke gate, strictly verified local bundle, and all 21 
 tests. T4 records native hide/restore observations and restored system state.
 CP-FINAL-1 and CP-FINAL-3 remain open for the missing native evidence below.
 
+**Additional native evidence (2026-11-06):** With **CalRelayUITestHost** disabled
+in macOS Menu Bar settings, ran the existing
+`testFakeHostWithoutArgumentsFailsClosedToMissingConfiguration` and
+`testDisabledSchedulingQuitsWithoutWarning` cases through the same Xcode UI
+scheme with `-only-testing` filters. Both passed (2 tests, 0 failures). These
+launch the actual isolated host, recover its control panel without a menu item,
+and exercise intentional Quit. System Settings still reported the test-host
+switch off after both process launches; it was then restored to its original on
+state. Production CalRelay visibility was untouched. This is native hidden-launch
+and preference-persistence evidence for the shared shell, not Spotlight search
+or production Calendar/identity evidence. A direct Command-Space attempt also
+produced no observable Spotlight UI in the computer-use session; the Spotlight
+checkpoint remains unresolved.
+
 | Remaining native evidence | Current limit / required observation |
 | --- | --- |
-| Spotlight with the icon hidden | Computer-use Spotlight launch failed; actual indexed-app search, one-panel recovery, Quit access, and retained hidden visibility across relaunch remain unverified. |
+| Spotlight with the icon hidden | Hidden test-host launch, Quit, and native preference persistence passed. Computer-use Spotlight launch failed; actual indexed-app search/reopen, one-panel recovery, and production hidden-visibility continuity remain unverified. |
 | Menu keyboard and VoiceOver | Accessible labels and menu queries passed; actual keyboard traversal and spoken output remain unverified. |
 | Real login and wake | Fake policy/trigger paths passed; same-app OS registration, healthy/actionable login presentation, and real wake delivery remain unverified. |
 | Real notifications and Focus | Fake success/denial/submission-failure paths passed; actual notification-only alerting and denied-alert panel fallback with a hidden icon remain unverified. Respect OS presentation controls. |
@@ -596,3 +610,8 @@ All five slices are implemented. Local commits so far: T1 `b800311`, T2 `e465229
 T3 `83cf37b`, T4 `2a359f4`; T5 is committed with this record. No push or release
 operation was performed. The persistent goal awaits the native checkpoint or an
 explicit owner decision to defer native acceptance.
+
+2026-11-06 native follow-up: Two existing UI cases passed with the test-host icon
+hidden, and the OS visibility preference persisted across launches. Restored the
+original setting and recorded this stronger evidence without changing source or
+claiming the remaining native checkpoint complete.
