@@ -14,16 +14,16 @@ lifecycle decision and supersedes ADR 0001.
 
 **Readiness:** Ready — the accepted outcomes and validation procedures are
 defined. T1 resolves bounded platform and UI-query details before production shell
-work; it does not reopen the accepted product decision. The plan is prepared for
-owner review, and implementation has not started.
+work; it does not reopen the accepted product decision. The owner authorized slice-by-slice implementation and local commits without
+pushing on November 6, 2026. Implementation is in progress.
 
-**Execution boundary:** The owner requested a specification change and a plan for
-review only. Do not execute the tasks below until implementation is requested.
-No build, dependency resolution, UI launch, or calendar operation was performed
-while preparing this plan.
+**Execution boundary:** Implement and validate each slice, then commit that slice
+locally. Do not push, publish, run protected release operations, change dependencies,
+or mutate real calendars. Planning preparation performed no runtime operations;
+implementation evidence is recorded with each task below.
 
-**Next action:** Owner review of this plan. Once implementation is requested,
-start T1 and carry its evidence into T2.
+**Next action:** T2, using the T1 platform findings below. Required runtime checks
+remain explicit; the persistent goal covers all tasks and final checks.
 
 ## Scope and implementation approach
 
@@ -150,7 +150,7 @@ agent work is required; these tasks share the app shell and fake composition.
 
 ### T1: Confirm the shell and its verification path
 
-- [ ] `T1` — Resolve Q1, Q2, and Q4's platform signals before changing production presentation.
+- [x] `T1` — Resolve Q1, Q2, and Q4's platform signals before changing production presentation.
 
 **Basis:** Prerequisite for APP-AC-01 and APP-AC-12.
 **Dependencies:** Implementation requested; supported macOS and Swift toolchain,
@@ -161,20 +161,55 @@ any disposable prototype is not a delivered implementation. Investigate one
 candidate shell and at most the named alternative; produce the recorded findings
 and unresolved failures rather than expanding into an unrelated platform audit.
 
-- [ ] `T1-AC1` — Record the chosen menu API, accessory metadata, startup hook,
+- [x] `T1-AC1` — Record the chosen menu API, accessory metadata, startup hook,
   single-panel reopen mechanism, and accessible status-item query, citing Apple
   SDK documentation and observations. The chosen approach supports a windowless
   running process without a Dock icon, respects native icon hiding, and provides
   testable notification availability and submission-result handling for T3.
-- [ ] `T1-V1` — Inspect local SDK documentation or official Apple documentation,
+- [x] `T1-V1` — Inspect local SDK documentation or official Apple documentation,
   then exercise one minimal fake shell: show, close, reopen, and focus its panel;
   inspect its status item with accessibility tooling. Record any unsupported
   test-tool query and the manual procedure that supplies the missing evidence.
   Inspect native visibility persistence and notification error/availability
   documentation; record precise signals and limits without live permission prompts.
 
-**Evidence:** Pending. If no approach satisfies recovery and Dock absence, record
-the failure and revise the affected tasks before production implementation.
+**Evidence (2026-11-06, risk-first slice):** Selected AppKit `NSStatusItem` with
+an `NSMenu`, a stable `autosaveName`, `.removalAllowed` without
+`.terminationOnRemoval`, and production/fake-host `LSUIElement = true`. A retained
+AppKit `NSWindow` (`isReleasedWhenClosed = false`) hosts the existing SwiftUI panel.
+The delegate starts the shared view model at app launch and shows/focuses this
+same window for menu, explicit reopen, and recovery. This avoids a second SwiftUI
+window lifecycle and preserves pending review sheets.
+
+A disposable permission-free probe under `/private/tmp/calrelay-menu-probe`
+compiled and ran on macOS 27.2 / Swift 6.4.2. Its assertions reported
+`accessory=true accessibleLabel=true closed=true reopenedSamePanel=true singleVisiblePanel=true`.
+The single-panel check intentionally excludes AppKit's status-item window. Native
+computer-use inspection saw the panel; its app tree did not expose the system
+menu item reliably. The planned XCUITest query is the status item with the explicit
+CalRelay accessibility label, checking the app and Control Center surfaces. T2
+must validate that query; if unavailable, retain recorded manual menu evidence at
+CP-FINAL-3 instead of claiming automated coverage. The probe does not prove
+Spotlight, macOS settings persistence, login registration, or real notification
+presentation. Those remain the planned runtime checks, not discovery successes.
+
+Authoritative sources and implementation rules:
+
+- [Apple Launch Services keys](https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/LaunchServicesKeys.html):
+  `LSUIElement` selects an agent app without Dock presence.
+- Apple's installed `AppKit.framework/Headers/NSStatusItem.h` in the macOS SDK:
+  visibility persists by `autosaveName`; removal and termination-on-removal are
+  separate behaviors. Set the stable name, never force `isVisible = true` on reopen.
+- [Last-window termination delegate](https://developer.apple.com/documentation/appkit/nsapplicationdelegate/applicationshouldterminateafterlastwindowclosed(_:)):
+  return false so closing the last panel leaves the run loop alive.
+- [Notification alert settings](https://developer.apple.com/documentation/usernotifications/unnotificationsettings/alertsetting):
+  check alert capability as well as authorization. Submission is not evidence of
+  user receipt, and OS presentation controls remain respected. A reported
+  submission error selects panel recovery. Fake delivery must cover both outcomes.
+
+The initial unprivileged build was blocked by compiler-cache sandbox access; the
+approved build used the normal caches. The existing fake UI baseline is running
+separately; it is not claimed passed here. No production app or EventKit was used.
 
 ### T2: Deliver the persistent menu shell and recoverable panel
 
@@ -411,3 +446,7 @@ are registered in the custom runner, progress IDs are unique, and
 `git --no-pager diff HEAD --check` passes. These are documentation checks, not
 implementation, build, or runtime validation. Concurrently staged documentation
 was preserved; no staging, commit, or push was performed by this agent.
+
+2026-11-06 implementation start: Owner requested a persistent implementation goal
+and one local commit per completed slice, without pushing. T1 records the bounded
+platform proof and its runtime limits; T2 begins the actual app shell.
