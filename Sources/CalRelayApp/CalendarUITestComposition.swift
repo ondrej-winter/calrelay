@@ -1,5 +1,6 @@
 import AppKit
 import CalRelayKit
+import Combine
 import Foundation
 
 enum CalendarUITestScenario: String {
@@ -12,7 +13,10 @@ enum CalendarUITestScenario: String {
     case cleanupApplyFailure = "cleanup-apply-failure"
 
     static func current(arguments: [String]) -> CalendarUITestScenario? {
-        guard arguments.contains("--calrelay-ui-testing") else { return nil }
+        guard
+            arguments.contains("--calrelay-ui-testing")
+                || Bundle.main.bundleIdentifier == "dev.owinter.CalRelay.UITestHost"
+        else { return nil }
         guard let optionIndex = arguments.firstIndex(of: "--calrelay-ui-test-scenario"),
             arguments.indices.contains(optionIndex + 1),
             let scenario = CalendarUITestScenario(rawValue: arguments[optionIndex + 1])
@@ -36,6 +40,9 @@ enum CalendarUITestNotificationMode: String {
 }
 
 @MainActor enum CalendarUITestComposition {
+    // One isolated host process owns one in-memory fixture; this never touches production settings.
+    private static var mutateConfigurationForUITest: (() async -> Void)?
+
     static func makeViewModel(scenario: CalendarUITestScenario, appDelegate: CalRelayAppDelegate)
         -> CalendarListViewModel
     {
@@ -78,7 +85,7 @@ enum CalendarUITestNotificationMode: String {
             automaticReconciliation: automaticReconciliation,
             automationState: CalendarAutomationStateUseCase(stateStore: fixture.automationStateStore),
             configurationObserver: ConfigurationFileObserver(selectedFile: selectedFile, isEnabled: false),
-            automationTriggers: CalendarAutomationTriggerSource(isEnabled: false),
+            automationTriggers: CalendarAutomationTriggerSource(isEnabled: false, now: { now }),
             launchAtLogin: CalendarLaunchAtLoginController(isEnabled: false),
             automationAttention: CalendarAutomationAttentionController(
                 delivery: notificationDelivery,
@@ -88,15 +95,33 @@ enum CalendarUITestNotificationMode: String {
                 appDelegate?.resolveInitialLaunchPresentation(presentation)
             }, now: { now }, automaticAttemptsEnabled: false)
         notificationDelivery.didChange = { [weak viewModel] summary in viewModel?.notificationSummary = summary }
+        notificationDelivery.trackAutomaticOperations(viewModel)
+        let settingsProvider = fixture.settingsProvider
+        mutateConfigurationForUITest = { [weak viewModel] in
+            await settingsProvider.changeSyncWindowForUITest()
+            viewModel?.configurationDidChange()
+        }
         return viewModel
     }
 
     static func handleWindowClosure(viewModel: CalendarListViewModel) {
-        guard CalendarUITestScenario.current(arguments: CommandLine.arguments) != nil,
-            CalendarUITestNotificationMode.current() != nil
-        else { return }
+        guard CalendarUITestScenario.current(arguments: CommandLine.arguments) != nil else { return }
+        let simulateWake = CommandLine.arguments.contains("--calrelay-ui-test-wake-after-close")
+        let simulateConfigurationChange = CommandLine.arguments.contains(
+            "--calrelay-ui-test-configuration-change-after-close")
+        guard simulateWake || simulateConfigurationChange || CalendarUITestNotificationMode.current() != nil else {
+            return
+        }
         Task { @MainActor [weak viewModel] in
             guard let viewModel else { return }
+            if simulateConfigurationChange {
+                await mutateConfigurationForUITest?()
+                return
+            }
+            if simulateWake {
+                viewModel.automationTriggers.deliverTestTrigger(.wake)
+                return
+            }
             viewModel.primaryStatus = "Scheduled sync freshness is overdue."
             viewModel.automationAttentionReason = .freshnessOverdue
             viewModel.automationAttention.update(reason: .freshnessOverdue)
@@ -188,9 +213,18 @@ private struct CalendarUITestFixture {
 }
 
 private actor CalendarUITestSettingsProvider: CalendarRelaySettingsProvider {
-    private let result: Result<LoadedCalendarRelaySettings, CalendarRelaySettingsProviderError>
+    private var result: Result<LoadedCalendarRelaySettings, CalendarRelaySettingsProviderError>
 
     init(result: Result<LoadedCalendarRelaySettings, CalendarRelaySettingsProviderError>) { self.result = result }
+
+    func changeSyncWindowForUITest() {
+        guard case .success(let loaded) = result else { return }
+        let current = loaded.settings
+        let changed = CalendarRelaySettings(
+            hubCalendar: current.hubCalendar, personalPrefix: current.personalPrefix, syncWindowDays: 31,
+            workCalendars: current.workCalendars, legacyMarkers: current.legacyMarkers)
+        result = .success(LoadedCalendarRelaySettings(displayPath: loaded.displayPath, settings: changed))
+    }
 
     func loadSettings() async throws -> LoadedCalendarRelaySettings { try result.get() }
 }
@@ -254,8 +288,16 @@ private struct CalendarUITestStoreFailure: Error {}
     private var submissions = 0
     private var recoveryOpens = 0
     private let showControlPanel: () -> Void
+    private var operationObservation: AnyCancellable?
 
     init(showControlPanel: @escaping () -> Void) { self.showControlPanel = showControlPanel }
+
+    func trackAutomaticOperations(_ viewModel: CalendarListViewModel) {
+        guard CommandLine.arguments.contains("--calrelay-ui-test-wake-after-close") else { return }
+        operationObservation = viewModel.$automaticOperationSummary.sink { [weak self] summary in
+            Task { @MainActor in self?.didChange?("Test automatic result: \(summary)") }
+        }
+    }
 
     func requestAuthorization() async {}
     func authorizationSummary() async -> String { summary }

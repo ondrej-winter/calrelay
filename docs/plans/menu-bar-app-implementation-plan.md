@@ -22,7 +22,7 @@ locally. Do not push, publish, run protected release operations, change dependen
 or mutate real calendars. Planning preparation performed no runtime operations;
 implementation evidence is recorded with each task below.
 
-**Next action:** T4, verifying lifecycle and compatibility edges. Required runtime checks
+**Next action:** T5, aligning delivered guidance. Required native runtime checks
 remain explicit; the persistent goal covers all tasks and final checks.
 
 ## Scope and implementation approach
@@ -365,7 +365,7 @@ native hiding/restoration, and Spotlight remain explicit CP-FINAL-3 evidence.
 
 ### T4: Prove login, windowless operation, Quit, and compatibility
 
-- [ ] `T4` — Integrate the shell with the existing lifecycle and authorization.
+- [x] `T4` — Integrate the shell with the existing lifecycle and authorization.
 
 **Basis:** APP-03 through APP-06; APP-AC-01, APP-AC-05, APP-AC-12, APP-AC-16.
 **Dependencies:** T2 and T3 integrated through one shared presentation state.
@@ -377,17 +377,17 @@ same directory; `CalendarLoginLaunchPolicyTests.swift`,
 under `Tests/CalRelayKitTests/Features/CalendarRelay/Contracts/`;
 `UITests/CalRelayUITests/CalRelayUITests.swift`.
 
-- [ ] `T4-AC1` — Fake healthy login initializes automation without creating or
+- [x] `T4-AC1` — Fake healthy login initializes automation without creating or
   showing the panel or opening the menu; actionable login opens recovery under
   the existing launch policy. Injected launch/wake/timer/retry and configuration
   changes still reach the single coordinator with the panel closed, with no
   overlap or duplicate observers after repeated reopen. Tests use explicit fake
   triggers rather than waiting for real timers or mutating real calendars.
-- [ ] `T4-AC2` — Menu Quit reaches the existing warning when scheduling is enabled;
+- [x] `T4-AC2` — Menu Quit reaches the existing warning when scheduling is enabled;
   Cancel leaves the process and lifecycle active, and confirmed Quit exits. A
   disabled-scheduling Quit exits without the scheduling warning. Quitting retains
   saved scheduling and login preferences and introduces no execution after exit.
-- [ ] `T4-AC3` — A fixture carrying existing authorized preferences retains them
+- [x] `T4-AC3` — A fixture carrying existing authorized preferences retains them
   across the shell upgrade. Calendar prompts remain exclusive to the explicit
   setup/recovery action; manual and cleanup reviews retain exact confirmation.
   Production identity, signing assumptions, persistence keys, and the existing
@@ -397,7 +397,7 @@ under `Tests/CalRelayKitTests/Features/CalendarRelay/Contracts/`;
   hiding does not change scheduling. Post-startup problem routing follows T3-AC4
   while actionable-login recovery retains its existing opening policy even when
   notifications are available. No automatic presentation confirms pending mutation.
-- [ ] `T4-V1` — Extend T2's fake lifecycle composition with explicit trigger
+- [x] `T4-V1` — Extend T2's fake lifecycle composition with explicit trigger
   delivery and retained-preference/Quit scenarios while preserving its
   disabled EventKit, OS registration, notifications, filesystem observation, and
   real timers. Run `make ui-test` for lifecycle/quit cases and
@@ -408,8 +408,45 @@ under `Tests/CalRelayKitTests/Features/CalendarRelay/Contracts/`;
   remain manual CP-FINAL-3 evidence; fake presentation tests cannot prove these
   system integrations.
 
-**Evidence:** Pending. Update obsolete Dock terminology in assertions without
-weakening launch-policy behavior. Fake UI changes must retain ADR 0003 isolation.
+**Evidence (2026-11-06, lifecycle slice):** The final `make ui-test` passed all
+21 cases on macOS 27.2 / Xcode 27.2. New cases prove healthy hidden initialization
+before any panel exists, actionable-login recovery, explicit fake wake delivery
+while closed, no duplicate panel or repeated operation after reopen, enabled Quit
+Cancel/confirm, disabled Quit, and configuration-change recovery. The configuration
+fixture changes the synchronization horizon from 30 to 31 days, so the existing
+authorization invalidation path receives a mutation-relevant change. The resulting
+panel requires fresh reviewed authorization and records zero mutations.
+
+The fake trigger uses an injected fixed clock and the existing coordinator. It
+does not register OS timers or wake observation. The separately identified UI host
+now defaults to the isolated missing-configuration fixture even without arguments;
+it cannot accidentally select production services. This safety regression was
+verified only after adding the guard: running the old no-argument branch as a RED
+test could have accessed production state. Wake and configuration regressions
+were observed failing before their explicit fake event paths were added.
+
+The Dock test first identifies Finder in the system Dock as a positive query
+control, then verifies the fake app is absent with the panel open and closed.
+Existing review/cleanup tests still pass. The full `make check` includes
+`CalendarLoginLaunchPolicyTests`, `CalendarAutomationCoordinationTests`, and
+`CalendarAutomationPersistenceTests`; all passed. Metadata, production identity,
+stored keys, policy version, and same-app login registration remain unchanged.
+No new Calendar permission or OS registration path was introduced.
+
+Native computer-use inspection in System Settings > Menu Bar > Allow in the Menu
+Bar successfully hid and restored **CalRelayUITestHost**; the control panel remained
+recoverable. The test-host setting was restored to its original enabled state;
+the production CalRelay setting was untouched. The computer-use tool could not
+launch Spotlight (Launch Services returned a launch failure), so Launch Services
+reopen tests are not claimed as Spotlight/indexing evidence. T4-AC4 remains open
+for the complete hidden-icon, relaunch, and OS presentation matrix at CP-FINAL-3.
+
+Final source gates: `make format-check`, `make check`, `make app` with strict
+signature verification, and the 21-case `make ui-test` all passed. Formatting
+reported existing warnings outside changed files; lint reported no violations.
+No live EventKit, real notifications, real login registration, or real calendar
+mutation was used. Real login/wake, notification/Focus, VoiceOver, and production
+identity continuity still require the explicit native acceptance checkpoint.
 
 ### T5: Align delivered guidance and review the integrated change
 
@@ -440,12 +477,12 @@ preserve historical ADR rationale.
 
 **Prerequisites:** T1 through T5 and their required focused evidence.
 All commands run from the repository root. Commands below are confirmed from
-`docs/development.md` and `Makefile`; they have not been run for this plan.
+`docs/development.md` and `Makefile`; execution evidence is recorded per slice.
 
 - [ ] `CP-FINAL-1` — Every in-scope requirement has evidence, the diff contains
   only the intended shell and supporting changes, and existing user work remains
   preserved. No unresolved required check is represented as passed.
-- [ ] `CP-FINAL-2` — Run `make format-check`, `make check`, `make app`, and
+- [x] `CP-FINAL-2` — Run `make format-check`, `make check`, `make app`, and
   `make ui-test`. Expect clean formatting, lint/build/custom-runner/smoke results,
   a strictly verified local bundle, and the complete fake UI lane to pass. UI
   tests require Xcode 27+; report missing prerequisites rather than bypassing them.
@@ -521,3 +558,8 @@ commit. All 12 fake UI cases and the complete deterministic gate passed; T3 is n
 
 2026-11-06 T3: Notification-first routing, live menu state, and closed-panel recovery
 verified through deterministic contracts and the 14-case UI lane. T4 is next.
+
+2026-11-06 T4: Lifecycle implementation and the complete 21-case fake UI lane
+passed with the full repository gate and signed bundle check. Native icon
+hide/restore was observed and the original setting restored. T4-AC4 and
+CP-FINAL-3 retain the outstanding system-integration acceptance evidence; T5 is next.

@@ -232,12 +232,105 @@ import XCTest
         }
     }
 
+    func testExplicitWakeTriggerRunsWhilePanelIsClosed() async throws {
+        let app = launch(
+            scenario: "ready", notificationMode: "available", extraArguments: ["--calrelay-ui-test-wake-after-close"])
+        defer { app.terminate() }
+        waitUntilEnabled(element("pause-scheduled-sync", in: app))
+        let panel = app.windows["calrelay-control-panel"]
+        panel.buttons[XCUIIdentifierCloseWindow].click()
+        let item = statusItem(in: app)
+        let ready = expectation(
+            for: NSPredicate(format: "label CONTAINS %@", "Latest outcome: applied"), evaluatedWith: item)
+        await fulfillment(of: [ready], timeout: 10)
+        XCTAssertFalse(panel.exists)
+        _ = try await NSWorkspace.shared.openApplication(at: Self.testHostURL, configuration: .init())
+        assertElement("automatic-operation-status", in: app, contains: "Confirmed creates/deletes: 1/0")
+        _ = try await NSWorkspace.shared.openApplication(at: Self.testHostURL, configuration: .init())
+        XCTAssertEqual(app.windows.matching(identifier: "calrelay-control-panel").count, 1)
+        assertElement("automatic-operation-status", in: app, contains: "Confirmed creates/deletes: 1/0")
+    }
+
+    func testQuitCancellationPreservesSchedulingAndConfirmedQuitExits() async throws {
+        let app = XCUIApplication(url: Self.testHostURL)
+        app.launchArguments = ["--calrelay-ui-testing", "--calrelay-ui-test-scenario", "healthy-login"]
+        app.launch()
+        defer { app.terminate() }
+        _ = try await NSWorkspace.shared.openApplication(at: Self.testHostURL, configuration: .init())
+        waitUntilEnabled(element("pause-scheduled-sync", in: app))
+        let system = openStatusMenu(in: app)
+        let local = app.menuItems["Quit CalRelay"]
+        let quit = local.waitForExistence(timeout: 2) ? local : system.menuItems["Quit CalRelay"]
+        quit.click()
+        XCTAssertTrue(app.buttons["Cancel"].firstMatch.waitForExistence(timeout: 10))
+        app.buttons["Cancel"].firstMatch.click()
+        assertElement("scheduling-status", in: app, contains: "Enabled")
+        element("quit-calrelay", in: app).click()
+        XCTAssertTrue(app.buttons["Quit"].firstMatch.waitForExistence(timeout: 10))
+        app.buttons["Quit"].firstMatch.click()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+    }
+
+    func testConfigurationMutationWhilePanelClosedRequiresRecovery() {
+        let app = launch(
+            scenario: "ready", notificationMode: "denied",
+            extraArguments: ["--calrelay-ui-test-configuration-change-after-close"])
+        defer { app.terminate() }
+        waitUntilEnabled(element("pause-scheduled-sync", in: app))
+        app.windows["calrelay-control-panel"].buttons[XCUIIdentifierCloseWindow].click()
+        XCTAssertTrue(app.windows["calrelay-control-panel"].waitForExistence(timeout: 10))
+        assertElement("standing-authorization-status", in: app, contains: "Not enabled")
+        assertElement("primary-status", in: app, contains: "fresh reviewed authorization")
+        assertElement("automatic-operation-status", in: app, contains: "Confirmed creates/deletes: 0/0")
+    }
+
+    func testFakeHostWithoutArgumentsFailsClosedToMissingConfiguration() {
+        let app = XCUIApplication(url: Self.testHostURL)
+        app.launchArguments = []
+        app.launch()
+        defer { app.terminate() }
+        assertElement("primary-status", in: app, contains: "Configuration is missing")
+        assertElement("notification-status", in: app, contains: "Denied. Scheduling remains available")
+    }
+
+    func testActionableLoginOpensRecoveryWithoutPermissionPrompt() {
+        let app = launch(scenario: "missing-configuration", extraArguments: ["--calrelay-ui-test-login"])
+        defer { app.terminate() }
+        assertElement("primary-status", in: app, contains: "Configuration is missing")
+        XCTAssertTrue(app.windows["calrelay-control-panel"].exists)
+        XCTAssertFalse(isEnabled("run-sync-now", in: app))
+    }
+
+    func testAccessoryHostDoesNotAppearInDockWithPanelOpenOrClosed() {
+        let app = launch(scenario: "ready")
+        defer { app.terminate() }
+        let dock = XCUIApplication(bundleIdentifier: "com.apple.dock")
+        XCTAssertTrue(dock.dockItems["Finder"].waitForExistence(timeout: 10))
+        let testItems = dock.dockItems.matching(
+            NSPredicate(format: "label IN %@", ["CalRelay UI Test Host", "CalRelayUITestHost"]))
+        XCTAssertEqual(testItems.count, 0)
+        app.windows["calrelay-control-panel"].buttons[XCUIIdentifierCloseWindow].click()
+        waitUntilMissing(app.windows["calrelay-control-panel"])
+        XCTAssertEqual(testItems.count, 0)
+    }
+
+    func testDisabledSchedulingQuitsWithoutWarning() {
+        let app = launch(scenario: "ready")
+        defer { app.terminate() }
+        element("quit-calrelay", in: app).click()
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
+    }
+
     func testHealthyLoginStartsWithoutOpeningControlPanel() async throws {
         let app = XCUIApplication(url: Self.testHostURL)
         app.launchArguments = ["--calrelay-ui-testing", "--calrelay-ui-test-scenario", "healthy-login"]
         app.launch()
         defer { app.terminate() }
         XCTAssertNotEqual(app.state, .notRunning)
+        let item = statusItem(in: app)
+        let ready = expectation(
+            for: NSPredicate(format: "label CONTAINS %@", "Scheduled sync is healthy"), evaluatedWith: item)
+        await fulfillment(of: [ready], timeout: 10)
         XCTAssertFalse(app.windows["calrelay-control-panel"].exists)
         _ = try await NSWorkspace.shared.openApplication(at: Self.testHostURL, configuration: .init())
         assertElement("configuration-status", in: app, contains: "Valid:")
@@ -276,7 +369,9 @@ import XCTest
         return XCUIApplication(bundleIdentifier: "com.apple.controlcenter")
     }
 
-    private func launch(scenario: String, notificationMode: String? = nil) -> XCUIApplication {
+    private func launch(scenario: String, notificationMode: String? = nil, extraArguments: [String] = [])
+        -> XCUIApplication
+    {
         let hostExists = FileManager.default.fileExists(atPath: Self.testHostURL.path)
         XCTAssertTrue(hostExists)
         let app = XCUIApplication(url: Self.testHostURL)
@@ -284,6 +379,7 @@ import XCTest
         defer { if !launchCompleted { app.terminate() } }
         app.launchArguments = ["--calrelay-ui-testing", "--calrelay-ui-test-scenario", scenario]
         if let notificationMode { app.launchArguments += ["--calrelay-ui-test-notifications", notificationMode] }
+        app.launchArguments += extraArguments
         app.launch()
         XCTAssertNotEqual(app.state, .notRunning)
         let primaryStatusExists = element("primary-status", in: app).waitForExistence(timeout: 10)

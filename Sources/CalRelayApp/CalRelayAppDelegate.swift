@@ -16,7 +16,9 @@ import SwiftUI
     func configure(viewModel: CalendarListViewModel) { self.viewModel = viewModel }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
-        if CalendarUITestScenario.current(arguments: CommandLine.arguments) == .healthyLogin {
+        let scenario = CalendarUITestScenario.current(arguments: CommandLine.arguments)
+        if scenario == .healthyLogin || (scenario != nil && CommandLine.arguments.contains("--calrelay-ui-test-login"))
+        {
             initialLaunchContext = .loginItem
         } else {
             initialLaunchContext = Self.launchContext(for: NSAppleEventManager.shared().currentAppleEvent)

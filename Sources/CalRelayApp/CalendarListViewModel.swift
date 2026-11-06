@@ -390,7 +390,7 @@ enum CalendarStatusRefreshState {
         }
     }
 
-    private func configurationDidChange() {
+    func configurationDidChange() {
         markConfigurationStatusStale()
         Task {
             do { try await standingAuthorization.invalidateAuthorizationForObservedConfigurationChange() } catch {
