@@ -194,6 +194,17 @@ Successful explanation output reports the effective start/end boundaries and con
 
 ## macOS app scheduling
 
+The behavior described below reflects the current Dock-visible implementation.
+Accepted [macOS app specification revision 9](specs/macos-app-spec.md) replaces
+Dock presence and its warning badge with a menu bar app, keeps the control panel
+recoverable, and continues scheduling after the window closes. That shell change
+is awaiting implementation under the [menu bar plan](plans/menu-bar-app-implementation-plan.md);
+it does not change configuration or synchronization authorization. The accepted
+design respects icon hiding through macOS settings and preserves Spotlight
+access. New actionable or overdue problems after startup notify first when
+notifications are available and open the control panel otherwise, even with
+the menu bar icon hidden. These refinements are not implemented yet.
+
 The current app implements Calendar setup/recovery, ID-free inventory, canonical configuration status, complete configured readiness, migration status, and non-mutating **Dry Run Sync**. It observes the canonical file as an invalidation signal: creation, replacement, edit, or removal promptly marks configuration-dependent controls stale and triggers a fresh status load. Changes invalidate open ordinary or cleanup reviews; changes detected during an active operation coalesce into one follow-up refresh after that operation finishes rather than interrupting a possibly partial mutation. Every status refresh and run still loads and validates the current file afresh, so observation never becomes a cached-settings fallback. Each dry run loads the current Calendar snapshot, uses the shared ordinary preflight and planner, and presents only aggregate planned delete/create counts without event titles or EventKit IDs.
 
 **Run Sync Now** loads a fresh plan and opens an aggregate review with explicit confirmation. Confirmation repeats configuration loading and complete preflight, compares the exact ordered executable targets, and checks the configuration mutation identity again before mutation. A changed plan or mutation-relevant configuration requires fresh review even if counts remain equal. Cancel performs no mutation; partial failure stops without rollback and requires a new review for manual recovery. Ordinary success counts confirmed actions and does not claim immediate provider convergence or perform a post-apply verification read.

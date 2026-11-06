@@ -1,7 +1,7 @@
 # 0001. Launch the Normal App at Login for Scheduled Sync
 
 Date: 2026-09-16
-Status: Accepted
+Status: Superseded by [0006](./0006-run-calrelay-as-a-menu-bar-app.md)
 
 ## Context
 
@@ -56,8 +56,8 @@ new ADR.
 
 ## Alternatives considered
 
-| Option | Reason rejected |
-| --- | --- |
-| Require users to launch CalRelay manually after login | Conflicts with the minimal-effort freshness objective. |
+| Option                                                   | Reason rejected                                                                                                    |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Require users to launch CalRelay manually after login    | Conflicts with the minimal-effort freshness objective.                                                             |
 | Run a helper or LaunchAgent while the main app is closed | Adds lifecycle, permission, signing, packaging, rollback, and trust costs before closed-app operation is required. |
-| Make the app accessory-only or menu-bar-first | Weakens the recoverable Dock-visible control-panel model and is unnecessary for scheduling. |
+| Make the app accessory-only or menu-bar-first            | Weakens the recoverable Dock-visible control-panel model and is unnecessary for scheduling.                        |

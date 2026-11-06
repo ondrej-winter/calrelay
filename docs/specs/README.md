@@ -10,7 +10,7 @@ This directory contains the accepted, capability-owned product and behavior cont
 - [`routing-spec.md`](routing-spec.md): hub/work marker routing, eventual-convergence migration, and multi-computer topology.
 - [`configuration-spec.md`](configuration-spec.md): strict YAML settings, markers, selectors, path discovery, validation, and migration cleanup coverage.
 - [`cli-spec.md`](cli-spec.md): `calrelay` discovery, config check, ordinary dry-run/apply/explanation, legacy cleanup, and CLI-facing diagnostics.
-- [`macos-app-spec.md`](macos-app-spec.md): the control panel, manual sync and cleanup, standing authorization, launch-at-login, scheduling, freshness, recovery state, user notifications, and closed-app boundary.
+- [`macos-app-spec.md`](macos-app-spec.md): the menu bar app and control panel, manual sync and cleanup, standing authorization, launch-at-login, scheduling, freshness, recovery state, user notifications, and process-exit boundary.
 - [`distribution-spec.md`](distribution-spec.md): public-beta releases, Homebrew formula and cask installation, signing and notarization, upgrades, uninstallation, and release recovery.
 
 Together, these documents define the current EventKit product and its distribution contract.
@@ -30,4 +30,4 @@ The former specification files have been removed. Use the listed canonical speci
 - Calendar permission, EventKit types, calendar IDs, stores, and mutation mechanics remain at adapter or app/bootstrap boundaries.
 - Domain and application APIs remain deterministic and independent of EventKit, filesystem-path resolution, UI frameworks, and live external provider APIs.
 - A capability that crosses slices must reference the owning specification instead of duplicating the other slice's normative requirement.
-- Automation requires the relevant explicit decision in [`macos-app-spec.md`](macos-app-spec.md). The normal-app launch-at-login decision is recorded in [`../adr/0001-launch-normal-app-at-login-for-scheduled-sync.md`](../adr/0001-launch-normal-app-at-login-for-scheduled-sync.md); closed-app operation requires a later explicit decision and a new ADR.
+- Automation requires the relevant explicit decision in [`macos-app-spec.md`](macos-app-spec.md). The menu bar app and launch-at-login decision is recorded in [ADR 0006](../adr/0006-run-calrelay-as-a-menu-bar-app.md), superseding the Dock-visible shell in ADR 0001. Operation after the app process exits requires a later explicit decision and a new ADR.

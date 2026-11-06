@@ -8,6 +8,9 @@ references linked from the [documentation index](../README.md).
 
 ## Current plans
 
+- [Menu bar app implementation plan](menu-bar-app-implementation-plan.md):
+  review-ready implementation sequence for accepted macOS app specification
+  revision 9. App implementation has not started.
 - [Distribution implementation plan](distribution-implementation-plan.md):
   repository implementation, protected release rollout, and acceptance-evidence
   tracking for the public-beta distribution capability. Read the plan record for
