@@ -164,7 +164,7 @@ extension CalendarListViewModel {
 
     func refreshLaunchAtLoginSummary() {
         switch launchAtLogin.currentState() {
-        case .enabled: launchAtLoginSummary = "Enabled for the normal Dock-visible app."
+        case .enabled: launchAtLoginSummary = "Enabled for CalRelay in the menu bar."
         case .disabled:
             launchAtLoginSummary =
                 isSchedulingEnabled
@@ -215,6 +215,7 @@ extension CalendarListViewModel {
             hasStandingAuthorization: state.standingAuthorization != nil,
             launchAtLoginHealthy: launchAtLogin.currentState() == .enabled, operationalStatus: state.operationalStatus,
             now: now)
+        automationAttentionReason = reason
         automationAttention.update(reason: reason)
         automationAttentionSummary = Self.attentionDescription(reason, overdue: overdue)
     }
@@ -237,7 +238,7 @@ extension CalendarListViewModel {
 
     private static func attentionDescription(_ reason: CalendarAutomationAttentionReason) -> String {
         return switch reason {
-        case .schedulingPaused: "Scheduling is paused; the Dock badge remains until scheduling resumes."
+        case .schedulingPaused: "Scheduling is paused; the menu bar status remains degraded until scheduling resumes."
         case .standingAuthorizationRequired: "A fresh reviewed standing authorization is required."
         case .launchAtLoginUnavailable: "Launch at login is unavailable, disabled, or awaiting approval."
         case .configurationUnavailable: "The canonical configuration is missing or invalid."

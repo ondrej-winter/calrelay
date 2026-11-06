@@ -3,12 +3,15 @@ import CalRelayKit
 import CoreServices
 import SwiftUI
 
-@MainActor final class CalRelayAppDelegate: NSObject, NSApplicationDelegate {
+@MainActor final class CalRelayAppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private(set) var initialLaunchContext = CalendarAppLaunchContext.ordinary
     private var isAwaitingLoginPresentation = false
     private var viewModel: CalendarListViewModel?
     private var controlPanel: NSWindow?
     private var menuBar: CalendarMenuBarController?
+    private var didInjectUITestProblem = false
+
+    var runtimeAlertsEnabled: Bool { viewModel?.didResolveInitialLaunchPresentation == true }
 
     func configure(viewModel: CalendarListViewModel) { self.viewModel = viewModel }
 
@@ -22,9 +25,11 @@ import SwiftUI
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        menuBar = CalendarMenuBarController(openControlPanel: { [weak self] in self?.openControlPanel() })
+        guard let viewModel else { return }
+        menuBar = CalendarMenuBarController(
+            viewModel: viewModel, openControlPanel: { [weak self] in self?.openControlPanel() })
         if !isAwaitingLoginPresentation { showControlPanel() }
-        viewModel?.start()
+        viewModel.start()
     }
 
     func resolveInitialLaunchPresentation(_ presentation: CalendarLoginLaunchPresentation) {
@@ -36,6 +41,12 @@ import SwiftUI
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
         openControlPanel()
         return false
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard !didInjectUITestProblem, let viewModel, notification.object as? NSWindow === controlPanel else { return }
+        didInjectUITestProblem = true
+        CalendarUITestComposition.handleWindowClosure(viewModel: viewModel)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
@@ -67,6 +78,7 @@ import SwiftUI
             window.identifier = NSUserInterfaceItemIdentifier("calrelay-control-panel")
             window.minSize = NSSize(width: 720, height: 480)
             window.isReleasedWhenClosed = false
+            window.delegate = self
             window.contentView = NSHostingView(rootView: CalendarListView(viewModel: viewModel))
             window.center()
             controlPanel = window

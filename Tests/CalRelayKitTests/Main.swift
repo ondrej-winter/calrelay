@@ -4,17 +4,17 @@ import Foundation
     private static let registeredFilters: Set<String> = [
         "CalendarAccessPreflightTests", "CalendarAccessPrivacyTests", "CalendarAppBundleMetadataTests",
         "CalendarAuthorizationTests", "CalendarAutomaticReconciliationTests", "CalendarAutomationCoordinationTests",
-        "CalendarAutomationPersistenceTests", "CalendarCleanupAccessTests", "CalendarConfigurationIdentityTests",
-        "CalendarConfigurationObservationTests", "CalendarConfigurationSchemaTests", "CalendarControlPanelStatusTests",
-        "CalendarListCommandHandlerTests", "CalendarLoginLaunchPolicyTests", "CalendarManualApplyFreshSnapshotTests",
-        "CalendarManualApplySafetyTests", "CalendarManualApplyTests", "CalendarManualCleanupFailureTests",
-        "CalendarManualCleanupReviewTests", "CalendarManualCleanupSnapshotTests", "CalendarManualCleanupTests",
-        "CalendarManualDryRunTests", "CalendarMutationExecutorTests", "CalendarNoPromptContractTests",
-        "CalendarReviewedActionTests", "CalendarStandingAuthorizationTests", "CalRelayCLISmokeTests",
-        "CalRelayContractTests", "ConfigCheckCommandHandlerTests", "EventKitExactEventOccurrenceResolverTests",
-        "DistributionDocumentationTests", "DistributionHomebrewPackageTests", "DistributionProductionArtifactTests",
-        "DistributionReleasePolicyTests", "DistributionReleaseStateTests", "DistributionReleaseWorkflowTests",
-        "DistributionWorkflowContextTests",
+        "CalendarAutomationAlertTests", "CalendarAutomationPersistenceTests", "CalendarCleanupAccessTests",
+        "CalendarConfigurationIdentityTests", "CalendarConfigurationObservationTests",
+        "CalendarConfigurationSchemaTests", "CalendarControlPanelStatusTests", "CalendarListCommandHandlerTests",
+        "CalendarLoginLaunchPolicyTests", "CalendarManualApplyFreshSnapshotTests", "CalendarManualApplySafetyTests",
+        "CalendarManualApplyTests", "CalendarManualCleanupFailureTests", "CalendarManualCleanupReviewTests",
+        "CalendarManualCleanupSnapshotTests", "CalendarManualCleanupTests", "CalendarManualDryRunTests",
+        "CalendarMutationExecutorTests", "CalendarNoPromptContractTests", "CalendarReviewedActionTests",
+        "CalendarStandingAuthorizationTests", "CalRelayCLISmokeTests", "CalRelayContractTests",
+        "ConfigCheckCommandHandlerTests", "EventKitExactEventOccurrenceResolverTests", "DistributionDocumentationTests",
+        "DistributionHomebrewPackageTests", "DistributionProductionArtifactTests", "DistributionReleasePolicyTests",
+        "DistributionReleaseStateTests", "DistributionReleaseWorkflowTests", "DistributionWorkflowContextTests",
         "DistributionVersionTests", "FileCalendarRelaySettingsProviderTests",
         "OrdinaryReconciliationCalendarCaptureTests", "OrdinaryReconciliationWindowTests",
         "ReconcileCommandHandlerTests", "ReconciliationConvergenceTests", "ReconciliationSpecificationTests",
@@ -119,6 +119,9 @@ import Foundation
     }
 
     private static func runAutomationSuites(filters: Set<String>) async throws {
+        if filters.isEmpty || filters.contains("CalendarAutomationAlertTests") {
+            try await CalendarAutomationAlertTests.runAll()
+        }
         if filters.isEmpty || filters.contains("CalendarAutomationPersistenceTests") {
             try await CalendarAutomationPersistenceTests.runAll()
         }

@@ -3,13 +3,12 @@ import SwiftUI
 
 @main struct CalRelayApp: App {
     @NSApplicationDelegateAdaptor(CalRelayAppDelegate.self) private var appDelegate
-    private let viewModel: CalendarListViewModel
 
     init() {
+        let delegate = appDelegate
         if let scenario = CalendarUITestScenario.current(arguments: CommandLine.arguments) {
-            let viewModel = CalendarUITestComposition.makeViewModel(scenario: scenario)
-            self.viewModel = viewModel
-            appDelegate.configure(viewModel: viewModel)
+            let viewModel = CalendarUITestComposition.makeViewModel(scenario: scenario, appDelegate: delegate)
+            delegate.configure(viewModel: viewModel)
             return
         }
 
@@ -43,13 +42,15 @@ import SwiftUI
             automaticReconciliation: automaticReconciliation, automationState: automationState,
             configurationObserver: configurationObserver, automationTriggers: CalendarAutomationTriggerSource(),
             launchAtLogin: CalendarLaunchAtLoginController(),
-            automationAttention: CalendarAutomationAttentionController(),
-            launchContext: { (NSApp.delegate as? CalRelayAppDelegate)?.initialLaunchContext ?? .ordinary },
-            resolveInitialLaunchPresentation: { presentation in
-                (NSApp.delegate as? CalRelayAppDelegate)?.resolveInitialLaunchPresentation(presentation)
+            automationAttention: CalendarAutomationAttentionController(
+                delivery: CalendarUserNotificationDelivery(showControlPanel: { [weak delegate] in
+                    delegate?.openControlPanel()
+                }), runtimeAlertsEnabled: { [weak delegate] in delegate?.runtimeAlertsEnabled == true }),
+            launchContext: { [weak delegate] in delegate?.initialLaunchContext ?? .ordinary },
+            resolveInitialLaunchPresentation: { [weak delegate] presentation in
+                delegate?.resolveInitialLaunchPresentation(presentation)
             })
-        self.viewModel = viewModel
-        appDelegate.configure(viewModel: viewModel)
+        delegate.configure(viewModel: viewModel)
     }
 
     var body: some Scene { Settings { EmptyView() } }

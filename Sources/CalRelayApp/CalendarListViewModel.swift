@@ -1,7 +1,16 @@
 import CalRelayKit
 import SwiftUI
 
+enum CalendarStatusRefreshState {
+    case notChecked
+    case checking
+    case checked
+    case failed
+}
+
 @MainActor final class CalendarListViewModel: ObservableObject {
+    @Published var statusRefreshState = CalendarStatusRefreshState.notChecked
+    @Published var automationAttentionReason: CalendarAutomationAttentionReason?
     @Published var output = "Use the setup or recovery action, then show the separate calendar inventory."
     @Published var primaryStatus = "Status has not been refreshed."
     @Published var configurationSummary = "Configuration has not been checked."
@@ -103,6 +112,7 @@ import SwiftUI
         canRunOrdinarySync = false
         canReviewCleanup = false
         isMigrationPending = false
+        statusRefreshState = .checking
         output = "Refreshing configuration, Calendar access, and configured readiness…"
 
         Task {
@@ -112,6 +122,7 @@ import SwiftUI
                 await refreshAutomationPresentation()
                 output = "Status refresh completed without requesting Calendar access."
             } catch {
+                statusRefreshState = .failed
                 primaryStatus = "Status refresh failed."
                 canRunOrdinarySync = false
                 output = "Status could not be refreshed. Check the configuration and try again."
@@ -160,6 +171,7 @@ import SwiftUI
     }
 
     private func apply(_ status: CalendarControlPanelStatus) {
+        statusRefreshState = .checked
         controlPanelPrimaryState = status.primaryState
         primaryStatus = Self.primaryStatus(for: status.primaryState)
         configurationSummary = Self.configurationSummary(for: status.configurationState)
@@ -431,6 +443,7 @@ import SwiftUI
                     "Configuration change detected. Status refreshed from the current file without prompting."
                 output = preservingOperationOutput ? previousOutput + "\n\n" + recovery : recovery
             } catch {
+                statusRefreshState = .failed
                 primaryStatus = "Status refresh failed after a configuration change."
                 let recovery = "The changed configuration could not be checked. Fix the file and try Refresh Status."
                 output = preservingOperationOutput ? previousOutput + "\n\n" + recovery : recovery

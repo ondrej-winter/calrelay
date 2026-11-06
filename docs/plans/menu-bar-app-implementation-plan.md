@@ -22,7 +22,7 @@ locally. Do not push, publish, run protected release operations, change dependen
 or mutate real calendars. Planning preparation performed no runtime operations;
 implementation evidence is recorded with each task below.
 
-**Next action:** T3, building on the committed menu shell. Required runtime checks
+**Next action:** T4, verifying lifecycle and compatibility edges. Required runtime checks
 remain explicit; the persistent goal covers all tasks and final checks.
 
 ## Scope and implementation approach
@@ -281,7 +281,7 @@ production identity, and dependency files are unchanged.
 
 ### T3: Deliver menu status and notification-independent attention
 
-- [ ] `T3` — Deliver safe menu status and notification-first active recovery.
+- [x] `T3` — Deliver safe menu status and notification-first active recovery.
 
 **Basis:** APP-05, APP-AC-10, and APP-AC-18.
 **Dependencies:** T2's shared shell and view-model ownership; T1's Q4 platform signals.
@@ -291,20 +291,20 @@ production identity, and dependency files are unchanged.
 `CalendarUITestComposition.swift`, `CalRelayAppDelegate.swift` in the same directory,
 the T2 menu component, and `UITests/CalRelayUITests/CalRelayUITests.swift`.
 
-- [ ] `T3-AC1` — Menu and panel use the same current safe operational state.
+- [x] `T3-AC1` — Menu and panel use the same current safe operational state.
   Unchecked, disabled/paused, normal, and actionable/overdue states are accurately
   represented. Secondary retry/freshness information does not hide an earlier
   unmet prerequisite. Menus do not expose private configuration or calendar data.
-- [ ] `T3-AC2` — With notifications denied and the panel closed, attention remains
+- [x] `T3-AC2` — With notifications denied and the panel closed, attention remains
   represented through the menu indicator and an accessible non-color description
   whenever the user allows the icon to be shown. Active recovery follows T3-AC4
   regardless of icon visibility.
   Recovery clears obsolete warning state on the menu and panel. A status refresh
   failure never leaves a misleading healthy indicator.
-- [ ] `T3-AC3` — Remove Dock badge dependence and stale Dock wording in production
+- [x] `T3-AC3` — Remove Dock badge dependence and stale Dock wording in production
   and fake presentation. Preserve notification authorization and alert eligibility;
   status presentation never requests Calendar access or authorizes mutation.
-- [ ] `T3-AC4` — A new runtime actionable/overdue condition sends a notification
+- [x] `T3-AC4` — A new runtime actionable/overdue condition sends a notification
   without auto-opening the panel when notifications are available. Unavailable
   notifications or reported submission failure opens/focuses recovery without
   requiring a visible status item. Repeated refreshes do not steal focus again
@@ -312,7 +312,7 @@ the T2 menu component, and `UITests/CalRelayUITests/CalRelayUITests.swift`.
   alert again. A transient retry alone does not interrupt the user, and opening
   recovery neither requests Calendar access nor authorizes mutation. Use the
   existing single-panel presentation path rather than a separate recovery window.
-- [ ] `T3-V1` — Use deterministic fake state transitions for unchecked, healthy,
+- [x] `T3-V1` — Use deterministic fake state transitions for unchecked, healthy,
   paused, blocked, overdue, refresh failure, and recovered states; compare menu and
   panel output while closing/reopening the panel. Run `make ui-test` and expect
   accessible identification and the available/unavailable/failed-submission
@@ -324,7 +324,44 @@ the T2 menu component, and `UITests/CalRelayUITests/CalRelayUITests.swift`.
   framework-free logic is extracted; register any such suite in
   `Tests/CalRelayKitTests/Main.swift` before running it.
 
-**Evidence:** Pending. Preserve generic placeholder data in all fixtures.
+**Evidence (2026-11-06, vertical slice):** Live menu presentation observes the
+shared view model and exposes safe primary/scheduling status, non-color attention
+symbols, accessible text, and explicit unchecked/checking/failed-refresh states.
+No Dock badge remains. Notification-first delivery is orchestrated by the new
+framework-free `CalendarAutomationAlertUseCase` and `CalendarAutomationAlertPort`;
+AppKit/UserNotifications remain in the app adapter. This additive Kit API has no
+existing external consumer migration. Its port accepts only safe application DTOs
+and reports notification availability/submission failure, clearing, and panel
+presentation. Session state coalesces identical problems; revisions reject obsolete
+async completions and source sequence numbers reject out-of-order UI tasks.
+
+New source boundaries: `Sources/CalRelayKit/Features/CalendarRelay/Application/Ports/CalendarAutomationAlertPort.swift`
+and `UseCases/CalendarAutomationAlertUseCase.swift` under the same application
+folder. `CalendarAutomationAlertTests.swift` is registered in the existing custom
+runner. Six deterministic tests cover submitted notifications without panel
+opening, denied/failed delivery fallback, recurrence after recovery, quiet startup
+and pause, delayed availability after recovery, and out-of-order updates. Nearby
+coordination tests retain transient retry and overdue precedence coverage.
+
+RED: the behavior tests failed with no notification submitted, the source-order
+regression revived an old problem, and the UI status test could not find scheduling
+status with the panel closed. The runtime UI matrix also exposed a fake-adapter
+instance mismatch and fragile `NSApp.delegate` casts. Production and fake
+composition now capture the actual delegate instance through weak callbacks;
+the delegate is the sole view-model owner. This fixes actual recovery delivery and
+initial launch-presentation callbacks rather than relying on source inspection.
+
+GREEN: `CalendarAutomationAlertTests` and `CalendarAutomationCoordinationTests`
+passed. The final `make ui-test` passed all 14 cases, including notification success
+(panel stays closed), denied notification (panel opens), and submission failure
+(panel opens), driven by explicit fake flags on window closure. These fixtures use
+the real controller/use case/window path, no OS notification service, no live timers,
+and no real calendars. The full `make check` and strictly verified `make app` passed.
+`make format-check` exited successfully with pre-existing warnings outside the
+changed formatted files. A lint finding in the test fixture was fixed with a named
+result instead of a large tuple; final lint reports no violations. `git diff HEAD
+--check` passed. Self-review found no blocking issue. Real notification/Focus,
+native hiding/restoration, and Spotlight remain explicit CP-FINAL-3 evidence.
 
 ### T4: Prove login, windowless operation, Quit, and compatibility
 
@@ -471,8 +508,9 @@ remain; technical validation and all implementation tasks are still pending.
 Preparation checks: local Markdown links resolve, referenced focused suite names
 are registered in the custom runner, progress IDs are unique, and
 `git --no-pager diff HEAD --check` passes. These are documentation checks, not
-implementation, build, or runtime validation. Concurrently staged documentation
-was preserved; no staging, commit, or push was performed by this agent.
+implementation, build, or runtime validation. During planning, concurrently staged documentation
+was preserved without staging or commits by this agent. Implementation commits are
+now explicitly authorized; no push has been performed.
 
 2026-11-06 implementation start: Owner requested a persistent implementation goal
 and one local commit per completed slice, without pushing. T1 records the bounded
@@ -480,3 +518,6 @@ platform proof and its runtime limits; T2 begins the actual app shell.
 
 2026-11-06 T2: Shared menu/window shell verified and ready for its local slice
 commit. All 12 fake UI cases and the complete deterministic gate passed; T3 is next.
+
+2026-11-06 T3: Notification-first routing, live menu state, and closed-panel recovery
+verified through deterministic contracts and the 14-case UI lane. T4 is next.

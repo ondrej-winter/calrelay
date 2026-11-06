@@ -21,8 +21,24 @@ enum CalendarUITestScenario: String {
     }
 }
 
+enum CalendarUITestNotificationMode: String {
+    case available
+    case denied
+    case failed
+
+    static func current() -> Self? {
+        let arguments = CommandLine.arguments
+        guard let index = arguments.firstIndex(of: "--calrelay-ui-test-notifications"),
+            arguments.indices.contains(index + 1)
+        else { return nil }
+        return Self(rawValue: arguments[index + 1])
+    }
+}
+
 @MainActor enum CalendarUITestComposition {
-    static func makeViewModel(scenario: CalendarUITestScenario) -> CalendarListViewModel {
+    static func makeViewModel(scenario: CalendarUITestScenario, appDelegate: CalRelayAppDelegate)
+        -> CalendarListViewModel
+    {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let fixture = CalendarUITestFixture(scenario: scenario, now: now)
         let configurationChanges = CalendarConfigurationChangeTracker()
@@ -53,7 +69,10 @@ enum CalendarUITestScenario: String {
         let selectedFile = SelectedConfigurationFile(
             path: "/dev/null", displayPath: "~/.config/calrelay/config.yaml", source: .defaultPath)
 
-        return CalendarListViewModel(
+        let notificationDelivery = CalendarUITestNotificationDelivery(showControlPanel: { [weak appDelegate] in
+            appDelegate?.openControlPanel()
+        })
+        let viewModel = CalendarListViewModel(
             inventory: inventory, setup: setup, status: status, manualDryRun: manualDryRun, manualApply: manualApply,
             manualCleanup: manualCleanup, standingAuthorization: standingAuthorization,
             automaticReconciliation: automaticReconciliation,
@@ -61,11 +80,27 @@ enum CalendarUITestScenario: String {
             configurationObserver: ConfigurationFileObserver(selectedFile: selectedFile, isEnabled: false),
             automationTriggers: CalendarAutomationTriggerSource(isEnabled: false),
             launchAtLogin: CalendarLaunchAtLoginController(isEnabled: false),
-            automationAttention: CalendarUITestAttentionController(),
-            launchContext: { scenario == .healthyLogin ? .loginItem : .ordinary },
-            resolveInitialLaunchPresentation: { presentation in
-                (NSApp.delegate as? CalRelayAppDelegate)?.resolveInitialLaunchPresentation(presentation)
+            automationAttention: CalendarAutomationAttentionController(
+                delivery: notificationDelivery,
+                runtimeAlertsEnabled: { [weak appDelegate] in appDelegate?.runtimeAlertsEnabled == true }),
+            launchContext: { [weak appDelegate] in appDelegate?.initialLaunchContext ?? .ordinary },
+            resolveInitialLaunchPresentation: { [weak appDelegate] presentation in
+                appDelegate?.resolveInitialLaunchPresentation(presentation)
             }, now: { now }, automaticAttemptsEnabled: false)
+        notificationDelivery.didChange = { [weak viewModel] summary in viewModel?.notificationSummary = summary }
+        return viewModel
+    }
+
+    static func handleWindowClosure(viewModel: CalendarListViewModel) {
+        guard CalendarUITestScenario.current(arguments: CommandLine.arguments) != nil,
+            CalendarUITestNotificationMode.current() != nil
+        else { return }
+        Task { @MainActor [weak viewModel] in
+            guard let viewModel else { return }
+            viewModel.primaryStatus = "Scheduled sync freshness is overdue."
+            viewModel.automationAttentionReason = .freshnessOverdue
+            viewModel.automationAttention.update(reason: .freshnessOverdue)
+        }
     }
 }
 
@@ -101,7 +136,8 @@ private struct CalendarUITestFixture {
             operationalStatus: CalendarAutomationOperationalStatus(
                 lastAttemptAt: now, latestOutcome: .noChanges, confirmedCounts: .zero, retryState: .none,
                 freshness: CalendarAutomationFreshnessMetadata(lastSuccessAt: now, nextNominalRunAt: nil)))
-        automationStateStore = CalendarUITestAutomationStateStore(state: scenario == .healthyLogin ? state : .empty)
+        automationStateStore = CalendarUITestAutomationStateStore(
+            state: scenario == .healthyLogin || CalendarUITestNotificationMode.current() != nil ? state : .empty)
 
         switch scenario {
         case .missingConfiguration:
@@ -212,16 +248,33 @@ private actor CalendarUITestCalendarStore: CalendarStorePort {
 
 private struct CalendarUITestStoreFailure: Error {}
 
-@MainActor private final class CalendarUITestAttentionController: CalendarAutomationAttentionControlling {
-    func requestAuthorization() async {}
+@MainActor private final class CalendarUITestNotificationDelivery: CalendarAutomationNotificationDelivering {
+    var didChange: ((String) -> Void)?
+    private let mode = CalendarUITestNotificationMode.current()
+    private var submissions = 0
+    private var recoveryOpens = 0
+    private let showControlPanel: () -> Void
 
-    func authorizationSummary() async -> String {
-        "Denied. Scheduling remains available with in-app and Dock fallback state."
+    init(showControlPanel: @escaping () -> Void) { self.showControlPanel = showControlPanel }
+
+    func requestAuthorization() async {}
+    func authorizationSummary() async -> String { summary }
+    func notificationsAvailable() async -> Bool { mode == .available || mode == .failed }
+    func submitNotification(_ notification: CalendarAutomationAttentionNotification) async -> Bool {
+        submissions += 1
+        didChange?(summary)
+        return mode == .available
+    }
+    func clearNotification() async {}
+    func openControlPanel() async {
+        recoveryOpens += 1
+        didChange?(summary)
+        showControlPanel()
     }
 
-    func update(reason: CalendarAutomationAttentionReason?) {
-        NSApp.dockTile.badgeLabel = reason == nil ? nil : "!"
-        NSApp.dockTile.display()
+    private var summary: String {
+        guard mode != nil else { return "Denied. Scheduling remains available; actionable recovery opens in CalRelay." }
+        return "Test submissions: \(submissions); recovery opens: \(recoveryOpens)"
     }
 }
 
