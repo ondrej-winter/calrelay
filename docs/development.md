@@ -49,17 +49,26 @@ swift run calrelay reconcile --help
 Xcode at `XCODE_DEVELOPER_DIR` (default:
 `/Applications/Xcode.app/Contents/Developer`) and runs the shared
 `CalRelayUITests` scheme. The command builds an ad-hoc-signed host with the
-separate bundle identifier `dev.owinter.CalRelay.UITestHost`, launches only
-explicit deterministic scenarios, and never uses EventKit, requests Calendar or
-notification permission, registers launch-at-login, starts wake/timer triggers,
-or reads production persistence. The suite covers:
+separate bundle identifier `dev.owinter.CalRelay.UITestHost`. That identity always
+selects deterministic in-memory composition, even without launch arguments; unknown
+or missing scenarios show missing configuration. It never uses EventKit, requests
+Calendar or notification permission, registers launch-at-login, starts real OS
+wake/timer sources, or reads production persistence. A fixed clock and explicit
+fake wake/configuration events exercise the shared coordinator; any resulting
+mutations affect only in-memory fixture calendars. The suite covers:
 
 - missing configuration;
 - Calendar access unavailable;
 - ready-state inventory and ordinary dry run;
 - manual-sync review and cancellation;
-- migration-cleanup review and cancellation; and
-- scheduled-sync authorization with pause/resume.
+- migration-cleanup review and cancellation;
+- scheduled-sync authorization with pause/resume;
+- menu status, panel closure/recovery, and absence from the Dock;
+- healthy and actionable fake login presentation;
+- notification success, denial, and failed submission with the panel closed;
+- explicit fake wake and mutation-relevant configuration changes while closed;
+- Quit warning, cancellation, and process exit; and
+- a safe default fake-host launch without arguments.
 
 UI tests intentionally remain outside `make check`. Run them when app sources,
 accessibility contracts, fake UI composition, or the UI-test harness changes.
@@ -69,6 +78,26 @@ lives under `~/Library/Caches/dev.owinter.CalRelay/ui-test-builds` and is linked
 at `.build/CalRelayUITestHost.app`. The latest result bundle is
 `.build/CalRelayUITests.xcresult`. These caches are disposable and are not
 removed by `make clean`.
+
+Menu-click tests require **System Settings → Menu Bar → Allow in the Menu Bar →
+CalRelayUITestHost** to be enabled. Restore that test-host setting after a manual
+hidden-icon check; tests do not override the production app's visibility choice.
+
+After building the host through `make ui-test`, you can open it safely for local
+presentation checks:
+
+```sh
+open .build/CalRelayUITestHost.app
+```
+
+The host defaults to missing configuration and shares the production menu/window
+path. Use it to inspect native icon hiding/restoration and window recovery without
+accessing private configuration or calendars. Spotlight search/indexing, actual
+login/wake delivery, notification/Focus behavior, and Calendar authorization still
+need explicit native integration evidence. The fake Launch Services reopen test
+does not establish Spotlight indexing, and fake delivery does not prove a real
+notification appeared. Track those checks in the
+[menu bar plan](plans/menu-bar-app-implementation-plan.md).
 
 The package manifest (`Package.swift`) is the source of truth for products, targets, and dependencies. Keep `Package.resolved` committed with intentional dependency resolution updates.
 `CalRelayUITests.xcodeproj` owns only the XCTest UI-test bundle and shared scheme;

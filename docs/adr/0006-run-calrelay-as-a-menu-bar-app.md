@@ -11,7 +11,9 @@ Dock. On November 6, 2026, the owner approved menu bar operation with access to
 the existing control panel, persistent operational status, launch-at-login,
 continued synchronization after window closure, and synchronization stopping on
 Quit. The owner requested a specification update and implementation plan for
-review; this accepted decision has not yet been implemented.
+review before implementation. The owner subsequently authorized implementation
+and local slice commits without pushing; progress and remaining acceptance evidence
+are tracked in the implementation plan.
 
 ADR 0001 coupled launch-at-login and in-process scheduling to a Dock-visible
 control panel. The same app can retain permission, settings, signing, and

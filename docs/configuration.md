@@ -194,16 +194,23 @@ Successful explanation output reports the effective start/end boundaries and con
 
 ## macOS app scheduling
 
-The behavior described below reflects the current Dock-visible implementation.
-Accepted [macOS app specification revision 9](specs/macos-app-spec.md) replaces
-Dock presence and its warning badge with a menu bar app, keeps the control panel
-recoverable, and continues scheduling after the window closes. That shell change
-is awaiting implementation under the [menu bar plan](plans/menu-bar-app-implementation-plan.md);
-it does not change configuration or synchronization authorization. The accepted
-design respects icon hiding through macOS settings and preserves Spotlight
-access. New actionable or overdue problems after startup notify first when
-notifications are available and open the control panel otherwise, even with
-the menu bar icon hidden. These refinements are not implemented yet.
+The source build runs as a menu bar app without adding a Dock icon. Choose
+**Open CalRelay** from its menu. For an installed, Spotlight-indexed app, use
+**Command-Space**, type **CalRelay**, and press **Return** to open or focus the
+control panel. Closing that window keeps
+scheduled synchronization running. **Quit CalRelay**, available from the menu and
+control panel, ends the process and stops synchronization; Cancel keeps it running.
+
+To hide or restore the icon, use **System Settings → Menu Bar → Allow in the Menu
+Bar → CalRelay**. This system preference changes visibility, not scheduling or
+launch-at-login. CalRelay has no separate icon-visibility toggle. Reopening the
+control panel does not force the icon visible, and controls remain recoverable
+through an explicit launch when it is hidden.
+
+These menu bar changes are implemented in source; publishing a release is a
+separate operation. See the [implementation plan](plans/menu-bar-app-implementation-plan.md)
+for validation evidence and remaining native Mac checks. The change preserves
+configuration, Calendar permission ownership, and synchronization authorization.
 
 The current app implements Calendar setup/recovery, ID-free inventory, canonical configuration status, complete configured readiness, migration status, and non-mutating **Dry Run Sync**. It observes the canonical file as an invalidation signal: creation, replacement, edit, or removal promptly marks configuration-dependent controls stale and triggers a fresh status load. Changes invalidate open ordinary or cleanup reviews; changes detected during an active operation coalesce into one follow-up refresh after that operation finishes rather than interrupting a possibly partial mutation. Every status refresh and run still loads and validates the current file afresh, so observation never becomes a cached-settings fallback. Each dry run loads the current Calendar snapshot, uses the shared ordinary preflight and planner, and presents only aggregate planned delete/create counts without event titles or EventKit IDs.
 
@@ -213,9 +220,9 @@ When migration is pending, the app exposes **Dry Run Legacy Cleanup** and **Run 
 
 Scheduled ordinary reconciliation uses the same reusable preflight, deterministic plans, and mutation executor as the CLI. One app-owned coordinator prevents overlap among manual ordinary work, cleanup, automatic runs, status refresh, and configuration recovery. Automatic triggers received during active work coalesce into at most one fresh follow-up attempt. This coordination is process-local and does not claim to lock out a separate CLI process. Automation never authorizes legacy cleanup.
 
-Before scheduling can be enabled for the first time, the app requires a successful ordinary dry run, presents its create/delete summary, and obtains explicit standing authorization for automatic ordinary apply runs. Setup also requests user-notification permission and enables launch-at-login for the normal Dock-visible app. Notification denial does not disable scheduling; privacy-safe in-app state and a Dock badge remain the fallback surfaces.
+Before scheduling can be enabled for the first time, the app requires a successful ordinary dry run, presents its create/delete summary, and obtains explicit standing authorization for automatic ordinary apply runs. Setup also requests user-notification permission and enables launch-at-login for the same menu bar app. Notification denial does not disable scheduling. Privacy-safe control-panel and menu status remain available; new actionable or overdue problems open the control panel automatically when notifications are unavailable.
 
-While the normal app is running and healthy, automatic reconciliation uses:
+While the app process is running and healthy, including with the window closed or icon hidden, automatic reconciliation uses:
 
 - a fixed 15-minute cadence;
 - one prompt run at every app launch and Mac wake; and
@@ -223,11 +230,21 @@ While the normal app is running and healthy, automatic reconciliation uses:
 
 Every automatic attempt reloads and validates the selected configuration, checks full Calendar access and configured topology, recomputes standing authorization, and revalidates configuration identity and access before its first mutation. Missing or invalid configuration, migration pending, insufficient access, topology failure, authorization invalidation, and selected-file changes suppress mutation without falling back to prior in-memory settings. A ready empty plan counts as a successful reconciliation; a mutating run succeeds after all ordered actions are confirmed, without a post-apply verification read.
 
-The control panel restores privacy-safe scheduling and operation metadata after relaunch and shows launch-at-login health, standing authorization, last attempt and success, latest safe outcome and aggregate counts, next nominal run, active retry, and freshness. More than 60 minutes since the latest successful ordinary reconciliation is overdue. Scheduling may be paused after setup, but the paused state remains visibly degraded because CalRelay is no longer maintaining freshness; pausing does not disable launch-at-login. Actionable recovery and overdue freshness can produce a user notification when authorized. Explicit Quit warns only while scheduling is enabled because reconciliation stops with the normal app process.
+The control panel restores privacy-safe scheduling and operation metadata after relaunch and shows launch-at-login health, standing authorization, last attempt and success, latest safe outcome and aggregate counts, next nominal run, active retry, and freshness. More than 60 minutes since the latest successful ordinary reconciliation is overdue. Scheduling may be paused after setup, but the paused state remains visibly degraded because CalRelay is no longer maintaining freshness; pausing does not disable launch-at-login. Actionable recovery and overdue freshness can produce a user notification when authorized. Explicit Quit warns only while scheduling is enabled because reconciliation stops with the app process.
 
 Standing authorization is bound to the mutation-relevant validated settings, the current reconciliation-policy version, and an opaque identity for the physical calendars currently resolved to configured roles. Changing a configured calendar selector, current or personal marker, `syncWindowDays`, legacy-marker set, or `workCalendars` declaration order suspends automatic mutation until the app presents a successful dry run for the new settings and the user renews authorization. A product upgrade that can change planned actions, exact targets, or execution order, and any changed or unprovably continuous EventKit calendar identity, also requires renewed authorization. Comments, quoting, mapping-key order, and other representation-only YAML changes do not require reauthorization.
 
-Scheduled reconciliation runs only while the normal app is running; there is no helper, LaunchAgent, menu-bar item, or closed-app execution. A launch delivered by macOS Login Items is identified from the open-application Apple event's launched-as-login-item property rather than an ambiguous default-launch heuristic. Only that launch context initially suppresses the control panel. After CalRelay reloads live configuration/access/readiness, approved persisted automation state, and launch-at-login health, a healthy login launch remains hidden through its fresh automatic launch attempt. An active bounded retry also remains unobtrusive, while missing or invalid setup, unavailable access or topology, migration pending, missing standing authorization, unhealthy login registration, paused/disabled scheduling, exhausted failure, or overdue freshness opens the control panel. Ordinary Dock/Finder launches remain visible, and clicking the Dock icon after a hidden login launch reopens the control panel.
+Scheduled reconciliation runs only while the menu bar app process is running; there is no helper, LaunchAgent, or execution after Quit. A launch delivered by macOS Login Items is identified from the open-application Apple event's launched-as-login-item property rather than an ambiguous default-launch heuristic. Only that launch context initially suppresses the control panel. After CalRelay reloads live configuration/access/readiness, approved persisted automation state, and launch-at-login health, a healthy login launch remains hidden through its fresh automatic launch attempt. An active bounded retry also remains unobtrusive, while missing or invalid setup, unavailable access or topology, migration pending, missing standing authorization, unhealthy login registration, paused/disabled scheduling, exhausted failure, or overdue freshness opens the control panel. Ordinary explicit launches and reopens through Spotlight or Finder show or focus the existing control panel. Healthy login startup and later window presentation respect the system icon-visibility preference.
+
+For a new problem requiring action or overdue synchronization after startup,
+CalRelay sends a notification when alerts are available. If alerts are disabled,
+not authorized, or submission fails, it opens or focuses the recovery panel,
+including when the icon is hidden. Repeated checks of the same unresolved problem
+do not repeatedly steal focus. Recovery permits a later new problem to alert
+again. Temporary failures undergoing bounded retries stay quiet unless they also
+require action or become overdue. macOS controls presentation, including Focus;
+notification submission does not prove that a banner was seen. Startup recovery
+keeps the separate login behavior described above.
 
 ## Changing or retiring a marker
 

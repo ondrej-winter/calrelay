@@ -6,7 +6,7 @@ This page describes the main source, test, and documentation areas in the reposi
 
 - `Sources/CalRelayKit/`: standalone shared `CalendarRelay` library target. It owns calendar relay business logic, application use cases, DTOs, ports, settings validation, projection, reconciliation planning, YAML configuration loading, reusable command handlers/formatters, and EventKit outbound adapters used by thin wrappers.
 - `Sources/CalRelayCLI/`: executable `calrelay` CLI wrapper. It owns ArgumentParser command declarations, command-line options, terminal printing, and composition by delegating reusable behavior to `CalRelayKit`.
-- `Sources/CalRelayApp/`: currently a Dock-visible SwiftUI app wrapper for setup, status, manual workflows, lifecycle presentation, and composition of the reusable CalRelayKit capabilities. Accepted [macOS app specification revision 9](specs/macos-app-spec.md) replaces that shell with menu bar operation; implementation is pending the [menu bar plan](plans/menu-bar-app-implementation-plan.md).
+- `Sources/CalRelayApp/`: thin macOS menu bar wrapper with AppKit lifecycle/window presentation and a SwiftUI control panel for setup, status, manual workflows, and composition of reusable CalRelayKit capabilities. See the [app specification](specs/macos-app-spec.md) for behavior and the [implementation plan](plans/menu-bar-app-implementation-plan.md) for validation evidence.
 
 `CalRelayKit` is the intended integration point for command-line, macOS, and future UI wrappers. Keep wrapper targets focused on UI, lifecycle, option parsing, and presentation-shell concerns; put reusable calendar relay behavior and related infrastructure behind kit APIs.
 

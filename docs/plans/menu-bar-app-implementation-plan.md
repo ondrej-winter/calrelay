@@ -12,18 +12,20 @@ APP-AC-17, APP-AC-18.
 [ADR 0006](../adr/0006-run-calrelay-as-a-menu-bar-app.md) records the accepted
 lifecycle decision and supersedes ADR 0001.
 
-**Readiness:** Ready — the accepted outcomes and validation procedures are
-defined. T1 resolves bounded platform and UI-query details before production shell
-work; it does not reopen the accepted product decision. The owner authorized slice-by-slice implementation and local commits without
-pushing on November 6, 2026. Implementation is in progress.
+**Readiness:** Blocked — all implementation slices and automated checks are
+complete; full native acceptance remains outstanding at T4-AC4 and CP-FINAL-3.
+The owner authorized slice-by-slice implementation and local commits without
+pushing on November 6, 2026. This status concerns remaining acceptance evidence,
+not an unresolved product decision.
 
 **Execution boundary:** Implement and validate each slice, then commit that slice
 locally. Do not push, publish, run protected release operations, change dependencies,
 or mutate real calendars. Planning preparation performed no runtime operations;
 implementation evidence is recorded with each task below.
 
-**Next action:** T5, aligning delivered guidance. Required native runtime checks
-remain explicit; the persistent goal covers all tasks and final checks.
+**Next action:** Obtain the outstanding native acceptance evidence in CP-FINAL-3,
+or an explicit owner decision to defer it. The persistent goal remains incomplete
+while required evidence is pending.
 
 ## Scope and implementation approach
 
@@ -46,22 +48,20 @@ remain explicit; the persistent goal covers all tasks and final checks.
 - Use app-scoped ownership for the existing view model and lifecycle. Keep menu
   handlers and window operations thin; do not move reconciliation into AppKit or
   duplicate the scheduling coordinator for the menu.
-- Candidate implementation: production `LSUIElement` metadata and an AppKit
+- Selected implementation: production `LSUIElement` metadata and an AppKit
   status item owned by the existing app delegate, observing the shared presentation
-  state. This fits the existing AppKit window and delegate code. T1 must validate
-  this against Apple's SDK documentation and the fake host before selection.
-  A SwiftUI menu bar scene is an alternative if it simplifies the same lifecycle
-  and accessibility requirements. Use one menu mechanism, not both.
+  state. T1 records the Apple SDK evidence and fake-shell observations supporting
+  this choice. One retained AppKit window hosts the existing SwiftUI control panel.
 - Keep the fake UI host separately identified and permission-free. Share the
   production shell path with injected fake services so its tests exercise real
   window/menu wiring rather than a parallel shell.
 - Helpers, LaunchAgents, operation after app exit, new triggers, visual YAML
   editing, release publication, and unrelated UI redesign remain out of scope.
 
-## Inspected implementation and constraints
+## Baseline inspected before implementation
 
-- `CalRelayApp.swift` constructs one `CalendarListViewModel` and exposes a SwiftUI
-  `Window`. `CalendarListView.swift` currently calls `start()` from `.task`.
+- `CalRelayApp.swift` constructed one `CalendarListViewModel` and exposed a SwiftUI
+  `Window`. `CalendarListView.swift` called `start()` from `.task`.
   `start()` is guarded against repeats, but hidden startup must not depend on
   SwiftUI creating window content.
 - `CalRelayAppDelegate.swift` suppresses the login window, focuses existing
@@ -118,9 +118,10 @@ show the panel; healthy login launches keep it closed under the existing policy.
   services, execution after Quit, or implementation during this planning task.
 - **Accepted assumptions:** None needed for product intent.
 - **Open questions / blockers:** No product questions; Q1–Q4 below are technical
-  verification dependencies. Implementation still awaits the owner's request.
-- **Next step:** Specification and plan refinement under this confirmed intent,
-  followed by owner review; no further interview confirmation is needed.
+  verification dependencies. At this interview stage, implementation awaited
+  the owner's request; that request was subsequently received.
+- **Next step at the interview:** Specification and plan refinement, followed by
+  owner review; no further product interview confirmation was needed.
 
 | ID | Question or assumption | Affected work | Resolution |
 | --- | --- | --- | --- |
@@ -450,7 +451,7 @@ identity continuity still require the explicit native acceptance checkpoint.
 
 ### T5: Align delivered guidance and review the integrated change
 
-- [ ] `T5` — Replace implementation-pending notes with accurate delivered usage.
+- [x] `T5` — Replace implementation-pending notes with accurate delivered usage.
 
 **Basis:** Revision 9 compatibility notice and repository documentation policy.
 **Dependencies:** T4's integrated behavior and focused evidence.
@@ -460,18 +461,32 @@ identity continuity still require the explicit native acceptance checkpoint.
 current references only if the shell change affects their actual instructions;
 preserve historical ADR rationale.
 
-- [ ] `T5-AC1` — Current guidance explains menu access, closing versus quitting,
+- [x] `T5-AC1` — Current guidance explains menu access, closing versus quitting,
   denied-notification fallback, ordinary launch and login presentation, and the
   expanded fake UI lane, including native icon hiding, Spotlight recovery, and
   notification-first runtime alerts. The old Dock workflow is not presented as
   delivered behavior. Pending-implementation labels are removed only when supported by
   implementation evidence, and unverified OS checks remain explicit.
-- [ ] `T5-V1` — Review the full diff against revision 9, verify referenced paths
+- [x] `T5-V1` — Review the full diff against revision 9, verify referenced paths
   and commands, and search current docs/app presentation for stale Dock claims.
   Run `git --no-pager diff HEAD --check`; expect no whitespace errors. Record
   unresolved validation honestly in this plan and the implementation handoff.
 
-**Evidence:** Pending.
+**Evidence (2026-11-06, documentation slice):** Updated configuration guidance,
+repository layout, developer validation instructions, the specification record,
+ADR context, and plan index to describe the implemented shell. Guidance distinguishes
+source availability from a published release, documents macOS icon visibility,
+installed-app Spotlight recovery, close versus Quit, and notification-first
+fallback/coalescing. The developer guide documents the safe no-argument fake host,
+fixed-clock event injection, expanded UI coverage, and test-host visibility
+prerequisite. Historical ADR 0001 remains preserved and superseded.
+
+Reviewed the integrated change against specification revision 9 and searched
+current app/docs for stale Dock-visible or implementation-pending guidance.
+Local documentation links, built-bundle paths, and referenced Make targets were
+verified; `git --no-pager diff HEAD --check` passed. No code changed after T4's
+final source gates. Real Spotlight/indexing and OS lifecycle/presentation checks
+are explicitly unverified rather than inferred from fake tests.
 
 ## Final checks
 
@@ -500,9 +515,21 @@ All commands run from the repository root. Commands below are confirmed from
   authorization and evidence before doing that work; pending evidence blocks a
   claim of full lifecycle validation.
 
-**Evidence:** Pending. Production signing/notarization and remote release are not
-part of this implementation plan; preserve their existing contracts without
-running protected release operations.
+**Evidence:** CP-FINAL-2 passed on the final source state: formatting check, complete
+lint/build/custom-runner/smoke gate, strictly verified local bundle, and all 21 UI
+tests. T4 records native hide/restore observations and restored system state.
+CP-FINAL-1 and CP-FINAL-3 remain open for the missing native evidence below.
+
+| Remaining native evidence | Current limit / required observation |
+| --- | --- |
+| Spotlight with the icon hidden | Computer-use Spotlight launch failed; actual indexed-app search, one-panel recovery, Quit access, and retained hidden visibility across relaunch remain unverified. |
+| Menu keyboard and VoiceOver | Accessible labels and menu queries passed; actual keyboard traversal and spoken output remain unverified. |
+| Real login and wake | Fake policy/trigger paths passed; same-app OS registration, healthy/actionable login presentation, and real wake delivery remain unverified. |
+| Real notifications and Focus | Fake success/denial/submission-failure paths passed; actual notification-only alerting and denied-alert panel fallback with a hidden icon remain unverified. Respect OS presentation controls. |
+| Calendar/upgrade integration | Identity and persisted-format contracts passed; live permission ownership/continuity and scheduling with harmless dedicated calendars remain unverified. Perform only explicit manual validation. |
+
+Production signing/notarization and remote release are not part of this plan;
+their contracts are preserved without running protected release operations.
 
 ## Risks and fallback
 
@@ -563,3 +590,9 @@ verified through deterministic contracts and the 14-case UI lane. T4 is next.
 passed with the full repository gate and signed bundle check. Native icon
 hide/restore was observed and the original setting restored. T4-AC4 and
 CP-FINAL-3 retain the outstanding system-integration acceptance evidence; T5 is next.
+
+2026-11-06 T5: Delivered usage and validation guidance aligned with the final source.
+All five slices are implemented. Local commits so far: T1 `b800311`, T2 `e465229`,
+T3 `83cf37b`, T4 `2a359f4`; T5 is committed with this record. No push or release
+operation was performed. The persistent goal awaits the native checkpoint or an
+explicit owner decision to defer native acceptance.
