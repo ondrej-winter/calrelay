@@ -14,9 +14,7 @@ extension CalendarListViewModel {
                 try await automationState.setNextNominalRunAt(nil)
                 await refreshAutomationPresentation()
                 output = "Scheduled sync paused. Launch at login remains unchanged."
-            } catch {
-                output = "Scheduled sync could not be paused. Try again."
-            }
+            } catch { output = "Scheduled sync could not be paused. Try again." }
             finishOperation()
         }
     }
@@ -37,9 +35,7 @@ extension CalendarListViewModel {
                 await refreshAutomationPresentation()
                 await startAutomationTriggersIfNeeded(runLaunchAttempt: true)
                 output = "Scheduled sync resumed. A fresh automatic attempt is queued."
-            } catch {
-                output = "Scheduled sync could not be resumed. Refresh status and try again."
-            }
+            } catch { output = "Scheduled sync could not be resumed. Refresh status and try again." }
             finishOperation()
         }
     }
@@ -50,9 +46,7 @@ extension CalendarListViewModel {
             do {
                 try launchAtLogin.enable()
                 output = "Launch at login is enabled for the normal CalRelay app."
-            } catch {
-                output = "Launch at login could not be enabled. Review Login Items in System Settings."
-            }
+            } catch { output = "Launch at login could not be enabled. Review Login Items in System Settings." }
             await refreshAutomationPresentation()
             finishOperation()
         }
@@ -67,6 +61,7 @@ extension CalendarListViewModel {
         if state.schedulingPreference == .enabled {
             automationTriggers.scheduleRetry(state.operationalStatus.retryState)
             await startAutomationTriggersIfNeeded(runLaunchAttempt: true)
+            if !automaticAttemptsEnabled { completeInitialAutomaticAttemptPresentation(using: state) }
         }
     }
 
@@ -79,12 +74,9 @@ extension CalendarListViewModel {
 
     func requestAutomaticAttempt(kind: CalendarAutomaticAttemptKind) {
         switch operationCoordinator.request(.automaticReconciliation) {
-        case .start:
-            runAutomaticAttempt(kind: kind)
-        case .coalesced:
-            pendingAutomaticKind = mergedAutomaticKind(pendingAutomaticKind, kind)
-        case .rejected:
-            break
+        case .start: runAutomaticAttempt(kind: kind)
+        case .coalesced: pendingAutomaticKind = mergedAutomaticKind(pendingAutomaticKind, kind)
+        case .rejected: break
         }
     }
 
@@ -127,9 +119,7 @@ extension CalendarListViewModel {
         isAutomationTriggerSourceRunning = false
     }
 
-    func enableLaunchAtLoginForScheduling() {
-        do { try launchAtLogin.enable() } catch {}
-    }
+    func enableLaunchAtLoginForScheduling() { do { try launchAtLogin.enable() } catch {} }
 
     func takePendingAutomaticKind() -> CalendarAutomaticAttemptKind {
         defer { pendingAutomaticKind = nil }
@@ -144,11 +134,8 @@ extension CalendarListViewModel {
     }
 
     private func mergedAutomaticKind(
-        _ existing: CalendarAutomaticAttemptKind?,
-        _ incoming: CalendarAutomaticAttemptKind
-    ) -> CalendarAutomaticAttemptKind {
-        existing == .ordinary || incoming == .ordinary ? .ordinary : .retry
-    }
+        _ existing: CalendarAutomaticAttemptKind?, _ incoming: CalendarAutomaticAttemptKind
+    ) -> CalendarAutomaticAttemptKind { existing == .ordinary || incoming == .ordinary ? .ordinary : .retry }
 
     func applyAutomationState(_ state: CalendarAutomationPersistentState) {
         schedulingPreference = state.schedulingPreference
@@ -159,7 +146,7 @@ extension CalendarListViewModel {
         }
 
         let status = state.operationalStatus
-        let now = Date()
+        let now = now()
         let policy = CalendarAutomationSchedulingPolicy()
         let overdue = policy.isFreshnessOverdue(
             schedulingPreference: state.schedulingPreference, lastSuccessAt: status.freshness.lastSuccessAt, now: now)
@@ -169,8 +156,7 @@ extension CalendarListViewModel {
             "Confirmed creates/deletes: \(status.confirmedCounts.confirmedCreates)/\(status.confirmedCounts.confirmedDeletes)",
             "Last success: \(Self.format(status.freshness.lastSuccessAt))",
             "Next nominal run: \(Self.format(status.freshness.nextNominalRunAt))",
-            "Retry: \(Self.retryDescription(status.retryState))",
-            "Freshness: \(overdue ? "overdue" : "not overdue")"
+            "Retry: \(Self.retryDescription(status.retryState))", "Freshness: \(overdue ? "overdue" : "not overdue")"
         ].joined(separator: "\n")
         applyAutomationAttention(state, overdue: overdue, now: now)
         applyAutomationPrimaryState(state, now: now)
@@ -181,16 +167,14 @@ extension CalendarListViewModel {
         case .enabled: launchAtLoginSummary = "Enabled for the normal Dock-visible app."
         case .disabled:
             launchAtLoginSummary =
-                isSchedulingEnabled ? "Disabled while scheduling is enabled; post-login freshness is degraded." : "Disabled."
-        case .requiresApproval:
-            launchAtLoginSummary = "Requires approval in System Settings > General > Login Items."
+                isSchedulingEnabled
+                ? "Disabled while scheduling is enabled; post-login freshness is degraded." : "Disabled."
+        case .requiresApproval: launchAtLoginSummary = "Requires approval in System Settings > General > Login Items."
         case .unavailable: launchAtLoginSummary = "Unavailable for the current app installation."
         }
     }
 
-    func refreshNotificationSummary() async {
-        notificationSummary = await automationAttention.authorizationSummary()
-    }
+    func refreshNotificationSummary() async { notificationSummary = await automationAttention.authorizationSummary() }
 
     private func prepareInitialLaunchPresentation(using state: CalendarAutomationPersistentState) {
         guard !didResolveInitialLaunchPresentation else { return }
@@ -215,7 +199,7 @@ extension CalendarListViewModel {
         guard let controlPanelPrimaryState else { return .showControlPanel }
         return CalendarLoginLaunchPolicy().presentation(
             launchContext: launchContext(), controlPanelState: controlPanelPrimaryState, automationState: state,
-            launchAtLoginHealthy: launchAtLogin.currentState() == .enabled, now: Date())
+            launchAtLoginHealthy: launchAtLogin.currentState() == .enabled, now: now())
     }
 
     func completeInitialLaunchPresentation(_ presentation: CalendarLoginLaunchPresentation) {
@@ -229,8 +213,7 @@ extension CalendarListViewModel {
         let reason = CalendarAutomationAttentionPolicy().reason(
             schedulingPreference: state.schedulingPreference,
             hasStandingAuthorization: state.standingAuthorization != nil,
-            launchAtLoginHealthy: launchAtLogin.currentState() == .enabled,
-            operationalStatus: state.operationalStatus,
+            launchAtLoginHealthy: launchAtLogin.currentState() == .enabled, operationalStatus: state.operationalStatus,
             now: now)
         automationAttention.update(reason: reason)
         automationAttentionSummary = Self.attentionDescription(reason, overdue: overdue)

@@ -47,6 +47,7 @@ import SwiftUI
     let automationAttention: any CalendarAutomationAttentionControlling
     let launchContext: () -> CalendarAppLaunchContext
     let resolveInitialLaunchPresentation: (CalendarLoginLaunchPresentation) -> Void
+    let now: () -> Date
     let automaticAttemptsEnabled: Bool
     var operationCoordinator = CalendarAppOperationCoordinator()
     var pendingAutomaticKind: CalendarAutomaticAttemptKind?
@@ -64,14 +65,12 @@ import SwiftUI
         manualApply: CalendarManualApplyUseCase, manualCleanup: CalendarManualCleanupUseCase,
         standingAuthorization: CalendarStandingAuthorizationUseCase,
         automaticReconciliation: CalendarAutomaticReconciliationUseCase,
-        automationState: CalendarAutomationStateUseCase,
-        configurationObserver: ConfigurationFileObserver,
-        automationTriggers: CalendarAutomationTriggerSource,
-        launchAtLogin: CalendarLaunchAtLoginController,
+        automationState: CalendarAutomationStateUseCase, configurationObserver: ConfigurationFileObserver,
+        automationTriggers: CalendarAutomationTriggerSource, launchAtLogin: CalendarLaunchAtLoginController,
         automationAttention: any CalendarAutomationAttentionControlling,
         launchContext: @escaping () -> CalendarAppLaunchContext,
         resolveInitialLaunchPresentation: @escaping (CalendarLoginLaunchPresentation) -> Void,
-        automaticAttemptsEnabled: Bool = true
+        now: @escaping () -> Date = Date.init, automaticAttemptsEnabled: Bool = true
     ) {
         self.inventory = inventory
         self.setup = setup
@@ -88,6 +87,7 @@ import SwiftUI
         self.automationAttention = automationAttention
         self.launchContext = launchContext
         self.resolveInitialLaunchPresentation = resolveInitialLaunchPresentation
+        self.now = now
         self.automaticAttemptsEnabled = automaticAttemptsEnabled
     }
 
@@ -443,12 +443,9 @@ import SwiftUI
         isLoading = false
         guard let next = operationCoordinator.finish() else { return }
         switch next {
-        case .configurationRecovery:
-            recoverFromConfigurationChange(preservingOperationOutput: true)
-        case .automaticReconciliation:
-            runAutomaticAttempt(kind: takePendingAutomaticKind())
-        default:
-            break
+        case .configurationRecovery: recoverFromConfigurationChange(preservingOperationOutput: true)
+        case .automaticReconciliation: runAutomaticAttempt(kind: takePendingAutomaticKind())
+        default: break
         }
     }
 

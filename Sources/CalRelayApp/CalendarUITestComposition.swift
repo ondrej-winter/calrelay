@@ -6,6 +6,7 @@ enum CalendarUITestScenario: String {
     case missingConfiguration = "missing-configuration"
     case calendarAccessUnavailable = "calendar-access-unavailable"
     case ready
+    case healthyLogin = "healthy-login"
     case manualApplyFailure = "manual-apply-failure"
     case migrationPending = "migration-pending"
     case cleanupApplyFailure = "cleanup-apply-failure"
@@ -60,8 +61,11 @@ enum CalendarUITestScenario: String {
             configurationObserver: ConfigurationFileObserver(selectedFile: selectedFile, isEnabled: false),
             automationTriggers: CalendarAutomationTriggerSource(isEnabled: false),
             launchAtLogin: CalendarLaunchAtLoginController(isEnabled: false),
-            automationAttention: CalendarUITestAttentionController(), launchContext: { .ordinary },
-            resolveInitialLaunchPresentation: { _ in }, automaticAttemptsEnabled: false)
+            automationAttention: CalendarUITestAttentionController(),
+            launchContext: { scenario == .healthyLogin ? .loginItem : .ordinary },
+            resolveInitialLaunchPresentation: { presentation in
+                (NSApp.delegate as? CalRelayAppDelegate)?.resolveInitialLaunchPresentation(presentation)
+            }, now: { now }, automaticAttemptsEnabled: false)
     }
 }
 
@@ -69,7 +73,7 @@ private struct CalendarUITestFixture {
     let settingsProvider: CalendarUITestSettingsProvider
     let authorization: CalendarUITestAuthorization
     let calendarStore: CalendarUITestCalendarStore
-    let automationStateStore = CalendarUITestAutomationStateStore()
+    let automationStateStore: CalendarUITestAutomationStateStore
     let calendar: Calendar
 
     init(scenario: CalendarUITestScenario, now: Date) {
@@ -79,8 +83,7 @@ private struct CalendarUITestFixture {
 
         let hub = RelayCalendar(id: "ui-hub", title: "Test Hub", sourceTitle: "Test Account", isWritable: true)
         let work = RelayCalendar(id: "ui-work", title: "Test Work", sourceTitle: "Test Account", isWritable: true)
-        let legacyMarkers =
-            scenario == .migrationPending || scenario == .cleanupApplyFailure ? ["[RETIRED_TEST]"] : []
+        let legacyMarkers = scenario == .migrationPending || scenario == .cleanupApplyFailure ? ["[RETIRED_TEST]"] : []
         let settings = CalendarRelaySettings(
             hubCalendar: HubCalendarSettings(
                 calendar: CalendarSelector(sourceTitle: hub.sourceTitle, calendarTitle: hub.title)),
@@ -90,6 +93,15 @@ private struct CalendarUITestFixture {
                     name: "Test role", prefix: "[WORK]",
                     calendar: CalendarSelector(sourceTitle: work.sourceTitle, calendarTitle: work.title))
             ], legacyMarkers: legacyMarkers)
+
+        let binding = CalendarStandingAuthorizationBinding.derive(
+            settings: settings, resolvedCalendars: [hub.id, work.id], policyVersion: .current)
+        let state = CalendarAutomationPersistentState(
+            schedulingPreference: .enabled, standingAuthorization: binding,
+            operationalStatus: CalendarAutomationOperationalStatus(
+                lastAttemptAt: now, latestOutcome: .noChanges, confirmedCounts: .zero, retryState: .none,
+                freshness: CalendarAutomationFreshnessMetadata(lastSuccessAt: now, nextNominalRunAt: nil)))
+        automationStateStore = CalendarUITestAutomationStateStore(state: scenario == .healthyLogin ? state : .empty)
 
         switch scenario {
         case .missingConfiguration:
@@ -103,7 +115,7 @@ private struct CalendarUITestFixture {
                     LoadedCalendarRelaySettings(displayPath: "~/.config/calrelay/config.yaml", settings: settings)))
             authorization = CalendarUITestAuthorization(state: .denied)
             calendarStore = CalendarUITestCalendarStore(calendars: [hub, work], events: [:])
-        case .ready, .manualApplyFailure:
+        case .ready, .manualApplyFailure, .healthyLogin:
             settingsProvider = CalendarUITestSettingsProvider(
                 result: .success(
                     LoadedCalendarRelaySettings(displayPath: "~/.config/calrelay/config.yaml", settings: settings)))
@@ -214,7 +226,9 @@ private struct CalendarUITestStoreFailure: Error {}
 }
 
 private actor CalendarUITestAutomationStateStore: CalendarAutomationStateStore {
-    private var state = CalendarAutomationPersistentState.empty
+    private var state: CalendarAutomationPersistentState
+
+    init(state: CalendarAutomationPersistentState = .empty) { self.state = state }
 
     func loadState() async -> CalendarAutomationPersistentState { state }
 

@@ -9,7 +9,7 @@ import SwiftUI
         if let scenario = CalendarUITestScenario.current(arguments: CommandLine.arguments) {
             let viewModel = CalendarUITestComposition.makeViewModel(scenario: scenario)
             self.viewModel = viewModel
-            appDelegate.configureUITestWindow(viewModel: viewModel)
+            appDelegate.configure(viewModel: viewModel)
             return
         }
 
@@ -49,10 +49,8 @@ import SwiftUI
                 (NSApp.delegate as? CalRelayAppDelegate)?.resolveInitialLaunchPresentation(presentation)
             })
         self.viewModel = viewModel
-        appDelegate.shouldWarnBeforeQuit = { [weak viewModel] in viewModel?.isSchedulingEnabled == true }
+        appDelegate.configure(viewModel: viewModel)
     }
 
-    var body: some Scene {
-        Window("CalRelay", id: "main") { CalendarListView(viewModel: viewModel).frame(minWidth: 720, minHeight: 480) }
-    }
+    var body: some Scene { Settings { EmptyView() } }
 }

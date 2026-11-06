@@ -20,6 +20,8 @@
     <string>__CALRELAY_VERSION__</string>
     <key>CFBundleVersion</key>
     <string>__CALRELAY_BUNDLE_VERSION__</string>
+    <key>LSUIElement</key>
+    <true/>
     <key>LSMinimumSystemVersion</key>
     <string>26.0</string>
     <key>NSCalendarsFullAccessUsageDescription</key>

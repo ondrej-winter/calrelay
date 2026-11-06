@@ -14,7 +14,7 @@ struct CalendarListView: View {
             schedulingControls
             if viewModel.isMigrationPending { cleanupControls }
             calendarOutput
-        }.padding().task { viewModel.start() }.sheet(item: $viewModel.manualReview) { review in
+        }.padding().sheet(item: $viewModel.manualReview) { review in
             VStack(alignment: .leading, spacing: 16) {
                 Text("Review Sync Plan").font(.title2).accessibilityIdentifier("manual-review-title")
                 Text(viewModel.reviewNotice).accessibilityIdentifier("manual-review-notice")
@@ -61,7 +61,12 @@ struct CalendarListView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("CalRelay").font(.largeTitle)
+            HStack {
+                Text("CalRelay").font(.largeTitle)
+                Spacer()
+                Button("Quit CalRelay") { NSApplication.shared.terminate(nil) }.keyboardShortcut("q")
+                    .accessibilityIdentifier("quit-calrelay")
+            }
             Text(
                 "Verify Calendar access, inspect visible calendars, and review or explicitly confirm an ordinary sync."
             ).foregroundStyle(.secondary)

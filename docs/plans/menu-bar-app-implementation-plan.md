@@ -22,7 +22,7 @@ locally. Do not push, publish, run protected release operations, change dependen
 or mutate real calendars. Planning preparation performed no runtime operations;
 implementation evidence is recorded with each task below.
 
-**Next action:** T2, using the T1 platform findings below. Required runtime checks
+**Next action:** T3, building on the committed menu shell. Required runtime checks
 remain explicit; the persistent goal covers all tasks and final checks.
 
 ## Scope and implementation approach
@@ -213,7 +213,7 @@ separately; it is not claimed passed here. No production app or EventKit was use
 
 ### T2: Deliver the persistent menu shell and recoverable panel
 
-- [ ] `T2` — Replace Dock presentation and make startup independent of the window.
+- [x] `T2` — Replace Dock presentation and make startup independent of the window.
 
 **Basis:** APP-01, APP-04, APP-06; APP-AC-01 and APP-AC-12.
 **Dependencies:** T1's selected shell, startup, and query mechanisms.
@@ -226,21 +226,21 @@ separately; it is not claimed passed here. No production app or EventKit was use
 **Proposed new component:** `Sources/CalRelayApp/CalendarMenuBarController.swift`
 if the selected AppKit approach needs a separate small presentation controller.
 
-- [ ] `T2-AC1` — One app-owned menu item is available with Open CalRelay and Quit
+- [x] `T2-AC1` — One app-owned menu item is available with Open CalRelay and Quit
   CalRelay; no Dock icon appears during startup or with the panel open or closed.
   The item respects macOS hiding instead of forcing itself visible.
   Both production and fake bundles use the intended shell metadata while
   retaining their distinct identities and permission metadata.
-- [ ] `T2-AC2` — Menu Open, explicit launch, and reopen (including Spotlight with
+- [x] `T2-AC2` — Menu Open, explicit launch, and reopen (including Spotlight with
   the item hidden) focus one existing panel or recreate it after closure, without
   duplicates. Intentional Quit remains accessible from the focused app even when
   the status item is hidden. Pending review sheets and their existing
   confirmation/cancellation behavior remain intact.
-- [ ] `T2-AC3` — One shared view model starts from app lifecycle, including when
+- [x] `T2-AC3` — One shared view model starts from app lifecycle, including when
   login presentation stays hidden. Closing/reopening the panel or opening the
   menu neither restarts observers/triggers nor terminates the app. No slow work
   moves onto the main actor as part of the shell.
-- [ ] `T2-V1` — Add metadata regression assertions and fake UI flows for Open,
+- [x] `T2-V1` — Add metadata regression assertions and fake UI flows for Open,
   close/reopen, focus without duplicates, and a startup counter or equivalent
   fake lifecycle evidence. Introduce injectable fake launch context and shared
   presentation callbacks here so hidden startup can be verified before T2 is
@@ -249,8 +249,35 @@ if the selected AppKit approach needs a separate small presentation controller.
   and `make ui-test`; expect the new cases and existing review flows to pass.
   Runtime Dock absence is additionally verified at CP-FINAL-3.
 
-**Evidence:** Pending. Add focused regression coverage before changing the
-behavior where practical; keep metadata assertions distinct from runtime proof.
+**Evidence (2026-11-06, vertical slice):** Both source plists now declare
+`LSUIElement`; the delegate owns one retained panel and status item for production
+and fake composition, starts the shared view model independently of presentation,
+and keeps the process alive after window closure. The panel exposes intentional
+Quit even when the icon is hidden. Fake healthy login uses seeded authorization,
+a fixed presentation clock, and the production launch-presentation callback;
+reopening uses Launch Services without starting another view model.
+
+RED: the focused metadata suite failed because `LSUIElement` was absent; the menu
+UI case failed because there was no status item; the hidden-login case failed
+because the panel was visible. GREEN: `CalendarAppBundleMetadataTests` passed,
+`make check` passed (SwiftLint: zero violations), `make app` built and strictly
+verified the local bundle, and `make ui-test` passed all 12 cases, including menu
+close/reopen, healthy hidden login, manual and cleanup reviews, Escape cancellation,
+pause/resume, and relaunch disposal. `make format-check` exited successfully with
+existing warnings outside this slice's formatted files; `git diff HEAD --check`
+passed. The app/Control Center accessibility query reached the actual status item
+and Open action, resolving T1's query-reachability uncertainty.
+
+The old Dock-shell UI baseline had one cleanup-sheet timeout and subsequent UI
+authorization failures. The complete 12-case run through the new shared shell
+passed without those failures. Desktop activity produced interruption diagnostics
+but no failures in the passing run. Accessory apps may report background state
+with a visible window, so the harness asserts process existence and actual panel
+content instead of requiring a Dock-style foreground state. No test skips or
+permission bypasses were added. Final macOS settings, Spotlight indexing, login,
+wake, and real notification evidence remain at CP-FINAL-3. Self-review found no
+remaining blocking issue for this shell slice; scheduling and permission authority,
+production identity, and dependency files are unchanged.
 
 ### T3: Deliver menu status and notification-independent attention
 
@@ -450,3 +477,6 @@ was preserved; no staging, commit, or push was performed by this agent.
 2026-11-06 implementation start: Owner requested a persistent implementation goal
 and one local commit per completed slice, without pushing. T1 records the bounded
 platform proof and its runtime limits; T2 begins the actual app shell.
+
+2026-11-06 T2: Shared menu/window shell verified and ready for its local slice
+commit. All 12 fake UI cases and the complete deterministic gate passed; T3 is next.

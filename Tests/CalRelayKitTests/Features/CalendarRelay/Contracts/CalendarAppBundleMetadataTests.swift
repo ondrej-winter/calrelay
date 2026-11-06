@@ -10,6 +10,7 @@ enum CalendarAppBundleMetadataTests {
     static func runAll() throws {
         try testProductionSourceInfoPlistContainsNonemptyCalendarUsageDescriptions()
         try testProductionSourceDeclaresApplicationIcon()
+        try testAppAndFakeHostUseAccessoryPresentation()
         try testProductionSourceEntitlementsAllowCalendarAccessWithoutSandbox()
         try testLocalAppBuildSignsWithCalendarEntitlements()
         try testUITestHostSourceInfoPlistOmitsCalendarUsageDescriptions()
@@ -24,6 +25,15 @@ enum CalendarAppBundleMetadataTests {
         for key in calendarUsageDescriptionKeys { try expectNonemptyString(metadata[key], key: key) }
     }
 
+    private static func testAppAndFakeHostUseAccessoryPresentation() throws {
+        let root = try repositoryRoot()
+        for path in ["Resources/CalRelayApp/Info.plist", "Resources/CalRelayUITestHost/Info.plist"] {
+            let metadata = try propertyList(at: root.appendingPathComponent(path))
+            try expect(metadata["LSUIElement"] as? Bool == true, "\(path) must suppress Dock presence")
+            try expect(metadata["LSBackgroundOnly"] == nil, "The app must retain recoverable UI")
+        }
+    }
+
     private static func testProductionSourceDeclaresApplicationIcon() throws {
         let root = try repositoryRoot()
         let metadata = try propertyList(at: root.appendingPathComponent("Resources/CalRelayApp/Info.plist"))
@@ -32,7 +42,8 @@ enum CalendarAppBundleMetadataTests {
             metadata["CFBundleIconFile"] as? String == "CalRelay.icns",
             "The production app must declare CalRelay.icns as its application icon")
         let iconData = try Data(contentsOf: root.appendingPathComponent("Resources/CalRelayApp/CalRelay.icns"))
-        try expect(iconData.starts(with: Data("icns".utf8)), "The production application icon must be a valid ICNS file")
+        try expect(
+            iconData.starts(with: Data("icns".utf8)), "The production application icon must be a valid ICNS file")
     }
 
     private static func testProductionSourceEntitlementsAllowCalendarAccessWithoutSandbox() throws {
@@ -95,7 +106,8 @@ enum CalendarAppBundleMetadataTests {
 
         let script = fixtureRoot.appendingPathComponent("scripts/build-calrelay-app.sh")
         try fileManager.copyItem(at: root.appendingPathComponent("scripts/build-calrelay-app.sh"), to: script)
-        try fileManager.copyItem(at: root.appendingPathComponent("VERSION"), to: fixtureRoot.appendingPathComponent("VERSION"))
+        try fileManager.copyItem(
+            at: root.appendingPathComponent("VERSION"), to: fixtureRoot.appendingPathComponent("VERSION"))
         try fileManager.copyItem(
             at: root.appendingPathComponent("Resources/CalRelayApp/CalRelay.icns"),
             to: fixtureRoot.appendingPathComponent("Resources/CalRelayApp/CalRelay.icns"))

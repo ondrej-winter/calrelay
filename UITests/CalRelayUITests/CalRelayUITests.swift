@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 @MainActor final class CalRelayUITests: XCTestCase {
@@ -196,6 +197,40 @@ import XCTest
         assertElement("automation-attention-status", in: app, contains: "within the last hour")
     }
 
+    func testHealthyLoginStartsWithoutOpeningControlPanel() async throws {
+        let app = XCUIApplication(url: Self.testHostURL)
+        app.launchArguments = ["--calrelay-ui-testing", "--calrelay-ui-test-scenario", "healthy-login"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertNotEqual(app.state, .notRunning)
+        XCTAssertFalse(app.windows["calrelay-control-panel"].exists)
+        _ = try await NSWorkspace.shared.openApplication(at: Self.testHostURL, configuration: .init())
+        assertElement("configuration-status", in: app, contains: "Valid:")
+        assertElement("scheduling-status", in: app, contains: "Enabled")
+    }
+
+    func testMenuBarRecoversClosedPanelWithoutDuplicates() {
+        let app = launch(scenario: "ready")
+        defer { app.terminate() }
+        let panel = app.windows["calrelay-control-panel"]
+        panel.buttons[XCUIIdentifierCloseWindow].click()
+        waitUntilMissing(panel)
+        XCTAssertNotEqual(app.state, .notRunning)
+        let system = XCUIApplication(bundleIdentifier: "com.apple.controlcenter")
+        let item = system.descendants(matching: .any)["calrelay-status-item"]
+        let localItem = app.descendants(matching: .any)["calrelay-status-item"]
+        let statusItem = localItem.waitForExistence(timeout: 2) ? localItem : item
+        XCTAssertTrue(statusItem.waitForExistence(timeout: 10))
+        statusItem.click()
+        let localOpen = app.menuItems["Open CalRelay"]
+        let open = localOpen.waitForExistence(timeout: 2) ? localOpen : system.menuItems["Open CalRelay"]
+        XCTAssertTrue(open.waitForExistence(timeout: 10))
+        open.click()
+        XCTAssertTrue(panel.waitForExistence(timeout: 10))
+        XCTAssertEqual(app.windows.matching(identifier: "calrelay-control-panel").count, 1)
+        assertElement("configuration-status", in: app, contains: "Valid:")
+    }
+
     private func launch(scenario: String) -> XCUIApplication {
         let hostExists = FileManager.default.fileExists(atPath: Self.testHostURL.path)
         XCTAssertTrue(hostExists)
@@ -204,8 +239,7 @@ import XCTest
         defer { if !launchCompleted { app.terminate() } }
         app.launchArguments = ["--calrelay-ui-testing", "--calrelay-ui-test-scenario", scenario]
         app.launch()
-        let isRunning = app.wait(for: .runningForeground, timeout: 10)
-        XCTAssertTrue(isRunning)
+        XCTAssertNotEqual(app.state, .notRunning)
         let primaryStatusExists = element("primary-status", in: app).waitForExistence(timeout: 10)
         XCTAssertTrue(primaryStatusExists)
         launchCompleted = true

@@ -4,71 +4,76 @@ import CoreServices
 import SwiftUI
 
 @MainActor final class CalRelayAppDelegate: NSObject, NSApplicationDelegate {
-    var shouldWarnBeforeQuit: () -> Bool = { false }
     private(set) var initialLaunchContext = CalendarAppLaunchContext.ordinary
-    private var isSuppressingInitialLoginWindow = false
-    private var windowPresentationObserver: NSObjectProtocol?
-    private var uiTestViewModel: CalendarListViewModel?
-    private var uiTestWindow: NSWindow?
+    private var isAwaitingLoginPresentation = false
+    private var viewModel: CalendarListViewModel?
+    private var controlPanel: NSWindow?
+    private var menuBar: CalendarMenuBarController?
 
-    func configureUITestWindow(viewModel: CalendarListViewModel) { uiTestViewModel = viewModel }
+    func configure(viewModel: CalendarListViewModel) { self.viewModel = viewModel }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
-        initialLaunchContext = Self.launchContext(for: NSAppleEventManager.shared().currentAppleEvent)
-        guard initialLaunchContext == .loginItem else { return }
-
-        isSuppressingInitialLoginWindow = true
-        windowPresentationObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main
-        ) { [weak self] _ in MainActor.assumeIsolated { self?.hideControlPanel() } }
+        if CalendarUITestScenario.current(arguments: CommandLine.arguments) == .healthyLogin {
+            initialLaunchContext = .loginItem
+        } else {
+            initialLaunchContext = Self.launchContext(for: NSAppleEventManager.shared().currentAppleEvent)
+        }
+        isAwaitingLoginPresentation = initialLaunchContext == .loginItem
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        if let uiTestViewModel {
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 820, height: 860),
-                styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-            window.title = "CalRelay"
-            window.center()
-            window.contentView = NSHostingView(rootView: CalendarListView(viewModel: uiTestViewModel))
-            window.makeKeyAndOrderFront(nil)
-            uiTestWindow = window
-            NSApp.activate()
-            return
-        }
-        if isSuppressingInitialLoginWindow { hideControlPanel() }
+        menuBar = CalendarMenuBarController(openControlPanel: { [weak self] in self?.openControlPanel() })
+        if !isAwaitingLoginPresentation { showControlPanel() }
+        viewModel?.start()
     }
 
     func resolveInitialLaunchPresentation(_ presentation: CalendarLoginLaunchPresentation) {
-        guard isSuppressingInitialLoginWindow else { return }
-        switch presentation {
-        case .showControlPanel:
-            stopSuppressingInitialLoginWindow()
-            showControlPanel()
-        case .keepControlPanelHidden:
-            hideControlPanel()
-            stopSuppressingInitialLoginWindow()
-        }
+        guard isAwaitingLoginPresentation else { return }
+        isAwaitingLoginPresentation = false
+        if presentation == .showControlPanel { showControlPanel() }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
-        guard !hasVisibleWindows else { return true }
-        stopSuppressingInitialLoginWindow()
-        showControlPanel()
+        openControlPanel()
         return false
     }
 
-    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard shouldWarnBeforeQuit() else { return .terminateNow }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard viewModel?.isSchedulingEnabled == true else { return .terminateNow }
         let alert = NSAlert()
         alert.messageText = "Quit CalRelay?"
         alert.informativeText =
-            "Scheduled synchronization stops when the normal app is not running. Availability may become stale until the next manual launch or login."
+            "Scheduled synchronization stops when CalRelay is not running. Availability may become stale until the next manual launch or login."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Quit")
         alert.addButton(withTitle: "Cancel")
         return alert.runModal() == .alertFirstButtonReturn ? .terminateNow : .terminateCancel
+    }
+
+    func openControlPanel() {
+        isAwaitingLoginPresentation = false
+        showControlPanel()
+    }
+
+    private func showControlPanel() {
+        guard let viewModel else { return }
+        if controlPanel == nil {
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 820, height: 860),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+            window.title = "CalRelay"
+            window.identifier = NSUserInterfaceItemIdentifier("calrelay-control-panel")
+            window.minSize = NSSize(width: 720, height: 480)
+            window.isReleasedWhenClosed = false
+            window.contentView = NSHostingView(rootView: CalendarListView(viewModel: viewModel))
+            window.center()
+            controlPanel = window
+        }
+        controlPanel?.deminiaturize(nil)
+        controlPanel?.makeKeyAndOrderFront(nil)
+        NSApp.activate()
     }
 
     private static func launchContext(for event: NSAppleEventDescriptor?) -> CalendarAppLaunchContext {
@@ -76,21 +81,5 @@ import SwiftUI
             event?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
         else { return .ordinary }
         return .loginItem
-    }
-
-    private func stopSuppressingInitialLoginWindow() {
-        isSuppressingInitialLoginWindow = false
-        if let windowPresentationObserver { NotificationCenter.default.removeObserver(windowPresentationObserver) }
-        windowPresentationObserver = nil
-    }
-
-    private func hideControlPanel() {
-        guard isSuppressingInitialLoginWindow else { return }
-        for window in NSApp.windows { window.orderOut(nil) }
-    }
-
-    private func showControlPanel() {
-        NSApp.activate()
-        for window in NSApp.windows { window.makeKeyAndOrderFront(nil) }
     }
 }
