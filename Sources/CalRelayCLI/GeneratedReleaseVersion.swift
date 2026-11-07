@@ -1,3 +1,3 @@
 enum GeneratedReleaseVersion {
-    static let value = "1.4.0"
+    static let value = "1.4.1"
 }
