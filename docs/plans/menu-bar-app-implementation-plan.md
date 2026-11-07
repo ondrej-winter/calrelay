@@ -12,20 +12,20 @@ APP-AC-17, APP-AC-18.
 [ADR 0006](../adr/0006-run-calrelay-as-a-menu-bar-app.md) records the accepted
 lifecycle decision and supersedes ADR 0001.
 
-**Readiness:** Blocked — all implementation slices and automated checks are
-complete; full native acceptance remains outstanding at T4-AC4 and CP-FINAL-3.
-The owner authorized slice-by-slice implementation and local commits without
-pushing on November 6, 2026. This status concerns remaining acceptance evidence,
-not an unresolved product decision.
+**Readiness:** Ready — implementation complete, with remaining native acceptance
+explicitly deferred by the owner on November 7, 2026. T4-AC4 and CP-FINAL-3 retain
+the unverified checks; they are not represented as passed. The owner authorized
+slice-by-slice implementation and local commits without pushing on November 6,
+2026, then requested completion of the implementation goal with this deferral.
 
 **Execution boundary:** Implement and validate each slice, then commit that slice
 locally. Do not push, publish, run protected release operations, change dependencies,
 or mutate real calendars. Planning preparation performed no runtime operations;
 implementation evidence is recorded with each task below.
 
-**Next action:** Obtain the outstanding native acceptance evidence in CP-FINAL-3,
-or an explicit owner decision to defer it. The persistent goal remains incomplete
-while required evidence is pending.
+**Next action:** No further work is required for this implementation goal. Resume
+the deferred native acceptance checkpoint separately when requested; the product
+contract and its native verification expectations remain unchanged.
 
 ## Scope and implementation approach
 
@@ -398,6 +398,10 @@ under `Tests/CalRelayKitTests/Features/CalendarRelay/Contracts/`;
   hiding does not change scheduling. Post-startup problem routing follows T3-AC4
   while actionable-login recovery retains its existing opening policy even when
   notifications are available. No automatic presentation confirms pending mutation.
+
+  **Deferred:** Remaining native evidence explicitly deferred by the owner on
+  November 7, 2026. Automated and observed native evidence is retained below;
+  unchecked status does not indicate missing implementation work.
 - [x] `T4-V1` — Extend T2's fake lifecycle composition with explicit trigger
   delivery and retained-preference/Quit scenarios while preserving its
   disabled EventKit, OS registration, notifications, filesystem observation, and
@@ -490,11 +494,14 @@ are explicitly unverified rather than inferred from fake tests.
 
 ## Final checks
 
-**Prerequisites:** T1 through T5 and their required focused evidence.
+**Prerequisites:** T1 through T5 and their required focused evidence. For
+implementation closure, the owner explicitly deferred the remaining native
+acceptance evidence on November 7, 2026; this is not full lifecycle validation.
 All commands run from the repository root. Commands below are confirmed from
 `docs/development.md` and `Makefile`; execution evidence is recorded per slice.
 
-- [ ] `CP-FINAL-1` — Every in-scope requirement has evidence, the diff contains
+- [x] `CP-FINAL-1` — Every in-scope requirement has evidence or an explicit
+  owner-approved native-validation deferral, the diff contains
   only the intended shell and supporting changes, and existing user work remains
   preserved. No unresolved required check is represented as passed.
 - [x] `CP-FINAL-2` — Run `make format-check`, `make check`, `make app`, and
@@ -515,10 +522,15 @@ All commands run from the repository root. Commands below are confirmed from
   authorization and evidence before doing that work; pending evidence blocks a
   claim of full lifecycle validation.
 
+  **Deferred:** Owner response on November 7, 2026: “Defer native acceptance and
+  finish the implementation goal.” The remaining checks below are retained for
+  later execution and are not a condition of this implementation goal's closure.
+
 **Evidence:** CP-FINAL-2 passed on the final source state: formatting check, complete
 lint/build/custom-runner/smoke gate, strictly verified local bundle, and all 21 UI
 tests. T4 records native hide/restore observations and restored system state.
-CP-FINAL-1 and CP-FINAL-3 remain open for the missing native evidence below.
+CP-FINAL-1 is complete under the owner's explicit deferral. CP-FINAL-3 remains
+unverified and deferred for the native evidence below.
 
 **Additional native evidence (2026-11-06):** With **CalRelayUITestHost** disabled
 in macOS Menu Bar settings, ran the existing
@@ -534,7 +546,7 @@ or production Calendar/identity evidence. A direct Command-Space attempt also
 produced no observable Spotlight UI in the computer-use session; the Spotlight
 checkpoint remains unresolved.
 
-| Remaining native evidence | Current limit / required observation |
+| Deferred native evidence | Current limit / required observation |
 | --- | --- |
 | Spotlight with the icon hidden | Hidden test-host launch, Quit, and native preference persistence passed. Computer-use Spotlight launch failed; actual indexed-app search/reopen, one-panel recovery, and production hidden-visibility continuity remain unverified. |
 | Menu keyboard and VoiceOver | Accessible labels and menu queries passed; actual keyboard traversal and spoken output remain unverified. |
@@ -615,3 +627,14 @@ explicit owner decision to defer native acceptance.
 hidden, and the OS visibility preference persisted across launches. Restored the
 original setting and recorded this stronger evidence without changing source or
 claiming the remaining native checkpoint complete.
+
+2026-11-07 closure: The owner explicitly selected “Defer native acceptance and
+finish the implementation goal.” All five implementation slices and their local
+commits are complete. The final source remains identical to the source validated
+by `make format-check`, `make check`, `make app`, and the passing 21-case UI lane;
+two additional hidden-icon UI checks also passed. T4-AC4 and CP-FINAL-3 remain
+unchecked, explicitly deferred, and unverified. Product requirements are unchanged;
+no claim of full native lifecycle acceptance is made. Documentation links and
+`git --no-pager diff HEAD --check` were verified for this closure record. The
+implementation goal is complete with the owner's deferral; no push or release
+operation was performed.

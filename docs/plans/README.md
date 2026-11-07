@@ -9,8 +9,9 @@ references linked from the [documentation index](../README.md).
 ## Current plans
 
 - [Menu bar app implementation plan](menu-bar-app-implementation-plan.md):
-  implementation and acceptance-evidence tracking for accepted macOS app
-  specification revision 9, including remaining native Mac integration checks.
+  completed implementation for accepted macOS app specification revision 9;
+  remaining native Mac acceptance explicitly deferred by the owner on
+  November 7, 2026, with unverified checks retained in the plan.
 - [Distribution implementation plan](distribution-implementation-plan.md):
   repository implementation, protected release rollout, and acceptance-evidence
   tracking for the public-beta distribution capability. Read the plan record for
