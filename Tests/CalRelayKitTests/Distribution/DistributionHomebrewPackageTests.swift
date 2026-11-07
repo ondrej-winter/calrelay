@@ -7,6 +7,7 @@ enum DistributionHomebrewPackageTests {
         try testManifestSchemaRejectsUnexpectedFields()
         try testLifecycleValidationCoversCoexistenceUpgradeAndCleanup()
         try testLifecycleFailureCleansPackagesTapAndWorkDirectory()
+        try testLifecycleTrustFailureCleansTemporaryState()
     }
 
     private static func testVerifiedManifestRendersAtomicFormulaAndCask() throws {
@@ -101,6 +102,7 @@ enum DistributionHomebrewPackageTests {
         try expect(result.status == 0, "Fake-backed Homebrew lifecycle validation must succeed: \(result.output)")
         let log = try String(contentsOf: fixture.log, encoding: .utf8)
         for required in [
+            "trust --formula ondrej-winter/tap/calrelay", "trust --cask ondrej-winter/tap/calrelay",
             "style --formula ondrej-winter/tap/calrelay", "style --cask ondrej-winter/tap/calrelay",
             "audit --strict --formula --except=version ondrej-winter/tap/calrelay",
             "audit --strict --cask --except=sha256_no_check_if_unversioned ondrej-winter/tap/calrelay",
@@ -127,6 +129,10 @@ enum DistributionHomebrewPackageTests {
         let installedPackages = try fixture.installedPackages()
         try expect(retainedSentinel == fixture.sentinel, "Package operations must preserve user state")
         try expect(installedPackages.isEmpty, "Lifecycle validation must clean all installed test packages")
+        try fixture.assertUserTrustPreserved()
+        try expect(
+            !FileManager.default.fileExists(atPath: fixture.work.path),
+            "Successful validation must remove temporary trust")
     }
 
     private static func testLifecycleFailureCleansPackagesTapAndWorkDirectory() throws {
@@ -146,6 +152,25 @@ enum DistributionHomebrewPackageTests {
         try expect(log.contains("uninstall --force --formula"), "Failure cleanup must remove every temporary formula version")
         try expect(log.contains("uninstall --cask"), "Failure cleanup must remove the temporary cask")
         try expect(log.contains("untap ondrej-winter/tap"), "Failure cleanup must remove the temporary tap")
+        try fixture.assertUserTrustPreserved()
+    }
+
+    private static func testLifecycleTrustFailureCleansTemporaryState() throws {
+        let fixture = try HomebrewLifecycleFixture(failureCommandPrefix: "trust --cask ondrej-winter/tap/calrelay")
+        defer { fixture.remove() }
+
+        let result = try fixture.run()
+        let log = try String(contentsOf: fixture.log, encoding: .utf8)
+        let installedPackages = try fixture.installedPackages()
+        try expect(result.status != 0, "Failed package trust must fail validation")
+        try expect(
+            !log.contains("audit ") && !log.contains("install "), "Failed trust must stop before evaluating packages")
+        try expect(log.contains("untap ondrej-winter/tap"), "Failed trust must remove the temporary tap")
+        try expect(installedPackages.isEmpty, "Failed trust must not install packages")
+        try expect(
+            !FileManager.default.fileExists(atPath: fixture.work.path),
+            "Failed trust must remove partial temporary trust")
+        try fixture.assertUserTrustPreserved()
     }
 
     private static func expect(_ condition: @autoclosure () -> Bool, _ message: String) throws {
@@ -281,6 +306,10 @@ private final class HomebrewLifecycleFixture {
         }
         try Data(sentinel.utf8).write(to: state.appendingPathComponent("config.yaml"))
         try Data(sentinel.utf8).write(to: state.appendingPathComponent("app-state"))
+        let userTrust = root.appendingPathComponent("user-config/homebrew/trust.json")
+        try FileManager.default.createDirectory(
+            at: userTrust.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("USER-TRUST-SENTINEL".utf8).write(to: userTrust)
         try writeFakeBrew()
     }
 
@@ -292,6 +321,7 @@ private final class HomebrewLifecycleFixture {
         environment["CALRELAY_FAKE_BREW_FAILURE_COMMAND_PREFIX"] = failureCommandPrefix ?? ""
         environment["CALRELAY_FAKE_BREW_RETAIN_OLD_FORMULA"] = retainOldFormulaOnUpgrade ? "1" : ""
         environment["HOMEBREW_NO_INSTALL_CLEANUP"] = "1"
+        environment["XDG_CONFIG_HOME"] = root.appendingPathComponent("user-config").path
         return try Self.run(
             executable: "/usr/bin/env",
             arguments: [
@@ -315,6 +345,15 @@ private final class HomebrewLifecycleFixture {
         let directory = root.appendingPathComponent("installed")
         guard FileManager.default.fileExists(atPath: directory.path) else { return [] }
         return try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted()
+    }
+
+    func assertUserTrustPreserved() throws {
+        let config = root.appendingPathComponent("user-config/homebrew")
+        let trust = try String(contentsOf: config.appendingPathComponent("trust.json"), encoding: .utf8)
+        let files = try FileManager.default.contentsOfDirectory(atPath: config.path)
+        guard trust == "USER-TRUST-SENTINEL", files == ["trust.json"] else {
+            throw TestFailure("Homebrew validation must leave the caller's trust store unchanged")
+        }
     }
 
     func remove() { try? FileManager.default.removeItem(at: root) }
@@ -341,7 +380,21 @@ private final class HomebrewLifecycleFixture {
         for argument in "$@"; do
           [ "$argument" = "--cask" ] && kind=cask
         done
+        trust_directory="$XDG_CONFIG_HOME/homebrew"
         case "$command" in
+          audit|fetch|install|reinstall|upgrade|test)
+            [ -f "$trust_directory/trusted-$kind" ] || {
+              printf 'Refusing to load %s from untrusted tap ondrej-winter/tap\\n' "$kind" >&2
+              exit 1
+            }
+            ;;
+        esac
+        case "$command" in
+          trust)
+            [ "$*" = "--$kind ondrej-winter/tap/calrelay" ] || exit 64
+            mkdir -p "$trust_directory"
+            : > "$trust_directory/trusted-$kind"
+            ;;
           install|reinstall)
             : > "$CALRELAY_FAKE_BREW_STATE/$kind-current"
             ;;

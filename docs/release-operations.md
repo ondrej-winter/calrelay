@@ -142,6 +142,15 @@ release commit and tag from `source.bundle`, validates that restored commit in
 receives the matching validated revision. The protected job does not rerun source
 gates. Matching published state is accepted; mismatched state fails closed.
 
+If Homebrew audit refuses to load the temporary tap as untrusted, use the reviewed
+validator that grants formula- and cask-specific trust in a temporary configuration
+directory, then resume the original retained candidate. Resumption stages the
+current reviewed validator before restoring the retained source. Do not disable
+Homebrew trust checks or rebuild already published artifacts. Run `42405243068`
+reached immutable publication for `1.4.0` before this audit failure; its retained
+candidate requires this resumption path after the validator fix is available in
+the workflow revision.
+
 If later immutable source tags exist, an already-published retained candidate may
 still re-observe its exact tag and assets and continue to tap publication. This is
 not permission to publish a fresh stale source: an older candidate whose tag is

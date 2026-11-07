@@ -34,7 +34,10 @@ function main(arguments_) {
     : null;
   const workDirectory = resolve(required(options, "work-directory"));
   const stateDirectory = resolve(required(options, "state-directory"));
-  const brew = resolve(required(options, "brew"));
+  const brew = {
+    executable: resolve(required(options, "brew")),
+    configDirectory: join(workDirectory, "homebrew-config"),
+  };
 
   validatePackageDirectory(packagesDirectory, "current");
   if (previousPackagesDirectory) {
@@ -67,6 +70,8 @@ function main(arguments_) {
     }
 
     stagePackages(tapCheckout, packagesDirectory);
+    run(brew, ["trust", "--formula", token]);
+    run(brew, ["trust", "--cask", token]);
     run(brew, ["style", "--formula", token]);
     run(brew, ["style", "--cask", token]);
     run(brew, ["audit", "--strict", "--formula", "--except=version", token]);
@@ -197,23 +202,23 @@ function assertNotInstalled(brew, kind) {
 }
 
 function isInstalled(brew, kind) {
-  const result = spawnSync(brew, ["list", "--versions", `--${kind}`, packageToken], processOptions());
+  const result = spawnSync(brew.executable, ["list", "--versions", `--${kind}`, packageToken], processOptions(brew));
   if (result.error) throw result.error;
   return result.status === 0;
 }
 
-function run(executable, arguments_) {
-  const result = spawnSync(executable, arguments_, processOptions());
+function run(brew, arguments_) {
+  const result = spawnSync(brew.executable, arguments_, processOptions(brew));
   if (result.error) throw result.error;
   if (result.status !== 0) {
     const details = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim();
-    throw new Error(`${executable} ${arguments_.join(" ")} failed${details ? `: ${details}` : ""}.`);
+    throw new Error(`${brew.executable} ${arguments_.join(" ")} failed${details ? `: ${details}` : ""}.`);
   }
   return result.stdout ?? "";
 }
 
-function runForCleanup(executable, arguments_) {
-  spawnSync(executable, arguments_, processOptions());
+function runForCleanup(brew, arguments_) {
+  spawnSync(brew.executable, arguments_, processOptions(brew));
 }
 
 function git(repository, arguments_) {
@@ -224,7 +229,7 @@ function git(repository, arguments_) {
   });
 }
 
-function processOptions() {
+function processOptions(brew) {
   const environment = { ...process.env };
   delete environment.HOMEBREW_NO_INSTALL_CLEANUP;
   return {
@@ -234,6 +239,8 @@ function processOptions() {
       HOMEBREW_NO_AUTO_UPDATE: "1",
       HOMEBREW_NO_ANALYTICS: "1",
       HOMEBREW_NO_ENV_HINTS: "1",
+      // Keep item trust temporary, including during cleanup; never alter the caller's trust store.
+      XDG_CONFIG_HOME: brew.configDirectory,
     },
   };
 }

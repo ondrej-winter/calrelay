@@ -225,7 +225,11 @@ node scripts/release/generate-homebrew-packages.mjs \
 
 The protected release workflow runs real Homebrew `style`, `audit`, `fetch`,
 install, test, upgrade, reinstall, coexistence, and ordinary uninstall checks on
-the clean Apple Silicon release environment. The deterministic local equivalents
+the clean Apple Silicon release environment. The validator explicitly trusts only
+the CalRelay formula and cask before auditing them. Every Homebrew subprocess uses
+an isolated `XDG_CONFIG_HOME` beneath the temporary validation work directory;
+cleanup removes that trust on success or failure without changing the caller's
+trust store. The deterministic local equivalents
 and release orchestration fixtures run with:
 
 ```sh
